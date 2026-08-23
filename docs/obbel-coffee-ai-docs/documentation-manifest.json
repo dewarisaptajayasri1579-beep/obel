@@ -1,0 +1,188 @@
+{
+  "project": "Obbel Coffee & Milk — Stock, Sales & Booth Monitoring Platform",
+  "documentation_version": "1.1",
+  "focus": "Data consistency, transaction revision/cancellation, stock opname, reconciliation",
+  "generated_at": "2026-08-23T20:32:00+07:00",
+  "files": [
+    {
+      "path": "00-README.md",
+      "size": 4786,
+      "sha256": "6755383513024f15bd6d88df6bf5768499f19cd368af4b6b353b1146c5e45e50"
+    },
+    {
+      "path": "01-project-overview.md",
+      "size": 3995,
+      "sha256": "384109b6e6ab9e017245dca62ccd0f50ed497a33df743e676f8e2703219deccc"
+    },
+    {
+      "path": "02-system-architecture.md",
+      "size": 4081,
+      "sha256": "5b45336239d4d3613f3ead05d9fa139d984e4830953eb94202a88f0830a5e0f9"
+    },
+    {
+      "path": "03-users-roles-permissions.md",
+      "size": 3580,
+      "sha256": "b92ee255157fa0d7681ad3a682abeb77f8bf0d500b741e93a9904f8266067caf"
+    },
+    {
+      "path": "04-user-flow.md",
+      "size": 4395,
+      "sha256": "e07b3ce6f5d8122d69c42779b67efe153e4bbc5150803320b9dfe21b27357bfc"
+    },
+    {
+      "path": "05-feature-specification.md",
+      "size": 5377,
+      "sha256": "748fb46a66ef5d62eb7b129cd9e450eb1e3b3c02778e5902e46abb6c7731ae4e"
+    },
+    {
+      "path": "06-ui-ux-guideline.md",
+      "size": 3916,
+      "sha256": "cc5acbc6ad8ec2b866177113c69dd4feef0467a57b5915c074352fc73faa9add"
+    },
+    {
+      "path": "07-database-schema.md",
+      "size": 11052,
+      "sha256": "b98abe75442484abe1ae17b86aa9971c0fc64d02dce6271e34cf36ae83cf39d3"
+    },
+    {
+      "path": "08-business-rules.md",
+      "size": 7917,
+      "sha256": "13b8322ed1ee5cdbfe7e13f96e2d2c238cc39782958190cd9c3a767d6d38ff2e"
+    },
+    {
+      "path": "09-api-rpc-contract.md",
+      "size": 5096,
+      "sha256": "316d99df0ada90d90f1a8002aa68e0a93071d64e0fdc84a7992c795accda2a4d"
+    },
+    {
+      "path": "10-state-machines.md",
+      "size": 1864,
+      "sha256": "f4e4120698c7c4e7cbac4fc21d9fd780d540757e985acd174be8cf29384e3660"
+    },
+    {
+      "path": "11-notification-printing-offline.md",
+      "size": 2126,
+      "sha256": "df671c72a721cde84cde7824e88c199f1a8d391152e7e2e6488db829107e3fbe"
+    },
+    {
+      "path": "12-reporting-dashboard.md",
+      "size": 3251,
+      "sha256": "3a899baa0888270475c7ff7d46ee332bda54bb90989abaaebc3b3192ea9def35"
+    },
+    {
+      "path": "13-security-audit.md",
+      "size": 2413,
+      "sha256": "1b5c4b384469110a7002a27816d6250a95c6561e9b49d26eb2873b240e491edd"
+    },
+    {
+      "path": "14-development-guideline.md",
+      "size": 2962,
+      "sha256": "f39ec436d86f76d41581fb79a124fbd516577cf4e48fb5ffb6af668e7ac8bbf7"
+    },
+    {
+      "path": "15-testing-acceptance-criteria.md",
+      "size": 5537,
+      "sha256": "085fde2a6f2c719a78f2aca26f118978fe79785aef1eaf2a9ee2973a6ffc7f7f"
+    },
+    {
+      "path": "16-seed-dummy-data.md",
+      "size": 2441,
+      "sha256": "4202e724d5aad98a3104f777a5e3356a5f4503ae3669f0af482468978b350b07"
+    },
+    {
+      "path": "17-deployment-environment.md",
+      "size": 1447,
+      "sha256": "5b0f019ea8c31ba9626202b53e147f6782c40589657961bfe17feadd70c4a3e2"
+    },
+    {
+      "path": "18-ai-agent-implementation-plan.md",
+      "size": 3221,
+      "sha256": "c077ba683007361b5e1629c2bda80c8aec372b01b093f9dd38ece009370d9250"
+    },
+    {
+      "path": "19-requirement-traceability.md",
+      "size": 2544,
+      "sha256": "1f6516f74bf39a57d228d1ffff88eab643425e02a0d00a8260ef6dd23f999029"
+    },
+    {
+      "path": "20-starter-schema.sql",
+      "size": 8819,
+      "sha256": "334d2b99082d1700f7ba1b714731d59a2dbba91d56e34ee7a3ee575c70672710"
+    },
+    {
+      "path": "21-screen-route-map.md",
+      "size": 3064,
+      "sha256": "6f2b2c1b8338fbdac5a357baa3c922c866b8ae8cb629562fba66a068a97bd6bf"
+    },
+    {
+      "path": "22-mermaid-diagrams.md",
+      "size": 3911,
+      "sha256": "e825bcaf97656d9cb9ed320205a3e8ff9f9dc2a7aacb7e2de5629baa8cd2b3e4"
+    },
+    {
+      "path": "23-open-decisions.md",
+      "size": 3261,
+      "sha256": "5bab314e018cbaa772b49bb0e69006e00153dd383b31f1e7c23fb6c1c8cf7e2a"
+    },
+    {
+      "path": "24-data-consistency-correction-reversal.md",
+      "size": 30501,
+      "sha256": "1a998d02006ff22b5e0fc877f92af3cfe9dfac54ab467605fee49f9c62599164"
+    },
+    {
+      "path": "25-transaction-impact-matrix.md",
+      "size": 4777,
+      "sha256": "afb4e212924d6eaf8cb85db6332e8d258f626d2ba442bf2dae081ee98e7993c2"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 3471,
+      "sha256": "5120a3ce2c9d15fd67f67ea0face2f52bc71538a4fccf9b7226d6844388cbc62"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 716,
+      "sha256": "d846c6732b6cdac0a59e66b2e37e6e6acfc2eb9d7b340a5d89e797c70e06a812"
+    },
+    {
+      "path": "DATA-CONSISTENCY-SPECIFICATION.md",
+      "size": 30501,
+      "sha256": "1a998d02006ff22b5e0fc877f92af3cfe9dfac54ab467605fee49f9c62599164"
+    },
+    {
+      "path": "OBBEL-MASTER-SPECIFICATION.md",
+      "size": 141348,
+      "sha256": "fce18db7f6aee161f865c4f958bc5d4585594bc401706c0d07d052834e21ca2c"
+    },
+    {
+      "path": "references/01-android-petugas-booth-mockup.png",
+      "size": 1545920,
+      "sha256": "baf77debed78c3cb9776c22e78348742a290ba924be58e62f89cd0e05d5a4b84"
+    },
+    {
+      "path": "references/02-web-admin-pusat-mockup.png",
+      "size": 1546719,
+      "sha256": "3e7000d202b85dc8050c3163ec60f270687760c7485d3519b8a3cde08ed25ece"
+    },
+    {
+      "path": "references/03-android-owner-mockup.png",
+      "size": 1769922,
+      "sha256": "113f1a1b324bf1018d388a4d34a312dd46ee9072a49d92906363cece62f36000"
+    },
+    {
+      "path": "references/04-instagram-profile-reference.png",
+      "size": 268370,
+      "sha256": "5d8d5a6587e374d76259ece311d7e67ab350bd373c242d0bbefd340b0a559479"
+    },
+    {
+      "path": "references/05-menu-reference.png",
+      "size": 1365168,
+      "sha256": "92d9c4b481cf53a218653f4c6ff3bb59cd2e3aa537075ab36d38cc8cba799697"
+    },
+    {
+      "path": "references/06-location-reference.png",
+      "size": 2008456,
+      "sha256": "3188d0619d52d5402505d5718f67da386f3aec42a2dc8c89c6caed2743824b05"
+    }
+  ]
+}
