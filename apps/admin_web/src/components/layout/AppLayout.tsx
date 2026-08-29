@@ -1,0 +1,72 @@
+"use client";
+
+import React, { useState } from "react";
+import { Sidebar } from "./Sidebar";
+import { Header } from "./Header";
+import { HorizontalMenu } from "./HorizontalMenu";
+import { BottomBar } from "./BottomBar";
+import { CommandPalette } from "./CommandPalette";
+import { MotivationalQuote } from "../ui/MotivationalQuote";
+import { APP_CONFIG } from "@/lib/app-config";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+
+export interface AppLayoutProps {
+  children: React.ReactNode;
+  userName: string;
+  userRole: string;
+}
+
+export const AppLayout: React.FC<AppLayoutProps> = ({ children, userName, userRole }) => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const { navLayout } = usePreferences();
+  const isHorizontal = navLayout === "horizontal";
+
+  return (
+    <div className="app-shell min-h-screen bg-app-mesh text-slate-800 dark:text-fg font-sans flex relative overflow-x-clip">
+      <div className="no-print dark:hidden fixed -top-40 -left-40 w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+      <div className="no-print dark:hidden fixed -bottom-40 -right-40 w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+
+      {!isHorizontal && (
+        <div className="no-print contents">
+          <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed((p) => !p)} />
+        </div>
+      )}
+
+      <div
+        className={`app-shell-content flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+          isHorizontal ? "" : isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64"
+        }`}
+      >
+        <div className="no-print contents">
+          <Header
+            userName={userName}
+            userRole={userRole}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebarCollapse={isHorizontal ? undefined : () => setIsSidebarCollapsed((p) => !p)}
+          />
+        </div>
+
+        {isHorizontal && (
+          <div className="no-print contents">
+            <HorizontalMenu />
+          </div>
+        )}
+
+        <main className="app-shell-main flex-1 p-4 sm:p-6 lg:p-8 pb-28 lg:pb-8 relative z-10 max-w-7xl w-full mx-auto">
+          {children}
+        </main>
+
+        <footer className="no-print hidden lg:flex flex-col items-center gap-1 py-4 px-6 text-center text-xs text-slate-500 dark:text-fg-muted font-semibold border-t border-slate-200/60 dark:border-line z-10">
+          <MotivationalQuote />
+          <p>&copy; {new Date().getFullYear()} {APP_CONFIG.name} — {APP_CONFIG.tagline}.</p>
+        </footer>
+      </div>
+
+      <div className="no-print contents">
+        <BottomBar />
+      </div>
+
+      <CommandPalette />
+    </div>
+  );
+};

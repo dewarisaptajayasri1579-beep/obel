@@ -1,0 +1,33 @@
+{
+  "name": "obbel-admin-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web PWA Admin Pusat Obbel Coffee & Milk (Next.js + Tailwind, komponen UI diambil dari template internal, data lewat Backend API NestJS)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "lucide-react": "^0.475.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.6",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "eslint": "^9",
+    "eslint-config-next": "^15.1.6",
+    "postcss": "^8.5",
+    "tailwindcss": "^4.0.6",
+    "typescript": "^5.7.3"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
+  }
+}
