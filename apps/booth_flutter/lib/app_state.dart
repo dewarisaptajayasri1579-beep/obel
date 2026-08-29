@@ -277,4 +277,36 @@ class AppState extends ChangeNotifier {
       [{'productId': product.id, 'qty': qty}],
     );
   }
+
+  /// Memanggil POST /shifts/:id/closing/start (get_expected_stock snapshot).
+  Future<List<ClosingCountItem>> startShiftClosing() async {
+    if (_token == null || shiftSessionId == null) {
+      throw ApiException('SHIFT_NOT_OPEN', 'Shift tidak ditemukan, silakan login ulang.');
+    }
+    final result = await _api.startShiftClosing(_token!, shiftSessionId!);
+    return (result['items'] as List<dynamic>).map((raw) {
+      final item = raw as Map<String, dynamic>;
+      return ClosingCountItem(
+        productId: item['productId'] as String,
+        productName: item['productName'] as String,
+        expectedQty: item['expectedQty'] as int,
+        actualQty: item['actualQty'] as int,
+      );
+    }).toList();
+  }
+
+  /// Memanggil POST /shifts/:id/closing/confirm. Server yang menyesuaikan
+  /// booth_stocks ke actual & menutup shift (BR-011/BR-012).
+  Future<void> confirmShiftClosing(List<ClosingCountItem> items) async {
+    if (_token == null || shiftSessionId == null) return;
+    await _api.confirmShiftClosing(
+      _token!,
+      shiftSessionId!,
+      items.map((i) => {
+            'productId': i.productId,
+            'actualQty': i.actualQty,
+            if (i.reasonCode != null) 'reasonCode': i.reasonCode,
+          }).toList(),
+    );
+  }
 }

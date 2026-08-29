@@ -69,6 +69,22 @@ class ApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> startShiftClosing(String token, String shiftSessionId) {
+    return _post('/shifts/$shiftSessionId/closing/start', token: token);
+  }
+
+  Future<Map<String, dynamic>> confirmShiftClosing(
+    String token,
+    String shiftSessionId,
+    List<Map<String, dynamic>> items,
+  ) {
+    return _post(
+      '/shifts/$shiftSessionId/closing/confirm',
+      token: token,
+      body: {'items': items},
+    );
+  }
+
   Future<Map<String, dynamic>> createSale(
     String token, {
     required String idempotencyKey,

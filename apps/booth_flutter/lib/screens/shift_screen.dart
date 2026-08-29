@@ -162,14 +162,7 @@ class ShiftScreen extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ObbelTheme.primaryDark,
                       ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Menutup Shift. Melakukan Physical Count...'),
-                            backgroundColor: ObbelTheme.primaryDark,
-                          ),
-                        );
-                      },
+                      onPressed: () => Navigator.of(context).pushNamed('/closing'),
                       child: const Text('TUTUP SHIFT'),
                     ),
                   ),

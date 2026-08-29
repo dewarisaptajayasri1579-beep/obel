@@ -78,6 +78,13 @@ enum RestockRequestStatus {
   @@map("restock_request_status")
 }
 
+enum StockCountStatus {
+  DRAFT
+  CONFIRMED
+
+  @@map("stock_count_status")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -115,6 +122,7 @@ model Profile {
   receivedDistributions StockDistribution[] @relation("DistributionReceivedBy")
   requestedRestocks    RestockRequest[]    @relation("RestockRequestedBy")
   approvedRestocks     RestockRequest[]    @relation("RestockApprovedBy")
+  countedStockCounts   ShiftStockCount[]
 
   @@index([role])
   @@index([defaultBoothId])
@@ -151,6 +159,7 @@ model Product {
   warehouseStock     WarehouseStock?
   distributionItems  StockDistributionItem[]
   restockRequestItems RestockRequestItem[]
+  stockCountItems     ShiftStockCountItem[]
 
   @@index([categoryId])
   @@index([active])
@@ -187,7 +196,8 @@ model ShiftSession {
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  sales Sale[]
+  sales      Sale[]
+  stockCount ShiftStockCount?
 
   @@index([staffId, status])
   @@index([boothId, status])
@@ -380,4 +390,37 @@ model RestockRequestItem {
   @@unique([restockRequestId, productId])
   @@index([productId])
   @@map("restock_request_items")
+}
+
+model ShiftStockCount {
+  id             String            @id @default(uuid())
+  shiftSessionId String            @unique @map("shift_session_id")
+  shiftSession   ShiftSession      @relation(fields: [shiftSessionId], references: [id])
+  status         StockCountStatus  @default(DRAFT)
+  countedById    String            @map("counted_by")
+  countedBy      Profile           @relation(fields: [countedById], references: [id])
+  countedAt      DateTime          @default(now()) @map("counted_at")
+  confirmedAt    DateTime?         @map("confirmed_at")
+  note           String?
+
+  items ShiftStockCountItem[]
+
+  @@map("shift_stock_counts")
+}
+
+model ShiftStockCountItem {
+  id             String          @id @default(uuid())
+  stockCountId   String          @map("stock_count_id")
+  stockCount     ShiftStockCount @relation(fields: [stockCountId], references: [id])
+  productId      String          @map("product_id")
+  product        Product         @relation(fields: [productId], references: [id])
+  expectedQty    Int             @map("expected_qty")
+  actualQty      Int             @map("actual_qty")
+  discrepancyQty Int             @default(0) @map("discrepancy_qty")
+  reasonCode     String?         @map("reason_code")
+  reasonNote     String?         @map("reason_note")
+
+  @@unique([stockCountId, productId])
+  @@index([productId])
+  @@map("shift_stock_count_items")
 }

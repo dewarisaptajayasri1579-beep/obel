@@ -1,6 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ShiftStatus } from '@prisma/client';
+import { ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DomainError } from '../../common/domain-error';
+import { generateDocNo } from '../../common/doc-no';
+import { JwtPayload } from '../auth/jwt-payload.interface';
+import { ConfirmClosingDto } from './dto/confirm-closing.dto';
+
+function businessDateOf(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
 
 @Injectable()
 export class ShiftsService {
@@ -29,6 +38,199 @@ export class ShiftsService {
       status: shift.status,
       scheduledStartAt: shift.scheduledStartAt,
       scheduledEndAt: shift.scheduledEndAt,
+    };
+  }
+
+  private async loadOwnedShift(shiftSessionId: string, user: JwtPayload) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId } });
+    if (!shift) {
+      throw new DomainError('NOT_FOUND', 'Shift tidak ditemukan.');
+    }
+    if (user.role === UserRole.BOOTH_STAFF && shift.staffId !== user.sub) {
+      throw new DomainError('UNAUTHORIZED_BOOTH', 'Shift ini bukan milik user yang login.');
+    }
+    return shift;
+  }
+
+  /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
+  /// "expected", lalu ubah shift ke CLOSING. Idempotent — kalau closing
+  /// draft sudah ada, kembalikan yang itu (bukan bikin snapshot baru).
+  async startClosing(shiftSessionId: string, user: JwtPayload) {
+    const shift = await this.loadOwnedShift(shiftSessionId, user);
+
+    const existing = await this.prisma.shiftStockCount.findUnique({
+      where: { shiftSessionId },
+      include: { items: { include: { product: true } } },
+    });
+    if (existing) {
+      return this.toClosingResponse(existing);
+    }
+
+    if (shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk memulai closing.');
+    }
+
+    const boothStocks = await this.prisma.boothStock.findMany({
+      where: { boothId: shift.boothId },
+      include: { product: true },
+    });
+
+    const count = await this.prisma.$transaction(async (tx) => {
+      await tx.shiftSession.update({
+        where: { id: shiftSessionId },
+        data: { status: ShiftStatus.CLOSING, closingStartedAt: new Date() },
+      });
+
+      return tx.shiftStockCount.create({
+        data: {
+          shiftSessionId,
+          countedById: user.sub,
+          status: StockCountStatus.DRAFT,
+          items: {
+            createMany: {
+              data: boothStocks.map((s) => ({
+                productId: s.productId,
+                expectedQty: s.qtyOnHand,
+                actualQty: s.qtyOnHand,
+              })),
+            },
+          },
+        },
+        include: { items: { include: { product: true } } },
+      });
+    });
+
+    return this.toClosingResponse(count);
+  }
+
+  /// Mirrors confirm_shift_closing (§09): item dengan selisih wajib
+  /// reason_code (BR-011), lalu Booth stock disesuaikan ke actual lewat
+  /// movement ADJUSTMENT (BR-012) dan shift ditutup.
+  async confirmClosing(shiftSessionId: string, dto: ConfirmClosingDto, user: JwtPayload) {
+    const shift = await this.loadOwnedShift(shiftSessionId, user);
+
+    const count = await this.prisma.shiftStockCount.findUnique({
+      where: { shiftSessionId },
+      include: { items: true },
+    });
+    if (!count) {
+      throw new DomainError('CLOSING_NOT_STARTED', 'Closing belum dimulai untuk shift ini.');
+    }
+    if (count.status === StockCountStatus.CONFIRMED) {
+      return this.toClosingResponse(
+        (await this.prisma.shiftStockCount.findUnique({
+          where: { shiftSessionId },
+          include: { items: { include: { product: true } } },
+        }))!,
+      );
+    }
+    if (shift.status !== ShiftStatus.CLOSING) {
+      throw new DomainError('SHIFT_NOT_CLOSING', 'Shift ini tidak sedang dalam proses closing.');
+    }
+
+    const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));
+    for (const item of count.items) {
+      const input = inputByProduct.get(item.productId);
+      if (!input) continue;
+      if (input.actualQty !== item.expectedQty && !input.reasonCode) {
+        throw new DomainError(
+          'DISCREPANCY_REASON_REQUIRED',
+          'Alasan wajib diisi untuk produk dengan selisih stok.',
+          { productId: item.productId },
+        );
+      }
+    }
+
+    const closedAt = new Date();
+    const businessDate = businessDateOf(closedAt);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of count.items) {
+        const input = inputByProduct.get(item.productId);
+        const actualQty = input?.actualQty ?? item.expectedQty;
+        const discrepancyQty = actualQty - item.expectedQty;
+
+        await tx.shiftStockCountItem.update({
+          where: { id: item.id },
+          data: {
+            actualQty,
+            discrepancyQty,
+            reasonCode: input?.reasonCode,
+            reasonNote: input?.reasonNote,
+          },
+        });
+
+        if (discrepancyQty !== 0) {
+          await tx.boothStock.update({
+            where: { boothId_productId: { boothId: shift.boothId, productId: item.productId } },
+            data: { qtyOnHand: actualQty, version: { increment: 1 } },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              movementNo: generateDocNo('ADJ'),
+              movementType: StockMovementType.ADJUSTMENT,
+              productId: item.productId,
+              qty: Math.abs(discrepancyQty),
+              fromBoothId: discrepancyQty < 0 ? shift.boothId : null,
+              toBoothId: discrepancyQty > 0 ? shift.boothId : null,
+              referenceType: 'shift_closing',
+              referenceId: count.id,
+              shiftSessionId,
+              businessDate,
+              occurredAt: closedAt,
+              createdBy: user.sub,
+              note: input?.reasonNote ?? input?.reasonCode ?? 'Selisih closing shift',
+            },
+          });
+        }
+      }
+
+      await tx.shiftStockCount.update({
+        where: { id: count.id },
+        data: { status: StockCountStatus.CONFIRMED, confirmedAt: closedAt },
+      });
+
+      await tx.shiftSession.update({
+        where: { id: shiftSessionId },
+        data: { status: ShiftStatus.CLOSED, closedAt },
+      });
+    });
+
+    const final = await this.prisma.shiftStockCount.findUnique({
+      where: { shiftSessionId },
+      include: { items: { include: { product: true } } },
+    });
+    return this.toClosingResponse(final!);
+  }
+
+  private toClosingResponse(count: {
+    id: string;
+    shiftSessionId: string;
+    status: StockCountStatus;
+    confirmedAt: Date | null;
+    items: {
+      productId: string;
+      product: { name: string };
+      expectedQty: number;
+      actualQty: number;
+      discrepancyQty: number;
+      reasonCode: string | null;
+    }[];
+  }) {
+    return {
+      id: count.id,
+      shiftSessionId: count.shiftSessionId,
+      status: count.status,
+      confirmedAt: count.confirmedAt,
+      items: count.items.map((item) => ({
+        productId: item.productId,
+        productName: item.product.name,
+        expectedQty: item.expectedQty,
+        actualQty: item.actualQty,
+        discrepancyQty: item.discrepancyQty,
+        reasonCode: item.reasonCode,
+      })),
     };
   }
 }

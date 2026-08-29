@@ -38,6 +38,24 @@ class InboundItem {
   });
 }
 
+class ClosingCountItem {
+  final String productId;
+  final String productName;
+  final int expectedQty;
+  int actualQty;
+  String? reasonCode;
+
+  ClosingCountItem({
+    required this.productId,
+    required this.productName,
+    required this.expectedQty,
+    required this.actualQty,
+    this.reasonCode,
+  });
+
+  int get discrepancy => actualQty - expectedQty;
+}
+
 class BoothStock {
   final Product product;
   int currentQty;
