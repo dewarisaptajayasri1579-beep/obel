@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DistributionStatus, RestockRequestStatus, ReturnStatus, SaleStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
-
-const LOW_STOCK_THRESHOLD = 25;
+import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
 
 @Injectable()
 export class DashboardService {
@@ -15,18 +14,27 @@ export class DashboardService {
   async getAdminDashboard() {
     const todayStart = startOfTodayJakarta();
 
-    const [salesToday, activeBoothsCount, lowStockCount, pendingDistributions, pendingRestock, pendingReturns] =
+    const [salesToday, activeBoothsCount, boothStocks, thresholds, pendingDistributions, pendingRestock, pendingReturns] =
       await Promise.all([
         this.prisma.sale.findMany({
           where: { status: SaleStatus.PAID, paidAt: { gte: todayStart } },
           include: { items: true },
         }),
         this.prisma.shiftSession.count({ where: { status: ShiftStatus.OPEN } }),
-        this.prisma.boothStock.count({ where: { qtyOnHand: { lte: LOW_STOCK_THRESHOLD } } }),
+        this.prisma.boothStock.findMany(),
+        this.prisma.boothStockThreshold.findMany(),
         this.prisma.stockDistribution.count({ where: { status: DistributionStatus.SENT } }),
         this.prisma.restockRequest.count({ where: { status: RestockRequestStatus.REQUESTED } }),
         this.prisma.stockReturn.count({ where: { status: ReturnStatus.SUBMITTED } }),
       ]);
+
+    const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
+    const lowStockCount = boothStocks.filter((s) => {
+      const threshold = thresholdByKey.get(`${s.boothId}:${s.productId}`);
+      const minimumQty = threshold?.minimumQty ?? DEFAULT_MINIMUM_QTY;
+      const criticalQty = threshold?.criticalQty ?? DEFAULT_CRITICAL_QTY;
+      return resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty) !== 'Aman';
+    }).length;
 
     const omzetToday = salesToday.reduce((sum, s) => sum + Number(s.total), 0);
     const cupSoldToday = salesToday.reduce(

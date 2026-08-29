@@ -57,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "Produk", href: "/master/produk" },
           { label: "Booth", href: "/master/booth" },
           { label: "Shift", href: "/master/shift" },
+          { label: "Threshold Stok Booth", href: "/master/threshold" },
           { label: "User", href: "/master/user" },
         ],
       },

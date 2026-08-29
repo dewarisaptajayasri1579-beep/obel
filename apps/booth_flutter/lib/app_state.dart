@@ -4,16 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'api_client.dart';
 import 'models.dart';
 
-const _minimumQty = 25;
-const _criticalQty = 10;
 const _uuid = Uuid();
-
-String _statusFor(int qty) {
-  if (qty <= 0) return 'Habis';
-  if (qty <= _criticalQty) return 'Kritis';
-  if (qty <= _minimumQty) return 'Menipis';
-  return 'Aman';
-}
 
 String _fmtTime(DateTime dt) =>
     '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')}';
@@ -165,8 +156,9 @@ class AppState extends ChangeNotifier {
         imagePath: '',
       );
       final qty = map['qtyOnHand'] as int;
+      final status = map['status'] as String;
       products.add(product);
-      stocks.add(BoothStock(product: product, currentQty: qty, status: _statusFor(qty)));
+      stocks.add(BoothStock(product: product, currentQty: qty, status: status));
     }
 
     catalog = products;

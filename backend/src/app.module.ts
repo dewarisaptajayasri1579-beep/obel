@@ -15,6 +15,8 @@ import { ReturnsModule } from './modules/returns/returns.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { BoothStockThresholdsModule } from './modules/booth-stock-thresholds/booth-stock-thresholds.module';
+import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ReportsModule } from './modules/reports/reports.module';
     DashboardModule,
     BoothStockModule,
     ReportsModule,
+    BoothStockThresholdsModule,
+    ShiftTemplatesModule,
   ],
 })
 export class AppModule {}

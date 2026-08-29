@@ -204,6 +204,22 @@ export interface RestockRequest {
   distribution: { id: string; distributionNo: string; status: string } | null
 }
 
+export interface ShiftTemplate {
+  id: string
+  name: string
+  startTime: string
+  endTime: string
+  active: boolean
+}
+
+export interface BoothStockThreshold {
+  productId: string
+  productName: string
+  minimumQty: number
+  criticalQty: number
+  isCustomized: boolean
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<LoginResponse>("/auth/login", { method: "POST", body: { username, password } }),
@@ -255,4 +271,19 @@ export const api = {
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
   getSales: () => request<SaleListItem[]>("/sales"),
+
+  getShiftTemplates: () => request<ShiftTemplate[]>("/shift-templates"),
+  createShiftTemplate: (input: { name: string; startTime: string; endTime: string }) =>
+    request<ShiftTemplate>("/shift-templates", { method: "POST", body: input }),
+
+  getBoothStockThresholds: (boothId: string) =>
+    request<BoothStockThreshold[]>(`/booth-stock-thresholds?boothId=${boothId}`),
+  bulkUpsertBoothStockThresholds: (
+    boothId: string,
+    items: { productId: string; minimumQty: number; criticalQty: number }[],
+  ) =>
+    request<BoothStockThreshold[]>("/booth-stock-thresholds/bulk", {
+      method: "POST",
+      body: { boothId, items },
+    }),
 }

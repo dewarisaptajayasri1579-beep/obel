@@ -1,15 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-
-const MINIMUM_QTY = 25;
-const CRITICAL_QTY = 10;
-
-function statusFor(qty: number): string {
-  if (qty <= 0) return 'Habis';
-  if (qty <= CRITICAL_QTY) return 'Kritis';
-  if (qty <= MINIMUM_QTY) return 'Menipis';
-  return 'Aman';
-}
+import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
 
 @Injectable()
 export class BoothStockService {
@@ -18,18 +9,27 @@ export class BoothStockService {
   /// Monitor Stok Booth (05-feature-specification.md §B5) — lintas semua
   /// Booth, dipakai Admin/Owner untuk melihat matrix stok.
   async findAll() {
-    const stocks = await this.prisma.boothStock.findMany({
-      include: { booth: true, product: true },
-      orderBy: [{ booth: { name: 'asc' } }, { product: { sortOrder: 'asc' } }],
-    });
+    const [stocks, thresholds] = await Promise.all([
+      this.prisma.boothStock.findMany({
+        include: { booth: true, product: true },
+        orderBy: [{ booth: { name: 'asc' } }, { product: { sortOrder: 'asc' } }],
+      }),
+      this.prisma.boothStockThreshold.findMany(),
+    ]);
+    const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
 
-    return stocks.map((s) => ({
-      boothId: s.boothId,
-      boothName: s.booth.name,
-      productId: s.productId,
-      productName: s.product.name,
-      qtyOnHand: s.qtyOnHand,
-      status: statusFor(s.qtyOnHand),
-    }));
+    return stocks.map((s) => {
+      const threshold = thresholdByKey.get(`${s.boothId}:${s.productId}`);
+      const minimumQty = threshold?.minimumQty ?? DEFAULT_MINIMUM_QTY;
+      const criticalQty = threshold?.criticalQty ?? DEFAULT_CRITICAL_QTY;
+      return {
+        boothId: s.boothId,
+        boothName: s.booth.name,
+        productId: s.productId,
+        productName: s.product.name,
+        qtyOnHand: s.qtyOnHand,
+        status: resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty),
+      };
+    });
   }
 }

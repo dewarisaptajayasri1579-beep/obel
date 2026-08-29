@@ -110,6 +110,7 @@ model Booth {
   distributions   StockDistribution[]
   restockRequests RestockRequest[]
   stockReturns    StockReturn[]
+  stockThresholds BoothStockThreshold[]
 
   @@map("booths")
 }
@@ -173,10 +174,28 @@ model Product {
   restockRequestItems RestockRequestItem[]
   stockCountItems     ShiftStockCountItem[]
   stockReturnItems    StockReturnItem[]
+  stockThresholds     BoothStockThreshold[]
 
   @@index([categoryId])
   @@index([active])
   @@map("products")
+}
+
+/// Ambang stok per Booth-produk — AGENTS.md eksplisit melarang hardcode
+/// "minimum stok per produk per Booth". Baris yang belum diisi Admin
+/// dianggap memakai default (lihat DEFAULT_MINIMUM_QTY/DEFAULT_CRITICAL_QTY
+/// di booth-stock-thresholds.service.ts), bukan berarti stok selalu aman.
+model BoothStockThreshold {
+  boothId     String  @map("booth_id")
+  booth       Booth   @relation(fields: [boothId], references: [id])
+  productId   String  @map("product_id")
+  product     Product @relation(fields: [productId], references: [id])
+  minimumQty  Int     @default(25) @map("minimum_qty")
+  criticalQty Int     @default(10) @map("critical_qty")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@id([boothId, productId])
+  @@map("booth_stock_thresholds")
 }
 
 model ShiftTemplate {
