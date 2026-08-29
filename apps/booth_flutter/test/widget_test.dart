@@ -30,6 +30,9 @@ class FakeApiClient extends ApiClient {
 
   @override
   Future<List<dynamic>> getCatalog(String token) async => [];
+
+  @override
+  Future<List<dynamic>> getPendingDistributions(String token) async => [];
 }
 
 void main() {

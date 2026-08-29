@@ -1,10 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api_client.dart';
 import '../app_state.dart';
 import '../theme.dart';
 
-class InboundScreen extends StatelessWidget {
+class InboundScreen extends StatefulWidget {
   const InboundScreen({super.key});
+
+  @override
+  State<InboundScreen> createState() => _InboundScreenState();
+}
+
+class _InboundScreenState extends State<InboundScreen> {
+  bool _submitting = false;
+
+  Future<void> _receive(int totalQty) async {
+    setState(() => _submitting = true);
+    try {
+      await context.read<AppState>().receiveInbound();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Stok $totalQty cup berhasil diterima!'),
+          backgroundColor: ObbelTheme.primaryDark,
+        ),
+      );
+      Navigator.pop(context);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +71,9 @@ class InboundScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildInfoRow('Booth', 'Gallery Pandanaran'),
+                _buildInfoRow('Booth', appState.boothName),
                 const Divider(),
-                _buildInfoRow('Shift', '1 (08.00 - 16.30)'),
-                const Divider(),
-                _buildInfoRow('Waktu Kirim', '07 Mei 2025 07:30'),
+                _buildInfoRow('Shift', '${appState.shiftLabel} (${appState.shiftTime})'),
               ],
             ),
           ),
@@ -69,87 +97,87 @@ class InboundScreen extends StatelessWidget {
 
           // Item List
           Expanded(
-            child: ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      // Coffee Icon Placeholder
-                      Container(
-                        padding: const EdgeInsets.all(8),
+            child: items.isEmpty
+                ? const Center(child: Text('Tidak ada stok masuk.'))
+                : ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: ObbelTheme.backgroundLight,
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
-                          Icons.local_cafe,
-                          color: ObbelTheme.primaryDark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              item.product.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: ObbelTheme.textDark,
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: ObbelTheme.backgroundLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.local_cafe,
+                                color: ObbelTheme.primaryDark,
                               ),
                             ),
-                            Text(
-                              'Rp ${item.product.price}',
-                              style: const TextStyle(
-                                color: ObbelTheme.textLight,
-                                fontSize: 13,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.product.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: ObbelTheme.textDark,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Rp ${item.product.price}',
+                                    style: const TextStyle(
+                                      color: ObbelTheme.textLight,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () => context.read<AppState>().updateInboundQty(
+                                        item,
+                                        item.actualQty - 1,
+                                      ),
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  color: ObbelTheme.primaryMedium,
+                                ),
+                                Text(
+                                  '${item.actualQty}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => context.read<AppState>().updateInboundQty(
+                                        item,
+                                        item.actualQty + 1,
+                                      ),
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  color: ObbelTheme.primaryMedium,
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ),
-                      // Decrement / Increment controls
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => appState.updateInboundQty(
-                              item,
-                              item.actualQty - 1,
-                            ),
-                            icon: const Icon(Icons.remove_circle_outline),
-                            color: ObbelTheme.primaryMedium,
-                          ),
-                          Text(
-                            '${item.actualQty}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => appState.updateInboundQty(
-                              item,
-                              item.actualQty + 1,
-                            ),
-                            icon: const Icon(Icons.add_circle_outline),
-                            color: ObbelTheme.primaryMedium,
-                          ),
-                        ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
 
           // Bottom Buttons
@@ -190,19 +218,17 @@ class InboundScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: items.isEmpty
-                          ? null
-                          : () {
-                              context.read<AppState>().receiveInbound();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Stok $totalQty cup berhasil diterima!'),
-                                  backgroundColor: ObbelTheme.primaryDark,
-                                ),
-                              );
-                              Navigator.pop(context);
-                            },
-                      child: Text('TERIMA $totalQty CUP'),
+                      onPressed: (items.isEmpty || _submitting) ? null : () => _receive(totalQty),
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : Text('TERIMA $totalQty CUP'),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -217,7 +243,6 @@ class InboundScreen extends StatelessWidget {
                         ),
                       ),
                       onPressed: () {
-                        // Report discrepancy
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Laporan selisih dikirim ke Admin.'),

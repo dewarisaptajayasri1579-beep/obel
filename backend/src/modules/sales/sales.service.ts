@@ -9,14 +9,9 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
+import { generateDocNo } from '../../common/doc-no';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateSaleDto } from './dto/create-sale.dto';
-
-function generateDocNo(prefix: string): string {
-  const stamp = Date.now().toString(36).toUpperCase();
-  const suffix = randomUUID().slice(0, 6).toUpperCase();
-  return `${prefix}-${stamp}-${suffix}`;
-}
 
 @Injectable()
 export class SalesService {

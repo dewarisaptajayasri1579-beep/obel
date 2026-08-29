@@ -18,15 +18,15 @@ String _statusFor(int qty) {
 String _fmtTime(DateTime dt) =>
     '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')}';
 
-/// State bersama seluruh layar Petugas Booth. Login, katalog/stok, dan
-/// checkout memanggil Backend API sungguhan (lihat api_client.dart).
-/// Terima Stok masih data mock karena Backend API belum menyediakan endpoint
-/// distribusi — akan diganti begitu modul itu dibangun.
+/// State bersama seluruh layar Petugas Booth. Login, katalog/stok,
+/// distribusi (terima stok), dan checkout semuanya memanggil Backend API
+/// sungguhan (lihat api_client.dart) — tidak ada data mock lagi.
 class AppState extends ChangeNotifier {
   AppState({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
   final ApiClient _api;
   String? _token;
+  String? _pendingDistributionId;
 
   bool loggedIn = false;
   bool loading = false;
@@ -40,18 +40,7 @@ class AppState extends ChangeNotifier {
   List<Product> catalog = [];
   List<BoothStock> stock = [];
   final List<CartItem> cart = [];
-  List<InboundItem>? pendingInbound = [
-    InboundItem(
-      product: const Product(id: 'mock-1', name: 'Original', price: 8000, category: 'Coffee Milk', imagePath: ''),
-      expectedQty: 10,
-      actualQty: 10,
-    ),
-    InboundItem(
-      product: const Product(id: 'mock-2', name: 'Brown Sugar', price: 10000, category: 'Coffee Milk', imagePath: ''),
-      expectedQty: 5,
-      actualQty: 5,
-    ),
-  ];
+  List<InboundItem>? pendingInbound;
   final Map<String, int> soldQtyByProductId = {};
 
   int omzetToday = 0;
@@ -124,6 +113,40 @@ class AppState extends ChangeNotifier {
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
 
     await refreshCatalog();
+    await refreshPendingDistribution();
+  }
+
+  /// Mengambil distribusi SENT pertama yang menunggu diterima booth ini
+  /// (GET /distributions/pending). UI Beranda/Terima Stok hanya menampilkan
+  /// satu kartu inbound sekaligus, sesuai mockup.
+  Future<void> refreshPendingDistribution() async {
+    if (_token == null) return;
+    final distributions = await _api.getPendingDistributions(_token!);
+    if (distributions.isEmpty) {
+      _pendingDistributionId = null;
+      pendingInbound = null;
+      notifyListeners();
+      return;
+    }
+
+    final first = distributions.first as Map<String, dynamic>;
+    _pendingDistributionId = first['id'] as String;
+    pendingInbound = (first['items'] as List<dynamic>).map((raw) {
+      final item = raw as Map<String, dynamic>;
+      final qtySent = item['qtySent'] as int;
+      return InboundItem(
+        product: Product(
+          id: item['productId'] as String,
+          name: item['productName'] as String,
+          price: (item['sellPrice'] as num).toInt(),
+          category: '',
+          imagePath: '',
+        ),
+        expectedQty: qtySent,
+        actualQty: qtySent,
+      );
+    }).toList();
+    notifyListeners();
   }
 
   Future<void> refreshCatalog() async {
@@ -227,18 +250,21 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mock — belum ada endpoint distribusi di Backend API. Menambahkan qty
-  /// ke stok lokal supaya UI tetap bisa didemokan sebelum modul itu ada.
-  void receiveInbound() {
+  /// Memanggil POST /distributions/:id/receive. Server yang menambah
+  /// booth_stocks & mencatat stock_movements; kita refresh katalog + daftar
+  /// pending sesudahnya supaya tetap sinkron dengan backend.
+  Future<void> receiveInbound() async {
     final items = pendingInbound;
-    if (items == null) return;
-    for (final item in items) {
-      final idx = stock.indexWhere((s) => s.product.name == item.product.name);
-      if (idx >= 0) {
-        stock[idx].currentQty += item.actualQty;
-      }
-    }
-    pendingInbound = null;
-    notifyListeners();
+    final distributionId = _pendingDistributionId;
+    if (items == null || distributionId == null || _token == null) return;
+
+    await _api.receiveDistribution(
+      _token!,
+      distributionId,
+      items.map((i) => {'productId': i.product.id, 'actualQty': i.actualQty}).toList(),
+    );
+
+    await refreshCatalog();
+    await refreshPendingDistribution();
   }
 }

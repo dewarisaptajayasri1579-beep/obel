@@ -15,15 +15,27 @@ export class ApiError extends Error {
   }
 }
 
+function getToken(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem("obbel-admin-session")
+    if (!raw) return null
+    return (JSON.parse(raw) as { token?: string }).token ?? null
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; token?: string | null } = {},
+  options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
+  const token = getToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
@@ -53,9 +65,100 @@ export interface LoginResponse {
   }
 }
 
+export interface Booth {
+  id: string
+  code: string
+  name: string
+  locationName: string | null
+  status: "ACTIVE" | "INACTIVE"
+}
+
+export interface ProductCategory {
+  id: string
+  code: string
+  name: string
+}
+
+export interface Product {
+  id: string
+  sku: string
+  name: string
+  category: string | null
+  sellPrice: number
+  active: boolean
+}
+
+export interface UserAccount {
+  id: string
+  username: string
+  fullName: string
+  role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
+  defaultBoothId: string | null
+  active: boolean
+}
+
+export interface WarehouseStockItem {
+  productId: string
+  sku: string
+  name: string
+  qtyOnHand: number
+}
+
+export interface DistributionItem {
+  id: string
+  productId: string
+  productName: string
+  sellPrice: number
+  qtySent: number
+  qtyReceived: number | null
+}
+
+export interface Distribution {
+  id: string
+  distributionNo: string
+  status: "SENT" | "RECEIVED" | "DISCREPANCY" | "CANCELLED" | "DRAFT"
+  boothId: string
+  boothName: string
+  sentAt: string | null
+  receivedAt: string | null
+  note: string | null
+  items: DistributionItem[]
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<LoginResponse>("/auth/login", { method: "POST", body: { username, password } }),
-  // Endpoint admin lain (booths, products, distributions, dst.) menyusul begitu
-  // backend menyediakannya — lihat timeline "Opsi A" di percakapan project.
+
+  getBooths: () => request<Booth[]>("/booths"),
+  createBooth: (input: { code: string; name: string; locationName?: string }) =>
+    request<Booth>("/booths", { method: "POST", body: input }),
+
+  getProducts: () => request<Product[]>("/products"),
+  getProductCategories: () => request<ProductCategory[]>("/products/categories"),
+  createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number }) =>
+    request<Product>("/products", { method: "POST", body: input }),
+
+  getUsers: () => request<UserAccount[]>("/users"),
+  createUser: (input: {
+    username: string
+    password: string
+    fullName: string
+    role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
+    defaultBoothId?: string
+  }) => request<UserAccount>("/users", { method: "POST", body: input }),
+
+  getWarehouseStock: () => request<WarehouseStockItem[]>("/warehouse-stock"),
+  adjustWarehouseStock: (input: { productId: string; targetQty: number; reason?: string }) =>
+    request<{ productId: string; qtyOnHand: number; delta: number }>("/warehouse-stock/adjust", {
+      method: "POST",
+      body: input,
+    }),
+
+  getDistributions: () => request<Distribution[]>("/distributions"),
+  createDistribution: (input: {
+    idempotencyKey: string
+    boothId: string
+    items: { productId: string; qty: number }[]
+    note?: string
+  }) => request<Distribution>("/distributions", { method: "POST", body: input }),
 }

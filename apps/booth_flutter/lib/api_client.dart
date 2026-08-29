@@ -44,6 +44,19 @@ class ApiClient {
     return result as Map<String, dynamic>;
   }
 
+  Future<List<dynamic>> getPendingDistributions(String token) async {
+    final result = await _get('/distributions/pending', token: token);
+    return result as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> receiveDistribution(
+    String token,
+    String distributionId,
+    List<Map<String, dynamic>> items,
+  ) {
+    return _post('/distributions/$distributionId/receive', token: token, body: {'items': items});
+  }
+
   Future<Map<String, dynamic>> createSale(
     String token, {
     required String idempotencyKey,

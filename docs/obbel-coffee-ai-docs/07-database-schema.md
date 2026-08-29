@@ -2,6 +2,8 @@
 
 Target: PostgreSQL self-hosted di Coolify, diakses melalui Backend API custom (bukan langsung dari client).
 
+> **Implementasi & index**: skema final dan seluruh index per tabel adalah `backend/prisma/schema.prisma` (sumber kebenaran, sudah dimigrasikan). Dokumen ini tetap referensi desain; kalau ada perbedaan dengan `schema.prisma`, ikuti `schema.prisma`. Index yang sudah diterapkan: `profiles` (role, default_booth_id), `products` (category_id, active), `shift_sessions` (staff_id+status, booth_id+status, business_date), `sales` (booth_id+created_at, shift_session_id, staff_id, status), `sale_items`/`payments` (sale_id), `stock_movements` (product_id+occurred_at, reference_type+reference_id, shift_session_id+occurred_at, business_date+movement_type), `stock_distributions` (booth_id+status, status), `booth_stocks`/`stock_distribution_items` (product_id).
+
 ## 1. Enum konseptual
 
 ```text

@@ -59,6 +59,16 @@ enum StockMovementType {
   @@map("stock_movement_type")
 }
 
+enum DistributionStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  DISCREPANCY
+  CANCELLED
+
+  @@map("distribution_status")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -72,6 +82,7 @@ model Booth {
   shiftSessions ShiftSession[]
   boothStocks   BoothStock[]
   sales         Sale[]
+  distributions StockDistribution[]
 
   @@map("booths")
 }
@@ -88,9 +99,13 @@ model Profile {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  shiftSessions ShiftSession[]
-  sales         Sale[]
+  shiftSessions        ShiftSession[]
+  sales                Sale[]
+  createdDistributions StockDistribution[] @relation("DistributionCreatedBy")
+  receivedDistributions StockDistribution[] @relation("DistributionReceivedBy")
 
+  @@index([role])
+  @@index([defaultBoothId])
   @@map("profiles")
 }
 
@@ -118,10 +133,14 @@ model Product {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  boothStocks    BoothStock[]
-  saleItems      SaleItem[]
-  stockMovements StockMovement[]
+  boothStocks        BoothStock[]
+  saleItems          SaleItem[]
+  stockMovements     StockMovement[]
+  warehouseStock     WarehouseStock?
+  distributionItems  StockDistributionItem[]
 
+  @@index([categoryId])
+  @@index([active])
   @@map("products")
 }
 
@@ -157,6 +176,9 @@ model ShiftSession {
 
   sales Sale[]
 
+  @@index([staffId, status])
+  @@index([boothId, status])
+  @@index([businessDate])
   @@map("shift_sessions")
 }
 
@@ -170,6 +192,7 @@ model BoothStock {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@id([boothId, productId])
+  @@index([productId])
   @@map("booth_stocks")
 }
 
@@ -201,6 +224,10 @@ model Sale {
   items    SaleItem[]
   payments Payment[]
 
+  @@index([boothId, createdAt])
+  @@index([shiftSessionId])
+  @@index([staffId])
+  @@index([status])
   @@map("sales")
 }
 
@@ -215,6 +242,8 @@ model SaleItem {
   qty                 Int
   lineTotal           BigInt  @map("line_total")
 
+  @@index([saleId])
+  @@index([productId])
   @@map("sale_items")
 }
 
@@ -226,6 +255,7 @@ model Payment {
   amount BigInt
   paidAt DateTime      @default(now()) @map("paid_at")
 
+  @@index([saleId])
   @@map("payments")
 }
 
@@ -246,5 +276,57 @@ model StockMovement {
   createdBy      String            @map("created_by")
   note           String?
 
+  @@index([productId, occurredAt])
+  @@index([referenceType, referenceId])
+  @@index([shiftSessionId, occurredAt])
+  @@index([businessDate, movementType])
   @@map("stock_movements")
+}
+
+model WarehouseStock {
+  productId   String   @id @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id])
+  qtyOnHand   Int      @default(0) @map("qty_on_hand")
+  version     BigInt   @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("warehouse_stocks")
+}
+
+model StockDistribution {
+  id               String              @id @default(uuid())
+  distributionNo   String              @unique @map("distribution_no")
+  boothId          String              @map("booth_id")
+  booth            Booth               @relation(fields: [boothId], references: [id])
+  status           DistributionStatus  @default(SENT)
+  idempotencyKey   String              @unique @map("idempotency_key")
+  sentAt           DateTime?           @map("sent_at")
+  receivedAt       DateTime?           @map("received_at")
+  createdById      String              @map("created_by")
+  createdBy        Profile             @relation("DistributionCreatedBy", fields: [createdById], references: [id])
+  receivedById     String?             @map("received_by")
+  receivedBy       Profile?            @relation("DistributionReceivedBy", fields: [receivedById], references: [id])
+  note             String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  items StockDistributionItem[]
+
+  @@index([boothId, status])
+  @@index([status])
+  @@map("stock_distributions")
+}
+
+model StockDistributionItem {
+  id             String            @id @default(uuid())
+  distributionId String            @map("distribution_id")
+  distribution   StockDistribution @relation(fields: [distributionId], references: [id])
+  productId      String            @map("product_id")
+  product        Product           @relation(fields: [productId], references: [id])
+  qtySent        Int               @map("qty_sent")
+  qtyReceived    Int?              @map("qty_received")
+
+  @@unique([distributionId, productId])
+  @@index([productId])
+  @@map("stock_distribution_items")
 }

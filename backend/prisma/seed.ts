@@ -1,7 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
+
+function docNo(prefix: string): string {
+  return `${prefix}-SEED-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
 
 // Data referensi dari docs/obbel-coffee-ai-docs/16-seed-dummy-data.md.
 // Untuk development/dev only — production harus diinput ulang oleh Admin.
@@ -49,22 +54,40 @@ async function main() {
     ),
   );
 
-  const booth = await prisma.booth.upsert({
-    where: { code: 'BOOTH-01' },
-    update: {},
-    create: { code: 'BOOTH-01', name: 'Booth Gallery Pandanaran', locationName: 'Jl. Pandanaran' },
-  });
+  // 10 lokasi referensi dari 16-seed-dummy-data.md §3. Nama/alamat final
+  // harus diverifikasi Admin — daftar ini bukan berarti hanya 10 Booth aktif.
+  const locations = [
+    'Depan Galaxy Jl. Pandanaran',
+    'Depan Rumah Dinas Bupati',
+    'Barat Pasar Ngebong',
+    'Depan Pom Bensin Kemiri Kab. Boyolali',
+    'Barat Tugu Keris Boyolali',
+    'Depan SMP 3 Boyolali',
+    'Depan MI Salfiyah Tukangan Ampel Boyolali',
+    'Depan SMK 1 Klaten',
+    'Depan Stadion/Tri Koyo Klaten',
+    'Jl. Mayor Kusmanto No.82 Klaten',
+  ];
 
-  const shiftTemplate = await prisma.shiftTemplate.upsert({
-    where: { id: 'a0000000-0000-4000-8000-000000000001' },
-    update: {},
-    create: {
-      id: 'a0000000-0000-4000-8000-000000000001',
-      name: 'Shift 1',
-      startTime: '08:00',
-      endTime: '16:30',
-    },
-  });
+  const booths = await Promise.all(
+    locations.map((locationName, index) => {
+      const code = `BOOTH-${String(index + 1).padStart(2, '0')}`;
+      return prisma.booth.upsert({
+        where: { code },
+        update: {},
+        create: { code, name: `Booth ${index + 1}`, locationName },
+      });
+    }),
+  );
+  const mainBooth = booths[0];
+
+  const shiftTemplates = await Promise.all(
+    [
+      { id: 'a0000000-0000-4000-8000-000000000001', name: 'Shift 1', startTime: '08:00', endTime: '16:30' },
+      { id: 'a0000000-0000-4000-8000-000000000003', name: 'Shift 2', startTime: '16:30', endTime: '22:00' },
+    ].map((t) => prisma.shiftTemplate.upsert({ where: { id: t.id }, update: {}, create: t })),
+  );
+  const shiftTemplate = shiftTemplates[0];
 
   const passwordHash = await bcrypt.hash('obbel123', 10);
 
@@ -76,7 +99,7 @@ async function main() {
       passwordHash,
       fullName: 'Kak Rina',
       role: 'BOOTH_STAFF',
-      defaultBoothId: booth.id,
+      defaultBoothId: mainBooth.id,
     },
   });
 
@@ -106,7 +129,7 @@ async function main() {
     create: {
       id: 'a0000000-0000-4000-8000-000000000002',
       businessDate,
-      boothId: booth.id,
+      boothId: mainBooth.id,
       shiftTemplateId: shiftTemplate.id,
       staffId: boothStaff.id,
       status: 'OPEN',
@@ -116,20 +139,58 @@ async function main() {
     },
   });
 
+  // Stok Gudang Pusat — sesuai 16-seed-dummy-data.md §7 ("100–300 cup/product").
   await Promise.all(
-    createdProducts.map((product, index) =>
-      prisma.boothStock.upsert({
-        where: { boothId_productId: { boothId: booth.id, productId: product.id } },
+    createdProducts.map((product) =>
+      prisma.warehouseStock.upsert({
+        where: { productId: product.id },
         update: {},
-        create: { boothId: booth.id, productId: product.id, qtyOnHand: 100 - index * 5 },
+        create: { productId: product.id, qtyOnHand: 300 },
       }),
     ),
   );
 
+  // Distribusi demo berstatus SENT ke Booth 1, supaya alur "Terima Stok" di
+  // app Petugas Booth ada datanya begitu backend dites end-to-end.
+  const demoDistributionId = 'a0000000-0000-4000-8000-000000000004';
+  const existingDemoDistribution = await prisma.stockDistribution.findUnique({
+    where: { id: demoDistributionId },
+  });
+  if (!existingDemoDistribution) {
+    const demoItems = createdProducts.slice(0, 4).map((product, index) => ({
+      productId: product.id,
+      qty: 20 - index * 2,
+    }));
+
+    await prisma.$transaction([
+      ...demoItems.map((item) =>
+        prisma.warehouseStock.update({
+          where: { productId: item.productId },
+          data: { qtyOnHand: { decrement: item.qty } },
+        }),
+      ),
+      prisma.stockDistribution.create({
+        data: {
+          id: demoDistributionId,
+          distributionNo: docNo('DIST'),
+          boothId: mainBooth.id,
+          status: 'SENT',
+          idempotencyKey: randomUUID(),
+          sentAt: new Date(),
+          createdById: (await prisma.profile.findUniqueOrThrow({ where: { username: 'admin' } })).id,
+          note: 'Distribusi awal (seed)',
+          items: { createMany: { data: demoItems.map((i) => ({ productId: i.productId, qtySent: i.qty })) } },
+        },
+      }),
+    ]);
+  }
+
   // eslint-disable-next-line no-console
   console.log('Seed selesai. Dummy login (password sama untuk semua: obbel123):');
   // eslint-disable-next-line no-console
-  console.log('  booth01 (BOOTH_STAFF) / admin (ADMIN) / owner (OWNER)');
+  console.log('  booth01 (BOOTH_STAFF, default booth: Booth 1) / admin (ADMIN) / owner (OWNER)');
+  // eslint-disable-next-line no-console
+  console.log(`  ${booths.length} booth di-seed, stok Gudang 300/produk, 1 distribusi SENT menunggu diterima Booth 1.`);
 }
 
 main()
