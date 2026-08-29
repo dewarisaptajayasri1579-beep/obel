@@ -14,6 +14,7 @@ import { RestockRequestsModule } from './modules/restock-requests/restock-reques
 import { ReturnsModule } from './modules/returns/returns.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
     ReturnsModule,
     DashboardModule,
     BoothStockModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

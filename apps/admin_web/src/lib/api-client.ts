@@ -132,6 +132,12 @@ export interface RestockRequestItemView {
   product: { id: string; name: string; sellPrice: number }
 }
 
+export interface ReportsSummary {
+  salesTrend: { date: string; omzet: number; cup: number }[]
+  boothRanking: { boothName: string; omzet: number; cup: number }[]
+  productRanking: { productName: string; qty: number }[]
+}
+
 export interface AdminDashboard {
   omzetToday: number
   cupSoldToday: number
@@ -246,6 +252,7 @@ export const api = {
     request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
 
   getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
+  getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
   getSales: () => request<SaleListItem[]>("/sales"),
 }

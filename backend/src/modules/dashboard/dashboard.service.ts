@@ -1,23 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DistributionStatus, RestockRequestStatus, ReturnStatus, SaleStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { startOfTodayJakarta } from '../../common/jakarta-date';
 
-const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 const LOW_STOCK_THRESHOLD = 25;
-
-/// Awal hari ini menurut Asia/Jakarta, dinyatakan sebagai instant UTC —
-/// dipakai karena laporan harian dikelompokkan per tanggal lokal
-/// (02-system-architecture.md §7), sementara timestamp di DB tetap UTC.
-function startOfTodayJakarta(): Date {
-  const now = new Date();
-  const jakartaNow = new Date(now.getTime() + JAKARTA_OFFSET_MS);
-  const startOfDayJakartaAsUtcWallClock = Date.UTC(
-    jakartaNow.getUTCFullYear(),
-    jakartaNow.getUTCMonth(),
-    jakartaNow.getUTCDate(),
-  );
-  return new Date(startOfDayJakartaAsUtcWallClock - JAKARTA_OFFSET_MS);
-}
 
 @Injectable()
 export class DashboardService {
