@@ -125,6 +125,26 @@ export interface Distribution {
   items: DistributionItem[]
 }
 
+export interface RestockRequestItemView {
+  id: string
+  productId: string
+  qtyRequested: number
+  product: { id: string; name: string; sellPrice: number }
+}
+
+export interface RestockRequest {
+  id: string
+  requestNo: string
+  status: "REQUESTED" | "APPROVED" | "REJECTED" | "CANCELLED"
+  boothId: string
+  booth: { id: string; name: string }
+  note: string | null
+  rejectReason: string | null
+  createdAt: string
+  items: RestockRequestItemView[]
+  distribution: { id: string; distributionNo: string; status: string } | null
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<LoginResponse>("/auth/login", { method: "POST", body: { username, password } }),
@@ -161,4 +181,10 @@ export const api = {
     items: { productId: string; qty: number }[]
     note?: string
   }) => request<Distribution>("/distributions", { method: "POST", body: input }),
+
+  getRestockRequests: () => request<RestockRequest[]>("/restock-requests"),
+  approveRestockRequest: (id: string, items: { productId: string; qtyApproved: number }[]) =>
+    request<RestockRequest>(`/restock-requests/${id}/approve`, { method: "POST", body: { items } }),
+  rejectRestockRequest: (id: string, reason: string) =>
+    request<RestockRequest>(`/restock-requests/${id}/reject`, { method: "POST", body: { reason } }),
 }

@@ -69,6 +69,15 @@ enum DistributionStatus {
   @@map("distribution_status")
 }
 
+enum RestockRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("restock_request_status")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -81,8 +90,9 @@ model Booth {
   profiles      Profile[]
   shiftSessions ShiftSession[]
   boothStocks   BoothStock[]
-  sales         Sale[]
-  distributions StockDistribution[]
+  sales           Sale[]
+  distributions   StockDistribution[]
+  restockRequests RestockRequest[]
 
   @@map("booths")
 }
@@ -103,6 +113,8 @@ model Profile {
   sales                Sale[]
   createdDistributions StockDistribution[] @relation("DistributionCreatedBy")
   receivedDistributions StockDistribution[] @relation("DistributionReceivedBy")
+  requestedRestocks    RestockRequest[]    @relation("RestockRequestedBy")
+  approvedRestocks     RestockRequest[]    @relation("RestockApprovedBy")
 
   @@index([role])
   @@index([defaultBoothId])
@@ -138,6 +150,7 @@ model Product {
   stockMovements     StockMovement[]
   warehouseStock     WarehouseStock?
   distributionItems  StockDistributionItem[]
+  restockRequestItems RestockRequestItem[]
 
   @@index([categoryId])
   @@index([active])
@@ -310,7 +323,8 @@ model StockDistribution {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  items StockDistributionItem[]
+  items          StockDistributionItem[]
+  restockRequest RestockRequest?
 
   @@index([boothId, status])
   @@index([status])
@@ -329,4 +343,41 @@ model StockDistributionItem {
   @@unique([distributionId, productId])
   @@index([productId])
   @@map("stock_distribution_items")
+}
+
+model RestockRequest {
+  id             String               @id @default(uuid())
+  requestNo      String               @unique @map("request_no")
+  boothId        String               @map("booth_id")
+  booth          Booth                @relation(fields: [boothId], references: [id])
+  status         RestockRequestStatus @default(REQUESTED)
+  requestedById  String               @map("requested_by")
+  requestedBy    Profile              @relation("RestockRequestedBy", fields: [requestedById], references: [id])
+  approvedById   String?              @map("approved_by")
+  approvedBy     Profile?             @relation("RestockApprovedBy", fields: [approvedById], references: [id])
+  distributionId String?              @unique @map("distribution_id")
+  distribution   StockDistribution?   @relation(fields: [distributionId], references: [id])
+  rejectReason   String?              @map("reject_reason")
+  note           String?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  items RestockRequestItem[]
+
+  @@index([boothId, status])
+  @@index([status])
+  @@map("restock_requests")
+}
+
+model RestockRequestItem {
+  id               String         @id @default(uuid())
+  restockRequestId String         @map("restock_request_id")
+  restockRequest   RestockRequest @relation(fields: [restockRequestId], references: [id])
+  productId        String         @map("product_id")
+  product          Product        @relation(fields: [productId], references: [id])
+  qtyRequested     Int            @map("qty_requested")
+
+  @@unique([restockRequestId, productId])
+  @@index([productId])
+  @@map("restock_request_items")
 }

@@ -34,6 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
     group: "Stok",
     items: [
       { label: "Distribusi Stok", href: "/distribusi", icon: Truck, bottomBar: true },
+      { label: "Restock Booth", href: "/restock", icon: PackageSearch, bottomBar: true },
       { label: "Monitor Stok Booth", href: "/stok/booth", icon: PackageSearch, bottomBar: false },
       { label: "Stok Gudang", href: "/stok/gudang", icon: Warehouse, bottomBar: false },
       { label: "Return Stok", href: "/return", icon: Undo2, bottomBar: false },

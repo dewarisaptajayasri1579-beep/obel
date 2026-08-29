@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api_client.dart';
 import '../app_state.dart';
 import '../theme.dart';
 
@@ -13,10 +14,37 @@ class StockScreen extends StatefulWidget {
 class _StockScreenState extends State<StockScreen> {
   String _filterType = 'Semua';
   int _restockIncrement = 5;
+  String? _selectedProductId;
+  bool _requesting = false;
+
+  Future<void> _submitRestock(String productName) async {
+    final appState = context.read<AppState>();
+    final product = appState.stock.firstWhere((s) => s.product.id == _selectedProductId).product;
+    setState(() => _requesting = true);
+    try {
+      await appState.requestRestock(product, _restockIncrement);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Permintaan restock $productName +$_restockIncrement cup terkirim!'),
+          backgroundColor: ObbelTheme.primaryDark,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
+      );
+    } finally {
+      if (mounted) setState(() => _requesting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final stocks = context.watch<AppState>().stock;
+    final selectedMatches = stocks.where((s) => s.product.id == _selectedProductId);
+    final selectedProduct = selectedMatches.isEmpty ? null : selectedMatches.first.product;
     return Scaffold(
       backgroundColor: ObbelTheme.backgroundLight,
       appBar: AppBar(
@@ -94,12 +122,18 @@ class _StockScreenState extends State<StockScreen> {
               itemCount: stocks.length,
               itemBuilder: (context, index) {
                 final stock = stocks[index];
-                return Container(
+                final isSelected = stock.product.id == _selectedProductId;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedProductId = stock.product.id),
+                  child: Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: isSelected
+                        ? Border.all(color: ObbelTheme.primaryDark, width: 1.5)
+                        : null,
                   ),
                   child: Row(
                     children: [
@@ -157,6 +191,7 @@ class _StockScreenState extends State<StockScreen> {
                       })
                     ],
                   ),
+                  ),
                 );
               },
             ),
@@ -177,14 +212,37 @@ class _StockScreenState extends State<StockScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Kelola Restock Cepat',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: ObbelTheme.textLight,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Kelola Restock Cepat',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: ObbelTheme.textLight,
+                        ),
+                      ),
+                      if (selectedProduct != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '· ${selectedProduct.name}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: ObbelTheme.primaryDark,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
+                  if (selectedProduct == null)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Tap salah satu produk di atas untuk memilih.',
+                        style: TextStyle(fontSize: 12, color: ObbelTheme.textLight),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   Row(
                     children: [5, 10, 15, 20].map((val) {
@@ -223,15 +281,19 @@ class _StockScreenState extends State<StockScreen> {
                   ),
                   const SizedBox(height: 14),
                   ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Permintaan restock +$_restockIncrement cup dikirim!'),
-                          backgroundColor: ObbelTheme.primaryDark,
-                        ),
-                      );
-                    },
-                    child: const Text('MINTA RESTOCK'),
+                    onPressed: (selectedProduct == null || _requesting)
+                        ? null
+                        : () => _submitRestock(selectedProduct.name),
+                    child: _requesting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text('MINTA RESTOCK'),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(

@@ -10,6 +10,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { UsersModule } from './modules/users/users.module';
 import { WarehouseStockModule } from './modules/warehouse-stock/warehouse-stock.module';
 import { DistributionsModule } from './modules/distributions/distributions.module';
+import { RestockRequestsModule } from './modules/restock-requests/restock-requests.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DistributionsModule } from './modules/distributions/distributions.modul
     UsersModule,
     WarehouseStockModule,
     DistributionsModule,
+    RestockRequestsModule,
   ],
 })
 export class AppModule {}

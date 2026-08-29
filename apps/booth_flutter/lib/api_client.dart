@@ -57,6 +57,18 @@ class ApiClient {
     return _post('/distributions/$distributionId/receive', token: token, body: {'items': items});
   }
 
+  Future<Map<String, dynamic>> createRestockRequest(
+    String token,
+    List<Map<String, dynamic>> items, {
+    String? note,
+  }) {
+    return _post(
+      '/restock-requests',
+      token: token,
+      body: {'items': items, 'note': ?note},
+    );
+  }
+
   Future<Map<String, dynamic>> createSale(
     String token, {
     required String idempotencyKey,

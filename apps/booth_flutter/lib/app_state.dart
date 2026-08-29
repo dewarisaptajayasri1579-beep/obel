@@ -267,4 +267,14 @@ class AppState extends ChangeNotifier {
     await refreshCatalog();
     await refreshPendingDistribution();
   }
+
+  /// Memanggil POST /restock-requests. Belum ada efek stok sampai Admin
+  /// approve (BR-008/BR-009) — Booth hanya mengajukan permintaan di sini.
+  Future<void> requestRestock(Product product, int qty) async {
+    if (_token == null) return;
+    await _api.createRestockRequest(
+      _token!,
+      [{'productId': product.id, 'qty': qty}],
+    );
+  }
 }
