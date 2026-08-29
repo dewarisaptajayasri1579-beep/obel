@@ -35,8 +35,7 @@ Jika implementasi backend diganti, pertahankan kontrak domain dan business rule 
 - Owner read-only.
 - Petugas Booth hanya boleh mengakses booth/shift yang ditugaskan kepadanya.
 - Admin Pusat dapat menjalankan aksi operasional lintas booth.
-- Gunakan Bahasa Indonesia pada UI.
-- UX: banyak klik/tap, minim ketikan, angka penting besar, satu layar satu tujuan utama.
+- UX: banyak klik/tap, minim ketikan, angka penting besar, satu layar satu tujuan utama. Fokus layout harus bersih, dengan font size yang lebih besar dari ukuran umum di aplikasi seluler pada umumnya, namun tetap terjaga proporsionalitasnya.
 
 ## Urutan implementasi yang disarankan
 1. Database, enum, constraint, index, authorization/role & booth-scoping layer di backend.
