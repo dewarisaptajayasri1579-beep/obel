@@ -85,6 +85,10 @@ class ApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> createReturn(String token) {
+    return _post('/returns', token: token, body: {});
+  }
+
   Future<Map<String, dynamic>> createSale(
     String token, {
     required String idempotencyKey,

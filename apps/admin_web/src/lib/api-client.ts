@@ -132,6 +132,26 @@ export interface RestockRequestItemView {
   product: { id: string; name: string; sellPrice: number }
 }
 
+export interface StockReturnItemView {
+  id: string
+  productId: string
+  qtySubmitted: number
+  qtyReceived: number | null
+  product: { id: string; name: string }
+}
+
+export interface StockReturn {
+  id: string
+  returnNo: string
+  status: "SUBMITTED" | "RECEIVED" | "DISCREPANCY" | "CANCELLED"
+  boothId: string
+  booth: { id: string; name: string }
+  note: string | null
+  submittedAt: string
+  receivedAt: string | null
+  items: StockReturnItemView[]
+}
+
 export interface RestockRequest {
   id: string
   requestNo: string
@@ -187,4 +207,8 @@ export const api = {
     request<RestockRequest>(`/restock-requests/${id}/approve`, { method: "POST", body: { items } }),
   rejectRestockRequest: (id: string, reason: string) =>
     request<RestockRequest>(`/restock-requests/${id}/reject`, { method: "POST", body: { reason } }),
+
+  getReturns: () => request<StockReturn[]>("/returns"),
+  receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[]) =>
+    request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
 }

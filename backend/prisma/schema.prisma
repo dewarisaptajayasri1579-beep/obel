@@ -85,6 +85,15 @@ enum StockCountStatus {
   @@map("stock_count_status")
 }
 
+enum ReturnStatus {
+  SUBMITTED
+  RECEIVED
+  DISCREPANCY
+  CANCELLED
+
+  @@map("return_status")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -100,6 +109,7 @@ model Booth {
   sales           Sale[]
   distributions   StockDistribution[]
   restockRequests RestockRequest[]
+  stockReturns    StockReturn[]
 
   @@map("booths")
 }
@@ -123,6 +133,8 @@ model Profile {
   requestedRestocks    RestockRequest[]    @relation("RestockRequestedBy")
   approvedRestocks     RestockRequest[]    @relation("RestockApprovedBy")
   countedStockCounts   ShiftStockCount[]
+  submittedReturns     StockReturn[]       @relation("ReturnSubmittedBy")
+  receivedReturns      StockReturn[]       @relation("ReturnReceivedBy")
 
   @@index([role])
   @@index([defaultBoothId])
@@ -160,6 +172,7 @@ model Product {
   distributionItems  StockDistributionItem[]
   restockRequestItems RestockRequestItem[]
   stockCountItems     ShiftStockCountItem[]
+  stockReturnItems    StockReturnItem[]
 
   @@index([categoryId])
   @@index([active])
@@ -423,4 +436,42 @@ model ShiftStockCountItem {
   @@unique([stockCountId, productId])
   @@index([productId])
   @@map("shift_stock_count_items")
+}
+
+model StockReturn {
+  id             String       @id @default(uuid())
+  returnNo       String       @unique @map("return_no")
+  boothId        String       @map("booth_id")
+  booth          Booth        @relation(fields: [boothId], references: [id])
+  status         ReturnStatus @default(SUBMITTED)
+  idempotencyKey String       @unique @map("idempotency_key")
+  submittedById  String       @map("submitted_by")
+  submittedBy    Profile      @relation("ReturnSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt    DateTime     @default(now()) @map("submitted_at")
+  receivedById   String?      @map("received_by")
+  receivedBy     Profile?     @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
+  receivedAt     DateTime?    @map("received_at")
+  note           String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  items StockReturnItem[]
+
+  @@index([boothId, status])
+  @@index([status])
+  @@map("stock_returns")
+}
+
+model StockReturnItem {
+  id             String      @id @default(uuid())
+  stockReturnId  String      @map("stock_return_id")
+  stockReturn    StockReturn @relation(fields: [stockReturnId], references: [id])
+  productId      String      @map("product_id")
+  product        Product     @relation(fields: [productId], references: [id])
+  qtySubmitted   Int         @map("qty_submitted")
+  qtyReceived    Int?        @map("qty_received")
+
+  @@unique([stockReturnId, productId])
+  @@index([productId])
+  @@map("stock_return_items")
 }

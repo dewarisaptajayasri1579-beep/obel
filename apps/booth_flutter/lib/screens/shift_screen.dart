@@ -1,10 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api_client.dart';
 import '../app_state.dart';
 import '../theme.dart';
 
 class ShiftScreen extends StatelessWidget {
   const ShiftScreen({super.key});
+
+  Future<void> _confirmAndSubmitReturn(BuildContext context, AppState appState) async {
+    final stockToReturn = appState.stock.where((s) => s.currentQty > 0).toList();
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kembalikan Stok'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (stockToReturn.isEmpty)
+                const Text('Tidak ada sisa stok untuk dikembalikan.')
+              else ...[
+                const Text('Sisa stok berikut akan dikembalikan ke Gudang Pusat:'),
+                const SizedBox(height: 8),
+                for (final s in stockToReturn)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text('${s.product.name}: ${s.currentQty} cup'),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: stockToReturn.isEmpty ? null : () => Navigator.of(context).pop(true),
+            child: const Text('Ajukan'),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true || !context.mounted) return;
+
+    try {
+      await appState.submitReturn();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Return diajukan, menunggu Admin menerima.')),
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,7 +232,7 @@ class ShiftScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () {},
+                      onPressed: () => _confirmAndSubmitReturn(context, appState),
                       child: const Text(
                         'KEMBALIKAN STOK',
                         style: TextStyle(

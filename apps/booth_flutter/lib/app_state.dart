@@ -309,4 +309,14 @@ class AppState extends ChangeNotifier {
           }).toList(),
     );
   }
+
+  /// Memanggil POST /returns. Server otomatis memakai seluruh sisa stok
+  /// Booth sebagai qty return (BR-013), lalu mengeluarkannya dari
+  /// booth_stocks supaya tidak bisa dijual lagi. Kita refresh stok
+  /// sesudahnya supaya UI (harusnya 0 semua) tetap sinkron.
+  Future<void> submitReturn() async {
+    if (_token == null) return;
+    await _api.createReturn(_token!);
+    await refreshCatalog();
+  }
 }
