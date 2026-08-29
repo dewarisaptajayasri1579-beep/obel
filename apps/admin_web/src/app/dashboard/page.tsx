@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { useAuth } from "@/lib/auth-context";
+import { Alert } from "@/components/ui/Alert";
 import { StatTile } from "@/components/ui/StatTile";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
@@ -43,6 +45,13 @@ function DashboardContent() {
         </div>
       ) : (
         <>
+          {data.reconciliationCasesOpen > 0 && (
+            <Link href="/koreksi">
+              <Alert variant="warning" title="Perlu Rekonsiliasi">
+                Ada {data.reconciliationCasesOpen} kasus yang memerlukan tinjauan Admin. Klik untuk membuka Riwayat & Koreksi Data.
+              </Alert>
+            </Link>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatTile label="Omzet Hari Ini" value={formatRupiah(data.omzetToday)} icon={Receipt} color="emerald" />
             <StatTile label="Cup Terjual" value={`${data.cupSoldToday} cup`} icon={Receipt} color="blue" />

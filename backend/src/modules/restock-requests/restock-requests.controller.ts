@@ -39,6 +39,12 @@ export class RestockRequestsController {
     return this.restockRequestsService.create(dto, user.boothId, user.sub);
   }
 
+  @Post(':id/revise')
+  @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
+  revise(@Param('id') id: string, @Body() dto: CreateRestockRequestDto) {
+    return this.restockRequestsService.reviseRequestedItems(id, dto);
+  }
+
   @Post(':id/approve')
   @Roles(UserRole.ADMIN)
   approve(@Param('id') id: string, @Body() dto: ApproveRestockRequestDto, @CurrentUser() user: JwtPayload) {

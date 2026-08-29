@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
   PaymentMethod,
+  PaymentStatus,
   Prisma,
+  SaleStatus,
   ShiftStatus,
   StockMovementType,
   UserRole,
@@ -10,12 +12,29 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { effectiveByGroup } from '../../common/effective-version';
+import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
+import { VoidSaleDto } from './dto/void-sale.dto';
+
+interface StockDelta {
+  productId: string;
+  productName: string;
+  qtyDelta: number;
+}
+
+function businessDateOf(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly corrections: CorrectionsService,
+  ) {}
 
   /// Mirrors create_paid_sale from
   /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §3 and enforces
@@ -156,26 +175,414 @@ export class SalesService {
     return this.toSaleResponse(saleId);
   }
 
-  /// Sales list untuk Admin (05-feature-specification.md §B7).
+  /// Sales list untuk Admin (05-feature-specification.md §B7). Hanya
+  /// menampilkan versi efektif (terbaru) per transaction_group_id — versi
+  /// lama yang sudah direvisi disembunyikan dari list ini (tetap terlihat
+  /// di Riwayat & Koreksi Data), sesuai "effective sale versions"
+  /// (docs/24-data-consistency-correction-reversal.md §14).
   async findAll() {
     const sales = await this.prisma.sale.findMany({
+      where: { status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] } },
       include: { booth: true, staff: true, items: true },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 500,
     });
 
-    return sales.map((s) => ({
-      id: s.id,
-      saleNo: s.saleNo,
-      boothName: s.booth.name,
-      staffName: s.staff.fullName,
-      status: s.status,
-      total: Number(s.total),
-      cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
-      paymentMethod: s.paymentMethod,
-      paidAt: s.paidAt,
-      createdAt: s.createdAt,
+    return effectiveByGroup(sales)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 200)
+      .map((s) => ({
+        id: s.id,
+        saleNo: s.saleNo,
+        boothName: s.booth.name,
+        staffName: s.staff.fullName,
+        status: s.status,
+        total: Number(s.total),
+        cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
+        paymentMethod: s.paymentMethod,
+        paidAt: s.paidAt,
+        createdAt: s.createdAt,
+        versionNo: s.versionNo,
+        isRevised: s.versionNo > 1,
+      }));
+  }
+
+  /// Detail satu sale untuk modal koreksi Admin Web.
+  async findOne(id: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+      include: { booth: true, staff: true, items: true, payments: true },
+    });
+    if (!sale) {
+      throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
+    }
+    const activePayment = sale.payments.find((p) => p.status === PaymentStatus.POSTED) ?? null;
+    return {
+      id: sale.id,
+      saleNo: sale.saleNo,
+      boothName: sale.booth.name,
+      staffName: sale.staff.fullName,
+      status: sale.status,
+      total: Number(sale.total),
+      paymentMethod: activePayment?.method ?? sale.paymentMethod,
+      versionNo: sale.versionNo,
+      items: sale.items.map((i) => ({
+        productId: i.productId,
+        productName: i.productNameSnapshot,
+        unitPrice: Number(i.unitPrice),
+        qty: i.qty,
+      })),
+    };
+  }
+
+  /// TX-03.A — Impact Preview untuk Void Sale (§6).
+  async previewVoidSale(saleId: string) {
+    const sale = await this.loadVoidableSale(saleId);
+    return this.buildVoidImpact(sale);
+  }
+
+  /// TX-03.A — Void Sale. Reverse seluruh stock ke Booth, reverse payment,
+  /// original sale tetap ada dengan status VOIDED (DC-004, COR-01).
+  async voidSale(user: JwtPayload, saleId: string, dto: VoidSaleDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.toSaleResponse(existing.entityId);
+    }
+
+    const sale = await this.loadVoidableSale(saleId);
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+    const impact = this.buildVoidImpact(sale);
+    const voidedAt = new Date();
+    const businessDate = businessDateOf(voidedAt);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const delta of impact.stockDeltas) {
+        await tx.boothStock.upsert({
+          where: { boothId_productId: { boothId: sale.boothId, productId: delta.productId } },
+          create: { boothId: sale.boothId, productId: delta.productId, qtyOnHand: delta.qtyDelta },
+          update: { qtyOnHand: { increment: delta.qtyDelta }, version: { increment: 1 } },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: StockMovementType.VOID_REVERSAL,
+            productId: delta.productId,
+            qty: delta.qtyDelta,
+            toBoothId: sale.boothId,
+            referenceType: 'sale_void',
+            referenceId: sale.id,
+            shiftSessionId: sale.shiftSessionId,
+            businessDate,
+            occurredAt: voidedAt,
+            createdBy: user.sub,
+          },
+        });
+      }
+
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: {
+          status: SaleStatus.VOIDED,
+          voidedAt,
+          voidReason: dto.reasonNote ? `${dto.reasonCode}: ${dto.reasonNote}` : dto.reasonCode,
+        },
+      });
+
+      await tx.payment.updateMany({
+        where: { saleId: sale.id, status: PaymentStatus.POSTED },
+        data: { status: PaymentStatus.REVERSED },
+      });
+
+      await this.corrections.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        transactionGroupId: sale.transactionGroupId,
+        correctionType: 'VOID',
+        originalVersionId: sale.id,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: impact,
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.toSaleResponse(sale.id);
+  }
+
+  /// TX-03.B/C — Impact Preview untuk Revisi Sale (§6).
+  async previewReviseSale(saleId: string, dto: Pick<ReviseSaleDto, 'items' | 'paymentMethod'>) {
+    const sale = await this.loadVoidableSale(saleId);
+    const { impact } = await this.buildRevisionPlan(sale, dto.items);
+    return impact;
+  }
+
+  /// TX-03.B/C/D — Revisi qty/produk/payment sekaligus. Atomic: reverse V1,
+  /// post V2 dengan transaction_group_id yang sama + version_no+1
+  /// (DC-003, COR-02).
+  async reviseSale(user: JwtPayload, saleId: string, dto: ReviseSaleDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.toSaleResponse(existing.replacementVersionId ?? existing.entityId);
+    }
+
+    const sale = await this.loadVoidableSale(saleId);
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+    const { impact, newItemsData, newTotal, activePayment } = await this.buildRevisionPlan(
+      sale,
+      dto.items,
+    );
+    const paymentMethod = dto.paymentMethod ?? sale.paymentMethod;
+    const newSaleId = randomUUID();
+    const newSaleNo = generateDocNo('OBL');
+    const revisedAt = new Date();
+    const businessDate = businessDateOf(sale.paidAt ?? revisedAt);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const delta of impact.stockDeltas) {
+        if (delta.qtyDelta > 0) {
+          const decremented = await tx.boothStock.updateMany({
+            where: { boothId: sale.boothId, productId: delta.productId, qtyOnHand: { gte: delta.qtyDelta } },
+            data: { qtyOnHand: { decrement: delta.qtyDelta }, version: { increment: 1 } },
+          });
+          if (decremented.count !== 1) {
+            throw new DomainError('INSUFFICIENT_STOCK', `Stok ${delta.productName} tidak cukup untuk revisi.`, {
+              productId: delta.productId,
+            });
+          }
+          await tx.stockMovement.create({
+            data: {
+              movementNo: generateDocNo('MOV'),
+              movementType: StockMovementType.SALE,
+              productId: delta.productId,
+              qty: delta.qtyDelta,
+              fromBoothId: sale.boothId,
+              referenceType: 'sale_revision',
+              referenceId: newSaleId,
+              shiftSessionId: sale.shiftSessionId,
+              businessDate,
+              occurredAt: revisedAt,
+              createdBy: user.sub,
+            },
+          });
+        } else if (delta.qtyDelta < 0) {
+          await tx.boothStock.upsert({
+            where: { boothId_productId: { boothId: sale.boothId, productId: delta.productId } },
+            create: { boothId: sale.boothId, productId: delta.productId, qtyOnHand: -delta.qtyDelta },
+            update: { qtyOnHand: { increment: -delta.qtyDelta }, version: { increment: 1 } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              movementNo: generateDocNo('MOV'),
+              movementType: StockMovementType.VOID_REVERSAL,
+              productId: delta.productId,
+              qty: -delta.qtyDelta,
+              toBoothId: sale.boothId,
+              referenceType: 'sale_revision',
+              referenceId: newSaleId,
+              shiftSessionId: sale.shiftSessionId,
+              businessDate,
+              occurredAt: revisedAt,
+              createdBy: user.sub,
+            },
+          });
+        }
+      }
+
+      await tx.sale.create({
+        data: {
+          id: newSaleId,
+          saleNo: newSaleNo,
+          idempotencyKey: dto.idempotencyKey,
+          boothId: sale.boothId,
+          shiftSessionId: sale.shiftSessionId,
+          staffId: sale.staffId,
+          status: SaleStatus.PAID,
+          subtotal: newTotal,
+          discount: 0n,
+          total: newTotal,
+          paymentMethod,
+          paidAt: sale.paidAt,
+          transactionGroupId: sale.transactionGroupId,
+          versionNo: sale.versionNo + 1,
+          revisionOfId: sale.id,
+        },
+      });
+      await tx.saleItem.createMany({ data: newItemsData.map((item) => ({ ...item, saleId: newSaleId })) });
+
+      if (activePayment) {
+        await tx.payment.update({ where: { id: activePayment.id }, data: { status: PaymentStatus.SUPERSEDED } });
+      }
+      await tx.payment.create({
+        data: {
+          saleId: newSaleId,
+          method: paymentMethod,
+          amount: newTotal,
+          paidAt: revisedAt,
+          transactionGroupId: activePayment?.transactionGroupId ?? randomUUID(),
+          versionNo: (activePayment?.versionNo ?? 0) + 1,
+          revisionOfId: activePayment?.id ?? null,
+        },
+      });
+
+      await this.corrections.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        transactionGroupId: sale.transactionGroupId,
+        correctionType: 'REVISION',
+        originalVersionId: sale.id,
+        replacementVersionId: newSaleId,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: impact,
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.toSaleResponse(newSaleId);
+  }
+
+  /// TX-04 — Revisi metode pembayaran saja. Tidak ada stock/omzet effect
+  /// (COR-03): hanya ledger Payment yang berubah, Sale tetap immutable.
+  async revisePayment(user: JwtPayload, saleId: string, dto: RevisePaymentDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.toSaleResponse(saleId);
+    }
+
+    const sale = await this.loadVoidableSale(saleId);
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+    const activePayment = sale.payments.find((p) => p.status === PaymentStatus.POSTED) ?? null;
+
+    await this.prisma.$transaction(async (tx) => {
+      if (activePayment) {
+        await tx.payment.update({ where: { id: activePayment.id }, data: { status: PaymentStatus.SUPERSEDED } });
+      }
+      await tx.payment.create({
+        data: {
+          saleId: sale.id,
+          method: dto.method,
+          amount: sale.total,
+          transactionGroupId: activePayment?.transactionGroupId ?? randomUUID(),
+          versionNo: (activePayment?.versionNo ?? 0) + 1,
+          revisionOfId: activePayment?.id ?? null,
+        },
+      });
+
+      await this.corrections.record(tx, {
+        entityType: 'payment',
+        entityId: activePayment?.id ?? sale.id,
+        transactionGroupId: activePayment?.transactionGroupId ?? sale.transactionGroupId,
+        correctionType: 'PAYMENT_CORRECTION',
+        originalVersionId: activePayment?.id ?? null,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: { from: activePayment?.method ?? sale.paymentMethod, to: dto.method },
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.toSaleResponse(sale.id);
+  }
+
+  private async loadVoidableSale(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { items: true, payments: true },
+    });
+    if (!sale) {
+      throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
+    }
+    if (sale.status !== SaleStatus.PAID) {
+      throw new DomainError('SALE_NOT_CORRECTABLE', 'Hanya sale berstatus PAID yang dapat dikoreksi.', {
+        status: sale.status,
+      });
+    }
+    return sale;
+  }
+
+  private buildVoidImpact(sale: Awaited<ReturnType<SalesService['loadVoidableSale']>>) {
+    const stockDeltas: StockDelta[] = sale.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productNameSnapshot,
+      qtyDelta: item.qty,
     }));
+    return {
+      omzetDelta: -Number(sale.total),
+      cupSoldDelta: -sale.items.reduce((sum, i) => sum + i.qty, 0),
+      stockDeltas,
+    };
+  }
+
+  private async buildRevisionPlan(
+    sale: Awaited<ReturnType<SalesService['loadVoidableSale']>>,
+    newItems: { productId: string; qty: number }[],
+  ) {
+    const productIds = [...new Set(newItems.map((i) => i.productId))];
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
+    const productById = new Map(products.map((p) => [p.id, p]));
+    const oldQtyByProduct = new Map(sale.items.map((i) => [i.productId, i.qty]));
+
+    for (const item of newItems) {
+      const product = productById.get(item.productId);
+      if (!product || !product.active) {
+        throw new DomainError('PRODUCT_INACTIVE', 'Salah satu produk tidak aktif atau tidak ditemukan.', {
+          productId: item.productId,
+        });
+      }
+    }
+
+    const oldItemBySnapshot = new Map(sale.items.map((i) => [i.productId, i]));
+    let newTotal = 0n;
+    const newItemsData: Prisma.SaleItemCreateManyInput[] = [];
+    for (const item of newItems) {
+      const existingItem = oldItemBySnapshot.get(item.productId);
+      const product = productById.get(item.productId)!;
+      const unitPrice = existingItem?.unitPrice ?? product.sellPrice;
+      const lineTotal = unitPrice * BigInt(item.qty);
+      newTotal += lineTotal;
+      newItemsData.push({
+        id: randomUUID(),
+        saleId: '',
+        productId: item.productId,
+        productNameSnapshot: existingItem?.productNameSnapshot ?? product.name,
+        unitPrice,
+        qty: item.qty,
+        lineTotal,
+      });
+    }
+
+    const newQtyByProduct = new Map(newItems.map((i) => [i.productId, i.qty]));
+    const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+    const stockDeltas: StockDelta[] = [];
+    for (const productId of allProductIds) {
+      const oldQty = oldQtyByProduct.get(productId) ?? 0;
+      const newQty = newQtyByProduct.get(productId) ?? 0;
+      const qtyDelta = newQty - oldQty;
+      if (qtyDelta === 0) continue;
+      const name =
+        oldItemBySnapshot.get(productId)?.productNameSnapshot ??
+        productById.get(productId)?.name ??
+        productId;
+      stockDeltas.push({ productId, productName: name, qtyDelta });
+    }
+
+    const activePayment = sale.payments.find((p) => p.status === PaymentStatus.POSTED) ?? null;
+
+    return {
+      impact: {
+        omzetDelta: Number(newTotal) - Number(sale.total),
+        cupSoldDelta:
+          newItems.reduce((sum, i) => sum + i.qty, 0) - sale.items.reduce((sum, i) => sum + i.qty, 0),
+        stockDeltas,
+      },
+      newItemsData,
+      newTotal,
+      activePayment,
+    };
   }
 
   private async toSaleResponse(saleId: string) {

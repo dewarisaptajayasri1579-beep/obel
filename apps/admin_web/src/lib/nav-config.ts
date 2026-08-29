@@ -8,6 +8,8 @@ import {
   Receipt,
   BarChart3,
   Settings,
+  ClipboardCheck,
+  History,
 } from "lucide-react"
 
 export interface NavItem {
@@ -37,6 +39,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Restock Booth", href: "/restock", icon: PackageSearch, bottomBar: true },
       { label: "Monitor Stok Booth", href: "/stok/booth", icon: PackageSearch, bottomBar: false },
       { label: "Stok Gudang", href: "/stok/gudang", icon: Warehouse, bottomBar: false },
+      { label: "Stok Opname", href: "/stok/opname", icon: ClipboardCheck, bottomBar: false },
+      { label: "Adjustment / Koreksi Stok", href: "/stok/adjustment", icon: Undo2, bottomBar: false },
       { label: "Return Stok", href: "/return", icon: Undo2, bottomBar: false },
     ],
   },
@@ -45,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Penjualan", href: "/penjualan", icon: Receipt, bottomBar: true },
       { label: "Laporan", href: "/laporan", icon: BarChart3, bottomBar: false },
+      { label: "Riwayat & Koreksi Data", href: "/koreksi", icon: History, bottomBar: false },
     ],
   },
   {

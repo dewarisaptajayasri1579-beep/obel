@@ -147,6 +147,7 @@ export interface AdminDashboard {
   pendingDistributions: number
   pendingRestock: number
   pendingReturns: number
+  reconciliationCasesOpen: number
 }
 
 export interface BoothStockRow {
@@ -169,6 +170,33 @@ export interface SaleListItem {
   paymentMethod: "CASH" | "QRIS"
   paidAt: string | null
   createdAt: string
+  versionNo?: number
+  isRevised?: boolean
+}
+
+export interface SaleDetailItem {
+  productId: string
+  productName: string
+  unitPrice: number
+  qty: number
+}
+
+export interface SaleDetail {
+  id: string
+  saleNo: string
+  boothName: string
+  staffName: string
+  status: "PENDING" | "PAID" | "VOIDED"
+  total: number
+  paymentMethod: "CASH" | "QRIS"
+  versionNo: number
+  items: SaleDetailItem[]
+}
+
+export interface SaleCorrectionImpact {
+  omzetDelta: number
+  cupSoldDelta: number
+  stockDeltas: { productId: string; productName: string; qtyDelta: number }[]
 }
 
 export interface StockReturnItemView {
@@ -218,6 +246,113 @@ export interface BoothStockThreshold {
   minimumQty: number
   criticalQty: number
   isCustomized: boolean
+}
+
+export type ReasonCode =
+  | "WRONG_PRODUCT"
+  | "WRONG_QTY"
+  | "WRONG_BOOTH"
+  | "WRONG_SHIFT"
+  | "WRONG_PAYMENT_METHOD"
+  | "DUPLICATE_TRANSACTION"
+  | "TRANSACTION_NEVER_HAPPENED"
+  | "WRONG_PHYSICAL_COUNT"
+  | "DAMAGED"
+  | "SPILLED"
+  | "LOST"
+  | "FOUND"
+  | "DATA_ENTRY_ERROR"
+  | "SYSTEM_ERROR"
+  | "OTHER"
+
+/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §10.
+export const REASON_CODE_OPTIONS: { value: ReasonCode; label: string }[] = [
+  { value: "WRONG_PRODUCT", label: "Salah Produk" },
+  { value: "WRONG_QTY", label: "Salah Qty" },
+  { value: "WRONG_BOOTH", label: "Salah Booth" },
+  { value: "WRONG_SHIFT", label: "Salah Shift" },
+  { value: "WRONG_PAYMENT_METHOD", label: "Salah Metode Pembayaran" },
+  { value: "DUPLICATE_TRANSACTION", label: "Transaksi Duplikat" },
+  { value: "TRANSACTION_NEVER_HAPPENED", label: "Transaksi Tidak Pernah Terjadi" },
+  { value: "WRONG_PHYSICAL_COUNT", label: "Salah Hitung Fisik" },
+  { value: "DAMAGED", label: "Rusak" },
+  { value: "SPILLED", label: "Tumpah" },
+  { value: "LOST", label: "Hilang" },
+  { value: "FOUND", label: "Ditemukan" },
+  { value: "DATA_ENTRY_ERROR", label: "Salah Input Data" },
+  { value: "SYSTEM_ERROR", label: "Error Sistem" },
+  { value: "OTHER", label: "Lainnya" },
+]
+
+export interface StockOpnameItem {
+  id: string
+  productId: string
+  productName: string
+  expectedQty: number
+  actualQty: number
+  discrepancyQty: number
+}
+
+export interface StockOpname {
+  id: string
+  opnameNo: string
+  locationType: "WAREHOUSE" | "BOOTH"
+  boothId: string | null
+  booth: { id: string; name: string } | null
+  status: "DRAFT" | "CONFIRMED" | "SUPERSEDED"
+  versionNo: number
+  snapshotAt: string
+  confirmedAt: string | null
+  countedBy: { id: string; fullName: string }
+  note: string | null
+  items: StockOpnameItem[]
+}
+
+export interface ReconciliationCaseRecord {
+  id: string
+  caseNo: string
+  sourceEntityType: string
+  sourceEntityId: string
+  status: "OPEN" | "RESOLVED" | "IGNORED"
+  severity: "INFO" | "WARNING" | "CRITICAL"
+  reasonCode: ReasonCode
+  details: Record<string, unknown>
+  resolvedBy: { id: string; fullName: string } | null
+  resolutionNote: string | null
+  createdAt: string
+}
+
+export interface TransactionCorrectionRecord {
+  id: string
+  entityType: string
+  entityId: string
+  transactionGroupId: string
+  correctionType: "VOID" | "REVISION" | "RECOUNT" | "ADJUSTMENT" | "PAYMENT_CORRECTION"
+  originalVersionId: string | null
+  replacementVersionId: string | null
+  reasonCode: ReasonCode
+  reasonNote: string | null
+  impactSnapshot: Record<string, unknown>
+  createdBy: { id: string; fullName: string }
+  createdAt: string
+}
+
+export interface StockAdjustmentRecord {
+  id: string
+  entityId: string
+  correctionType: "ADJUSTMENT" | "VOID"
+  reasonCode: ReasonCode
+  reasonNote: string | null
+  impactSnapshot: {
+    locationType: "WAREHOUSE" | "BOOTH"
+    boothId: string | null
+    productId: string
+    before: number
+    after: number
+    delta: number
+  }
+  createdBy: { id: string; fullName: string }
+  createdAt: string
 }
 
 export const api = {
@@ -271,6 +406,24 @@ export const api = {
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
   getSales: () => request<SaleListItem[]>("/sales"),
+  getSaleDetail: (id: string) => request<SaleDetail>(`/sales/${id}`),
+  previewVoidSale: (id: string) => request<SaleCorrectionImpact>(`/sales/${id}/preview-void`, { method: "POST" }),
+  voidSale: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request(`/sales/${id}/void`, { method: "POST", body: input }),
+  previewReviseSale: (id: string, input: { items: { productId: string; qty: number }[]; paymentMethod?: "CASH" | "QRIS" }) =>
+    request<SaleCorrectionImpact>(`/sales/${id}/preview-revise`, { method: "POST", body: input }),
+  reviseSale: (
+    id: string,
+    input: {
+      idempotencyKey: string
+      items: { productId: string; qty: number }[]
+      paymentMethod?: "CASH" | "QRIS"
+      reasonCode: ReasonCode
+      reasonNote?: string
+    },
+  ) => request(`/sales/${id}/revise`, { method: "POST", body: input }),
+  revisePaymentMethod: (id: string, input: { idempotencyKey: string; method: "CASH" | "QRIS"; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request(`/sales/${id}/revise-payment`, { method: "POST", body: input }),
 
   getShiftTemplates: () => request<ShiftTemplate[]>("/shift-templates"),
   createShiftTemplate: (input: { name: string; startTime: string; endTime: string }) =>
@@ -286,4 +439,36 @@ export const api = {
       method: "POST",
       body: { boothId, items },
     }),
+
+  getStockOpnames: () => request<StockOpname[]>("/stock-opname"),
+  getStockOpname: (id: string) => request<StockOpname>(`/stock-opname/${id}`),
+  startStockOpname: (input: { locationType: "WAREHOUSE" | "BOOTH"; boothId?: string }) =>
+    request<StockOpname>("/stock-opname", { method: "POST", body: input }),
+  confirmStockOpname: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; actualQty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<StockOpname>(`/stock-opname/${id}/confirm`, { method: "POST", body: input }),
+  recountStockOpname: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; actualQty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<StockOpname>(`/stock-opname/${id}/recount`, { method: "POST", body: input }),
+
+  getStockAdjustments: () => request<StockAdjustmentRecord[]>("/stock-adjustments"),
+  createStockAdjustment: (input: {
+    idempotencyKey: string
+    locationType: "WAREHOUSE" | "BOOTH"
+    boothId?: string
+    productId: string
+    targetQty: number
+    reasonCode: ReasonCode
+    reasonNote?: string
+  }) => request<StockAdjustmentRecord>("/stock-adjustments", { method: "POST", body: input }),
+  reverseStockAdjustment: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request<StockAdjustmentRecord>(`/stock-adjustments/${id}/reverse`, { method: "POST", body: input }),
+
+  getTransactionCorrections: () => request<TransactionCorrectionRecord[]>("/transaction-corrections"),
+
+  getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),
+  resolveReconciliationCase: (id: string, input: { status: "RESOLVED" | "IGNORED"; resolutionNote?: string }) =>
+    request<ReconciliationCaseRecord>(`/reconciliation-cases/${id}/resolve`, { method: "POST", body: input }),
 }

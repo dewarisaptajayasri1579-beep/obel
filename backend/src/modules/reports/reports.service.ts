@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SaleStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { businessDateKeyJakarta, startOfDayJakarta } from '../../common/jakarta-date';
+import { effectiveByGroup } from '../../common/effective-version';
 
 const TREND_DAYS = 7;
 
@@ -14,10 +15,13 @@ export class ReportsService {
   async getSummary() {
     const rangeStart = startOfDayJakarta(new Date(Date.now() - (TREND_DAYS - 1) * 24 * 60 * 60 * 1000));
 
-    const sales = await this.prisma.sale.findMany({
+    const salesRaw = await this.prisma.sale.findMany({
       where: { status: SaleStatus.PAID, paidAt: { gte: rangeStart } },
       include: { booth: true, items: { include: { product: true } } },
     });
+    // Effective versions only — revisi lama tidak boleh dihitung dua kali
+    // (docs/24-data-consistency-correction-reversal.md §14).
+    const sales = effectiveByGroup(salesRaw);
 
     const trendByDate = new Map<string, { omzet: number; cup: number }>();
     for (let i = 0; i < TREND_DAYS; i++) {

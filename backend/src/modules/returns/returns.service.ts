@@ -4,8 +4,11 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { CorrectionsService } from '../corrections/corrections.service';
+import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ReceiveReturnDto } from './dto/receive-return.dto';
+import { CancelReturnDto, CorrectReturnReceiptDto } from './dto/correction.dto';
 
 function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -13,7 +16,10 @@ function businessDateOf(date: Date): Date {
 
 @Injectable()
 export class ReturnsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly corrections: CorrectionsService,
+  ) {}
 
   findAll() {
     return this.prisma.stockReturn.findMany({
@@ -145,6 +151,155 @@ export class ReturnsService {
     });
 
     return this.loadWithRelations(id);
+  }
+
+  /// TX-09 — Cancel return SUBMITTED yang belum diterima Gudang. Kembalikan
+  /// stok ke Booth.
+  async cancelReturn(user: JwtPayload, id: string, dto: CancelReturnDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.loadWithRelations(existing.entityId);
+    }
+
+    const stockReturn = await this.loadWithRelations(id);
+    if (!stockReturn) {
+      throw new DomainError('NOT_FOUND', 'Return tidak ditemukan.');
+    }
+    if (stockReturn.status !== ReturnStatus.SUBMITTED) {
+      throw new DomainError('RETURN_NOT_CANCELLABLE', 'Hanya return SUBMITTED yang dapat dibatalkan.', {
+        status: stockReturn.status,
+      });
+    }
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of stockReturn.items) {
+        await tx.boothStock.upsert({
+          where: { boothId_productId: { boothId: stockReturn.boothId, productId: item.productId } },
+          create: { boothId: stockReturn.boothId, productId: item.productId, qtyOnHand: item.qtySubmitted },
+          update: { qtyOnHand: { increment: item.qtySubmitted }, version: { increment: 1 } },
+        });
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: StockMovementType.VOID_REVERSAL,
+            productId: item.productId,
+            qty: item.qtySubmitted,
+            toBoothId: stockReturn.boothId,
+            referenceType: 'return_cancel',
+            referenceId: stockReturn.id,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: user.sub,
+          },
+        });
+      }
+
+      await tx.stockReturn.update({ where: { id: stockReturn.id }, data: { status: ReturnStatus.CANCELLED } });
+
+      await this.corrections.record(tx, {
+        entityType: 'stock_return',
+        entityId: stockReturn.id,
+        transactionGroupId: stockReturn.transactionGroupId,
+        correctionType: 'VOID',
+        originalVersionId: stockReturn.id,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: { boothRestored: stockReturn.items.map((i) => ({ productId: i.productId, qty: i.qtySubmitted })) },
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.loadWithRelations(stockReturn.id);
+  }
+
+  /// TX-10 — Koreksi penerimaan return setelah RECEIVED/DISCREPANCY.
+  /// `qty_received` lama tidak diedit (DC-008); delta diterapkan langsung
+  /// ke warehouse_stocks (COR-08).
+  async correctReceipt(user: JwtPayload, id: string, dto: CorrectReturnReceiptDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.loadWithRelations(existing.entityId);
+    }
+
+    const stockReturn = await this.loadWithRelations(id);
+    if (!stockReturn) {
+      throw new DomainError('NOT_FOUND', 'Return tidak ditemukan.');
+    }
+    if (stockReturn.status !== ReturnStatus.RECEIVED && stockReturn.status !== ReturnStatus.DISCREPANCY) {
+      throw new DomainError('RETURN_NOT_RECEIVED', 'Return ini belum diterima Gudang.', {
+        status: stockReturn.status,
+      });
+    }
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+
+    const correctedQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
+    const now = new Date();
+    const deltas: { productId: string; delta: number }[] = [];
+
+    for (const item of stockReturn.items) {
+      const correctedQty = correctedQtyByProduct.get(item.productId);
+      if (correctedQty === undefined) continue;
+      const recordedQty = item.qtyReceived ?? item.qtySubmitted;
+      const delta = correctedQty - recordedQty;
+      if (delta !== 0) deltas.push({ productId: item.productId, delta });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const { productId, delta } of deltas) {
+        if (delta > 0) {
+          await tx.warehouseStock.upsert({
+            where: { productId },
+            create: { productId, qtyOnHand: delta },
+            update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
+          });
+        } else {
+          const decremented = await tx.warehouseStock.updateMany({
+            where: { productId, qtyOnHand: { gte: -delta } },
+            data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
+          });
+          if (decremented.count !== 1) {
+            throw new DomainError('INSUFFICIENT_STOCK', 'Koreksi akan membuat stok Gudang negatif.', { productId });
+          }
+        }
+
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: StockMovementType.ADJUSTMENT,
+            productId,
+            qty: Math.abs(delta),
+            referenceType: 'return_receipt_correction',
+            referenceId: stockReturn.id,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: user.sub,
+          },
+        });
+      }
+
+      if (deltas.length > 0 && stockReturn.status !== ReturnStatus.DISCREPANCY) {
+        await tx.stockReturn.update({ where: { id: stockReturn.id }, data: { status: ReturnStatus.DISCREPANCY } });
+      }
+
+      await this.corrections.record(tx, {
+        entityType: 'stock_return',
+        entityId: stockReturn.id,
+        transactionGroupId: stockReturn.transactionGroupId,
+        correctionType: 'ADJUSTMENT',
+        originalVersionId: stockReturn.id,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: { deltas },
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.loadWithRelations(stockReturn.id);
   }
 
   private loadWithRelations(id: string) {

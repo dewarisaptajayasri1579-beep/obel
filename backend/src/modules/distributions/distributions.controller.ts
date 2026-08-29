@@ -7,6 +7,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateDistributionDto } from './dto/create-distribution.dto';
 import { ReceiveDistributionDto } from './dto/receive-distribution.dto';
+import { CancelDistributionDto, CorrectReceiptDto, ReviseDistributionDto } from './dto/correction.dto';
 import { DistributionsService } from './distributions.service';
 
 @Controller('distributions')
@@ -43,5 +44,23 @@ export class DistributionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.distributionsService.receive(id, dto, user);
+  }
+
+  @Post(':id/cancel')
+  @Roles(UserRole.ADMIN)
+  cancel(@Param('id') id: string, @Body() dto: CancelDistributionDto, @CurrentUser() user: JwtPayload) {
+    return this.distributionsService.cancelDistribution(user, id, dto);
+  }
+
+  @Post(':id/revise')
+  @Roles(UserRole.ADMIN)
+  revise(@Param('id') id: string, @Body() dto: ReviseDistributionDto, @CurrentUser() user: JwtPayload) {
+    return this.distributionsService.reviseDistribution(user, id, dto);
+  }
+
+  @Post(':id/correct-receipt')
+  @Roles(UserRole.ADMIN)
+  correctReceipt(@Param('id') id: string, @Body() dto: CorrectReceiptDto, @CurrentUser() user: JwtPayload) {
+    return this.distributionsService.correctReceipt(user, id, dto);
   }
 }

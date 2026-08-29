@@ -94,6 +94,86 @@ enum ReturnStatus {
   @@map("return_status")
 }
 
+/// Reason code wajib untuk semua correction posted, per
+/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §10.
+enum ReasonCode {
+  WRONG_PRODUCT
+  WRONG_QTY
+  WRONG_BOOTH
+  WRONG_SHIFT
+  WRONG_PAYMENT_METHOD
+  DUPLICATE_TRANSACTION
+  TRANSACTION_NEVER_HAPPENED
+  WRONG_PHYSICAL_COUNT
+  DAMAGED
+  SPILLED
+  LOST
+  FOUND
+  DATA_ENTRY_ERROR
+  SYSTEM_ERROR
+  OTHER
+
+  @@map("reason_code")
+}
+
+enum CorrectionType {
+  VOID
+  REVISION
+  RECOUNT
+  ADJUSTMENT
+  PAYMENT_CORRECTION
+
+  @@map("correction_type")
+}
+
+enum CorrectionStatus {
+  PENDING
+  POSTED
+  FAILED
+
+  @@map("correction_status")
+}
+
+/// docs/24-data-consistency-correction-reversal.md §13 "payments additions".
+enum PaymentStatus {
+  POSTED
+  REVERSED
+  SUPERSEDED
+
+  @@map("payment_status")
+}
+
+enum ReconciliationStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+
+  @@map("reconciliation_status")
+}
+
+enum ReconciliationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+
+  @@map("reconciliation_severity")
+}
+
+enum OpnameLocationType {
+  WAREHOUSE
+  BOOTH
+
+  @@map("opname_location_type")
+}
+
+enum OpnameStatus {
+  DRAFT
+  CONFIRMED
+  SUPERSEDED
+
+  @@map("opname_status")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -103,39 +183,43 @@ model Booth {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  profiles      Profile[]
-  shiftSessions ShiftSession[]
-  boothStocks   BoothStock[]
+  profiles        Profile[]
+  shiftSessions   ShiftSession[]
+  boothStocks     BoothStock[]
   sales           Sale[]
   distributions   StockDistribution[]
   restockRequests RestockRequest[]
   stockReturns    StockReturn[]
   stockThresholds BoothStockThreshold[]
+  stockOpnames    StockOpname[]
 
   @@map("booths")
 }
 
 model Profile {
-  id             String    @id @default(uuid())
-  username       String    @unique
-  passwordHash   String    @map("password_hash")
-  fullName       String    @map("full_name")
+  id             String   @id @default(uuid())
+  username       String   @unique
+  passwordHash   String   @map("password_hash")
+  fullName       String   @map("full_name")
   role           UserRole
-  defaultBoothId String?   @map("default_booth_id")
-  defaultBooth   Booth?    @relation(fields: [defaultBoothId], references: [id])
-  active         Boolean   @default(true)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  defaultBoothId String?  @map("default_booth_id")
+  defaultBooth   Booth?   @relation(fields: [defaultBoothId], references: [id])
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  shiftSessions        ShiftSession[]
-  sales                Sale[]
-  createdDistributions StockDistribution[] @relation("DistributionCreatedBy")
-  receivedDistributions StockDistribution[] @relation("DistributionReceivedBy")
-  requestedRestocks    RestockRequest[]    @relation("RestockRequestedBy")
-  approvedRestocks     RestockRequest[]    @relation("RestockApprovedBy")
-  countedStockCounts   ShiftStockCount[]
-  submittedReturns     StockReturn[]       @relation("ReturnSubmittedBy")
-  receivedReturns      StockReturn[]       @relation("ReturnReceivedBy")
+  shiftSessions           ShiftSession[]
+  sales                   Sale[]
+  createdDistributions    StockDistribution[]     @relation("DistributionCreatedBy")
+  receivedDistributions   StockDistribution[]     @relation("DistributionReceivedBy")
+  requestedRestocks       RestockRequest[]        @relation("RestockRequestedBy")
+  approvedRestocks        RestockRequest[]        @relation("RestockApprovedBy")
+  countedStockCounts      ShiftStockCount[]
+  submittedReturns        StockReturn[]           @relation("ReturnSubmittedBy")
+  receivedReturns         StockReturn[]           @relation("ReturnReceivedBy")
+  transactionCorrections  TransactionCorrection[]
+  resolvedReconciliations ReconciliationCase[]
+  stockOpnames            StockOpname[]
 
   @@index([role])
   @@index([defaultBoothId])
@@ -155,26 +239,27 @@ model ProductCategory {
 }
 
 model Product {
-  id         String   @id @default(uuid())
-  sku        String   @unique
+  id         String           @id @default(uuid())
+  sku        String           @unique
   name       String
-  categoryId String?  @map("category_id")
+  categoryId String?          @map("category_id")
   category   ProductCategory? @relation(fields: [categoryId], references: [id])
-  sellPrice  BigInt   @map("sell_price")
-  active     Boolean  @default(true)
-  sortOrder  Int      @default(0) @map("sort_order")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  sellPrice  BigInt           @map("sell_price")
+  active     Boolean          @default(true)
+  sortOrder  Int              @default(0) @map("sort_order")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
-  boothStocks        BoothStock[]
-  saleItems          SaleItem[]
-  stockMovements     StockMovement[]
-  warehouseStock     WarehouseStock?
-  distributionItems  StockDistributionItem[]
+  boothStocks         BoothStock[]
+  saleItems           SaleItem[]
+  stockMovements      StockMovement[]
+  warehouseStock      WarehouseStock?
+  distributionItems   StockDistributionItem[]
   restockRequestItems RestockRequestItem[]
   stockCountItems     ShiftStockCountItem[]
   stockReturnItems    StockReturnItem[]
   stockThresholds     BoothStockThreshold[]
+  StockOpnameItem     StockOpnameItem[]
 
   @@index([categoryId])
   @@index([active])
@@ -186,12 +271,12 @@ model Product {
 /// dianggap memakai default (lihat DEFAULT_MINIMUM_QTY/DEFAULT_CRITICAL_QTY
 /// di booth-stock-thresholds.service.ts), bukan berarti stok selalu aman.
 model BoothStockThreshold {
-  boothId     String  @map("booth_id")
-  booth       Booth   @relation(fields: [boothId], references: [id])
-  productId   String  @map("product_id")
-  product     Product @relation(fields: [productId], references: [id])
-  minimumQty  Int     @default(25) @map("minimum_qty")
-  criticalQty Int     @default(10) @map("critical_qty")
+  boothId     String   @map("booth_id")
+  booth       Booth    @relation(fields: [boothId], references: [id])
+  productId   String   @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id])
+  minimumQty  Int      @default(25) @map("minimum_qty")
+  criticalQty Int      @default(10) @map("critical_qty")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@id([boothId, productId])
@@ -211,22 +296,22 @@ model ShiftTemplate {
 }
 
 model ShiftSession {
-  id               String      @id @default(uuid())
-  businessDate     DateTime    @map("business_date") @db.Date
-  boothId          String      @map("booth_id")
-  booth            Booth       @relation(fields: [boothId], references: [id])
-  shiftTemplateId  String      @map("shift_template_id")
+  id               String        @id @default(uuid())
+  businessDate     DateTime      @map("business_date") @db.Date
+  boothId          String        @map("booth_id")
+  booth            Booth         @relation(fields: [boothId], references: [id])
+  shiftTemplateId  String        @map("shift_template_id")
   shiftTemplate    ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
-  staffId          String      @map("staff_id")
-  staff            Profile     @relation(fields: [staffId], references: [id])
-  status           ShiftStatus @default(SCHEDULED)
-  scheduledStartAt DateTime    @map("scheduled_start_at")
-  scheduledEndAt   DateTime    @map("scheduled_end_at")
-  openedAt         DateTime?   @map("opened_at")
-  closingStartedAt DateTime?   @map("closing_started_at")
-  closedAt         DateTime?   @map("closed_at")
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
+  staffId          String        @map("staff_id")
+  staff            Profile       @relation(fields: [staffId], references: [id])
+  status           ShiftStatus   @default(SCHEDULED)
+  scheduledStartAt DateTime      @map("scheduled_start_at")
+  scheduledEndAt   DateTime      @map("scheduled_end_at")
+  openedAt         DateTime?     @map("opened_at")
+  closingStartedAt DateTime?     @map("closing_started_at")
+  closedAt         DateTime?     @map("closed_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
   sales      Sale[]
   stockCount ShiftStockCount?
@@ -274,6 +359,8 @@ model Sale {
   // are forward-compatible without a breaking migration later.
   transactionGroupId String        @default(uuid()) @map("transaction_group_id")
   versionNo          Int           @default(1) @map("version_no")
+  revisionOfId       String?       @map("revision_of_id")
+  reversalOfId       String?       @map("reversal_of_id")
   createdAt          DateTime      @default(now()) @map("created_at")
 
   items    SaleItem[]
@@ -303,12 +390,18 @@ model SaleItem {
 }
 
 model Payment {
-  id     String        @id @default(uuid())
-  saleId String        @map("sale_id")
-  sale   Sale          @relation(fields: [saleId], references: [id])
-  method PaymentMethod
-  amount BigInt
-  paidAt DateTime      @default(now()) @map("paid_at")
+  id                 String        @id @default(uuid())
+  saleId             String        @map("sale_id")
+  sale               Sale          @relation(fields: [saleId], references: [id])
+  method             PaymentMethod
+  amount             BigInt
+  paidAt             DateTime      @default(now()) @map("paid_at")
+  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  status             PaymentStatus @default(POSTED)
+  transactionGroupId String        @default(uuid()) @map("transaction_group_id")
+  versionNo          Int           @default(1) @map("version_no")
+  revisionOfId       String?       @map("revision_of_id")
+  reversalOfId       String?       @map("reversal_of_id")
 
   @@index([saleId])
   @@map("payments")
@@ -339,31 +432,36 @@ model StockMovement {
 }
 
 model WarehouseStock {
-  productId   String   @id @map("product_id")
-  product     Product  @relation(fields: [productId], references: [id])
-  qtyOnHand   Int      @default(0) @map("qty_on_hand")
-  version     BigInt   @default(0)
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  productId String   @id @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  qtyOnHand Int      @default(0) @map("qty_on_hand")
+  version   BigInt   @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("warehouse_stocks")
 }
 
 model StockDistribution {
-  id               String              @id @default(uuid())
-  distributionNo   String              @unique @map("distribution_no")
-  boothId          String              @map("booth_id")
-  booth            Booth               @relation(fields: [boothId], references: [id])
-  status           DistributionStatus  @default(SENT)
-  idempotencyKey   String              @unique @map("idempotency_key")
-  sentAt           DateTime?           @map("sent_at")
-  receivedAt       DateTime?           @map("received_at")
-  createdById      String              @map("created_by")
-  createdBy        Profile             @relation("DistributionCreatedBy", fields: [createdById], references: [id])
-  receivedById     String?             @map("received_by")
-  receivedBy       Profile?            @relation("DistributionReceivedBy", fields: [receivedById], references: [id])
-  note             String?
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
+  id                 String             @id @default(uuid())
+  distributionNo     String             @unique @map("distribution_no")
+  boothId            String             @map("booth_id")
+  booth              Booth              @relation(fields: [boothId], references: [id])
+  status             DistributionStatus @default(SENT)
+  idempotencyKey     String             @unique @map("idempotency_key")
+  sentAt             DateTime?          @map("sent_at")
+  receivedAt         DateTime?          @map("received_at")
+  createdById        String             @map("created_by")
+  createdBy          Profile            @relation("DistributionCreatedBy", fields: [createdById], references: [id])
+  receivedById       String?            @map("received_by")
+  receivedBy         Profile?           @relation("DistributionReceivedBy", fields: [receivedById], references: [id])
+  note               String?
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  transactionGroupId String             @default(uuid()) @map("transaction_group_id")
+  versionNo          Int                @default(1) @map("version_no")
+  revisionOfId       String?            @map("revision_of_id")
+  reversalOfId       String?            @map("reversal_of_id")
 
   items          StockDistributionItem[]
   restockRequest RestockRequest?
@@ -425,14 +523,14 @@ model RestockRequestItem {
 }
 
 model ShiftStockCount {
-  id             String            @id @default(uuid())
-  shiftSessionId String            @unique @map("shift_session_id")
-  shiftSession   ShiftSession      @relation(fields: [shiftSessionId], references: [id])
-  status         StockCountStatus  @default(DRAFT)
-  countedById    String            @map("counted_by")
-  countedBy      Profile           @relation(fields: [countedById], references: [id])
-  countedAt      DateTime          @default(now()) @map("counted_at")
-  confirmedAt    DateTime?         @map("confirmed_at")
+  id             String           @id @default(uuid())
+  shiftSessionId String           @unique @map("shift_session_id")
+  shiftSession   ShiftSession     @relation(fields: [shiftSessionId], references: [id])
+  status         StockCountStatus @default(DRAFT)
+  countedById    String           @map("counted_by")
+  countedBy      Profile          @relation(fields: [countedById], references: [id])
+  countedAt      DateTime         @default(now()) @map("counted_at")
+  confirmedAt    DateTime?        @map("confirmed_at")
   note           String?
 
   items ShiftStockCountItem[]
@@ -458,21 +556,26 @@ model ShiftStockCountItem {
 }
 
 model StockReturn {
-  id             String       @id @default(uuid())
-  returnNo       String       @unique @map("return_no")
-  boothId        String       @map("booth_id")
-  booth          Booth        @relation(fields: [boothId], references: [id])
-  status         ReturnStatus @default(SUBMITTED)
-  idempotencyKey String       @unique @map("idempotency_key")
-  submittedById  String       @map("submitted_by")
-  submittedBy    Profile      @relation("ReturnSubmittedBy", fields: [submittedById], references: [id])
-  submittedAt    DateTime     @default(now()) @map("submitted_at")
-  receivedById   String?      @map("received_by")
-  receivedBy     Profile?     @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
-  receivedAt     DateTime?    @map("received_at")
-  note           String?
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                 String       @id @default(uuid())
+  returnNo           String       @unique @map("return_no")
+  boothId            String       @map("booth_id")
+  booth              Booth        @relation(fields: [boothId], references: [id])
+  status             ReturnStatus @default(SUBMITTED)
+  idempotencyKey     String       @unique @map("idempotency_key")
+  submittedById      String       @map("submitted_by")
+  submittedBy        Profile      @relation("ReturnSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt        DateTime     @default(now()) @map("submitted_at")
+  receivedById       String?      @map("received_by")
+  receivedBy         Profile?     @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
+  receivedAt         DateTime?    @map("received_at")
+  note               String?
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  transactionGroupId String       @default(uuid()) @map("transaction_group_id")
+  versionNo          Int          @default(1) @map("version_no")
+  revisionOfId       String?      @map("revision_of_id")
+  reversalOfId       String?      @map("reversal_of_id")
 
   items StockReturnItem[]
 
@@ -482,15 +585,108 @@ model StockReturn {
 }
 
 model StockReturnItem {
-  id             String      @id @default(uuid())
-  stockReturnId  String      @map("stock_return_id")
-  stockReturn    StockReturn @relation(fields: [stockReturnId], references: [id])
-  productId      String      @map("product_id")
-  product        Product     @relation(fields: [productId], references: [id])
-  qtySubmitted   Int         @map("qty_submitted")
-  qtyReceived    Int?        @map("qty_received")
+  id            String      @id @default(uuid())
+  stockReturnId String      @map("stock_return_id")
+  stockReturn   StockReturn @relation(fields: [stockReturnId], references: [id])
+  productId     String      @map("product_id")
+  product       Product     @relation(fields: [productId], references: [id])
+  qtySubmitted  Int         @map("qty_submitted")
+  qtyReceived   Int?        @map("qty_received")
 
   @@unique([stockReturnId, productId])
   @@index([productId])
   @@map("stock_return_items")
+}
+
+/// Ledger correction generik lintas entity, per
+/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §13.
+/// Setiap void/revise/recount/adjustment domain-specific menulis satu baris
+/// ke sini di dalam transaction atomik yang sama dengan efek domainnya.
+model TransactionCorrection {
+  id                   String           @id @default(uuid())
+  entityType           String           @map("entity_type")
+  entityId             String           @map("entity_id")
+  transactionGroupId   String           @map("transaction_group_id")
+  correctionType       CorrectionType   @map("correction_type")
+  originalVersionId    String?          @map("original_version_id")
+  replacementVersionId String?          @map("replacement_version_id")
+  reasonCode           ReasonCode       @map("reason_code")
+  reasonNote           String?          @map("reason_note")
+  impactSnapshot       Json             @map("impact_snapshot")
+  status               CorrectionStatus @default(POSTED)
+  createdById          String           @map("created_by")
+  createdBy            Profile          @relation(fields: [createdById], references: [id])
+  createdAt            DateTime         @default(now()) @map("created_at")
+  postedAt             DateTime?        @map("posted_at")
+  idempotencyKey       String           @unique @map("idempotency_key")
+
+  @@index([entityType, entityId])
+  @@index([transactionGroupId])
+  @@map("transaction_corrections")
+}
+
+/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §12.
+model ReconciliationCase {
+  id               String                 @id @default(uuid())
+  caseNo           String                 @unique @map("case_no")
+  sourceEntityType String                 @map("source_entity_type")
+  sourceEntityId   String                 @map("source_entity_id")
+  status           ReconciliationStatus   @default(OPEN)
+  severity         ReconciliationSeverity @default(WARNING)
+  reasonCode       ReasonCode             @map("reason_code")
+  details          Json
+  resolvedById     String?                @map("resolved_by")
+  resolvedBy       Profile?               @relation(fields: [resolvedById], references: [id])
+  resolvedAt       DateTime?              @map("resolved_at")
+  resolutionNote   String?                @map("resolution_note")
+  createdAt        DateTime               @default(now()) @map("created_at")
+
+  @@index([sourceEntityType, sourceEntityId])
+  @@index([status])
+  @@map("reconciliation_cases")
+}
+
+/// Stock Opname standalone (TX-11/TX-12), terpisah dari Closing Count shift.
+model StockOpname {
+  id                   String             @id @default(uuid())
+  opnameNo             String             @unique @map("opname_no")
+  locationType         OpnameLocationType @map("location_type")
+  boothId              String?            @map("booth_id")
+  booth                Booth?             @relation(fields: [boothId], references: [id])
+  businessDate         DateTime           @map("business_date") @db.Date
+  status               OpnameStatus       @default(DRAFT)
+  transactionGroupId   String             @default(uuid()) @map("transaction_group_id")
+  versionNo            Int                @default(1) @map("version_no")
+  revisionOfId         String?            @map("revision_of_id")
+  snapshotAt           DateTime           @default(now()) @map("snapshot_at")
+  confirmedAt          DateTime?          @map("confirmed_at")
+  countedById          String             @map("counted_by")
+  countedBy            Profile            @relation(fields: [countedById], references: [id])
+  correctionReasonCode ReasonCode?        @map("correction_reason_code")
+  note                 String?
+
+  items StockOpnameItem[]
+
+  @@index([locationType, boothId])
+  @@index([status])
+  @@index([transactionGroupId])
+  @@map("stock_opnames")
+}
+
+model StockOpnameItem {
+  id                   String      @id @default(uuid())
+  stockOpnameId        String      @map("stock_opname_id")
+  stockOpname          StockOpname @relation(fields: [stockOpnameId], references: [id])
+  productId            String      @map("product_id")
+  product              Product     @relation(fields: [productId], references: [id])
+  expectedQty          Int         @map("expected_qty")
+  actualQty            Int         @map("actual_qty")
+  discrepancyQty       Int         @map("discrepancy_qty")
+  adjustmentMovementId String?     @map("adjustment_movement_id")
+  reasonCode           ReasonCode? @map("reason_code")
+  reasonNote           String?     @map("reason_note")
+
+  @@unique([stockOpnameId, productId])
+  @@index([productId])
+  @@map("stock_opname_items")
 }

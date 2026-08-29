@@ -102,6 +102,48 @@ export class RestockRequestsService {
     });
   }
 
+  /// TX-05 — Revisi qty selama masih REQUESTED. Belum ada efek stok
+  /// (BR-008), jadi ini edit langsung, bukan reversal/replacement seperti
+  /// dokumen yang sudah SENT.
+  async reviseRequestedItems(id: string, dto: CreateRestockRequestDto) {
+    const request = await this.prisma.restockRequest.findUnique({ where: { id } });
+    if (!request) {
+      throw new DomainError('NOT_FOUND', 'Permintaan restock tidak ditemukan.');
+    }
+    if (request.status !== RestockRequestStatus.REQUESTED) {
+      throw new DomainError('RESTOCK_NOT_PENDING', 'Hanya permintaan REQUESTED yang dapat direvisi.', {
+        status: request.status,
+      });
+    }
+
+    const productIds = dto.items.map((i) => i.productId);
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
+    const productById = new Map(products.map((p) => [p.id, p]));
+    for (const item of dto.items) {
+      const product = productById.get(item.productId);
+      if (!product || !product.active) {
+        throw new DomainError('PRODUCT_INACTIVE', 'Salah satu produk tidak aktif atau tidak ditemukan.', {
+          productId: item.productId,
+        });
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.restockRequestItem.deleteMany({ where: { restockRequestId: id } });
+      await tx.restockRequestItem.createMany({
+        data: dto.items.map((i) => ({ restockRequestId: id, productId: i.productId, qtyRequested: i.qty })),
+      });
+      if (dto.note !== undefined) {
+        await tx.restockRequest.update({ where: { id }, data: { note: dto.note } });
+      }
+    });
+
+    return this.prisma.restockRequest.findUnique({
+      where: { id },
+      include: { booth: true, items: { include: { product: true } }, distribution: true },
+    });
+  }
+
   async reject(id: string, dto: RejectRestockRequestDto, actorId: string) {
     const request = await this.prisma.restockRequest.findUnique({ where: { id } });
     if (!request) {

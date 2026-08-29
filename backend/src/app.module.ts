@@ -17,6 +17,10 @@ import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { BoothStockThresholdsModule } from './modules/booth-stock-thresholds/booth-stock-thresholds.module';
 import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.module';
+import { StockOpnameModule } from './modules/stock-opname/stock-opname.module';
+import { StockAdjustmentsModule } from './modules/stock-adjustments/stock-adjustments.module';
+import { ReconciliationCasesModule } from './modules/reconciliation-cases/reconciliation-cases.module';
+import { OwnerModule } from './modules/owner/owner.module';
 
 @Module({
   imports: [
@@ -38,6 +42,10 @@ import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.
     ReportsModule,
     BoothStockThresholdsModule,
     ShiftTemplatesModule,
+    StockOpnameModule,
+    StockAdjustmentsModule,
+    ReconciliationCasesModule,
+    OwnerModule,
   ],
 })
 export class AppModule {}
