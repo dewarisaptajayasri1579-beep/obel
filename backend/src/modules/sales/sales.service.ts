@@ -156,6 +156,28 @@ export class SalesService {
     return this.toSaleResponse(saleId);
   }
 
+  /// Sales list untuk Admin (05-feature-specification.md §B7).
+  async findAll() {
+    const sales = await this.prisma.sale.findMany({
+      include: { booth: true, staff: true, items: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+
+    return sales.map((s) => ({
+      id: s.id,
+      saleNo: s.saleNo,
+      boothName: s.booth.name,
+      staffName: s.staff.fullName,
+      status: s.status,
+      total: Number(s.total),
+      cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
+      paymentMethod: s.paymentMethod,
+      paidAt: s.paidAt,
+      createdAt: s.createdAt,
+    }));
+  }
+
   private async toSaleResponse(saleId: string) {
     const sale = await this.prisma.sale.findUniqueOrThrow({
       where: { id: saleId },

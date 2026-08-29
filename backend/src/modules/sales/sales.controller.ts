@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -12,6 +12,12 @@ import { SalesService } from './sales.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
+
+  @Get()
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  findAll() {
+    return this.salesService.findAll();
+  }
 
   @Post()
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)

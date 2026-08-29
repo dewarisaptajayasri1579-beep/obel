@@ -132,6 +132,39 @@ export interface RestockRequestItemView {
   product: { id: string; name: string; sellPrice: number }
 }
 
+export interface AdminDashboard {
+  omzetToday: number
+  cupSoldToday: number
+  transactionCountToday: number
+  activeBoothsCount: number
+  lowStockCount: number
+  pendingDistributions: number
+  pendingRestock: number
+  pendingReturns: number
+}
+
+export interface BoothStockRow {
+  boothId: string
+  boothName: string
+  productId: string
+  productName: string
+  qtyOnHand: number
+  status: "Aman" | "Menipis" | "Kritis" | "Habis"
+}
+
+export interface SaleListItem {
+  id: string
+  saleNo: string
+  boothName: string
+  staffName: string
+  status: "PENDING" | "PAID" | "VOIDED"
+  total: number
+  cupCount: number
+  paymentMethod: "CASH" | "QRIS"
+  paidAt: string | null
+  createdAt: string
+}
+
 export interface StockReturnItemView {
   id: string
   productId: string
@@ -211,4 +244,8 @@ export const api = {
   getReturns: () => request<StockReturn[]>("/returns"),
   receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[]) =>
     request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
+
+  getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
+  getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
+  getSales: () => request<SaleListItem[]>("/sales"),
 }

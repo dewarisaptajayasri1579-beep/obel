@@ -12,6 +12,8 @@ import { WarehouseStockModule } from './modules/warehouse-stock/warehouse-stock.
 import { DistributionsModule } from './modules/distributions/distributions.module';
 import { RestockRequestsModule } from './modules/restock-requests/restock-requests.module';
 import { ReturnsModule } from './modules/returns/returns.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { ReturnsModule } from './modules/returns/returns.module';
     DistributionsModule,
     RestockRequestsModule,
     ReturnsModule,
+    DashboardModule,
+    BoothStockModule,
   ],
 })
 export class AppModule {}
