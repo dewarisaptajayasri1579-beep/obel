@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api_client.dart';
 import '../app_state.dart';
 import '../theme.dart';
 
@@ -12,6 +13,29 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _paymentMethod = 'Tunai'; // 'Tunai' or 'QRIS'
+  bool _paying = false;
+
+  Future<void> _pay() async {
+    setState(() => _paying = true);
+    try {
+      await context.read<AppState>().checkout(_paymentMethod == 'Tunai' ? 'CASH' : 'QRIS');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pembayaran sukses! Mencetak nota...'),
+          backgroundColor: ObbelTheme.primaryDark,
+        ),
+      );
+      Navigator.popUntil(context, ModalRoute.withName('/home'));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
+      );
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,19 +238,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 20),
 
                   ElevatedButton(
-                    onPressed: cartItems.isEmpty
-                        ? null
-                        : () {
-                            context.read<AppState>().checkout();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Pembayaran sukses! Mencetak nota...'),
-                                backgroundColor: ObbelTheme.primaryDark,
-                              ),
-                            );
-                            Navigator.popUntil(context, ModalRoute.withName('/home'));
-                          },
-                    child: const Text('BAYAR & PRINT NOTA'),
+                    onPressed: (cartItems.isEmpty || _paying) ? null : _pay,
+                    child: _paying
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text('BAYAR & PRINT NOTA'),
                   )
                 ],
               ),

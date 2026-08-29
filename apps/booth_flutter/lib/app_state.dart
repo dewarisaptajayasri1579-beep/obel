@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
+import 'api_client.dart';
 import 'models.dart';
 
 const _minimumQty = 25;
 const _criticalQty = 10;
+const _uuid = Uuid();
 
 String _statusFor(int qty) {
   if (qty <= 0) return 'Habis';
@@ -12,61 +15,52 @@ String _statusFor(int qty) {
   return 'Aman';
 }
 
-/// State bersama seluruh layar Petugas Booth (Beranda, POS, Stok, Shift,
-/// Terima Stok). Dipakai sebagai pengganti sementara Backend API — setiap
-/// mutation di sini (checkout, receiveInbound) adalah tempat yang tepat untuk
-/// nanti diganti pemanggilan service/RPC atomik + stock_movements.
+String _fmtTime(DateTime dt) =>
+    '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')}';
+
+/// State bersama seluruh layar Petugas Booth. Login, katalog/stok, dan
+/// checkout memanggil Backend API sungguhan (lihat api_client.dart).
+/// Terima Stok masih data mock karena Backend API belum menyediakan endpoint
+/// distribusi — akan diganti begitu modul itu dibangun.
 class AppState extends ChangeNotifier {
-  AppState()
-      : catalog = const [
-          Product(id: '1', name: 'Original', price: 8000, category: 'Coffee Milk', imagePath: ''),
-          Product(id: '2', name: 'Brown Sugar', price: 10000, category: 'Coffee Milk', imagePath: ''),
-          Product(id: '3', name: 'Salted Caramel', price: 10000, category: 'Coffee Milk', imagePath: ''),
-          Product(id: '4', name: 'Matcha', price: 10000, category: 'Non Coffee', imagePath: ''),
-          Product(id: '5', name: 'Taro', price: 10000, category: 'Non Coffee', imagePath: ''),
-          Product(id: '6', name: 'Chocolate', price: 10000, category: 'Non Coffee', imagePath: ''),
-          Product(id: '7', name: 'Red Velvet', price: 10000, category: 'Non Coffee', imagePath: ''),
-          Product(id: '8', name: 'Americano', price: 10000, category: 'Coffee', imagePath: ''),
-        ] {
-    stock = [
-      BoothStock(product: catalog[0], currentQty: 120, status: _statusFor(120)),
-      BoothStock(product: catalog[1], currentQty: 80, status: _statusFor(80)),
-      BoothStock(product: catalog[2], currentQty: 60, status: _statusFor(60)),
-      BoothStock(product: catalog[3], currentQty: 70, status: _statusFor(70)),
-      BoothStock(product: catalog[4], currentQty: 60, status: _statusFor(60)),
-      BoothStock(product: catalog[5], currentQty: 50, status: _statusFor(50)),
-      BoothStock(product: catalog[6], currentQty: 40, status: _statusFor(40)),
-      BoothStock(product: catalog[7], currentQty: 30, status: _statusFor(30)),
-    ];
-    pendingInbound = [
-      InboundItem(product: catalog[0], expectedQty: 10, actualQty: 10),
-      InboundItem(product: catalog[1], expectedQty: 5, actualQty: 5),
-      InboundItem(product: catalog[3], expectedQty: 10, actualQty: 10),
-      InboundItem(product: catalog[4], expectedQty: 5, actualQty: 5),
-    ];
-    soldQtyByProductId = {'2': 30, '1': 30, '4': 18};
-  }
+  AppState({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
-  final String staffName = 'Kak Rina';
-  final String boothName = 'Booth Gallery Pandanaran';
-  final String shiftLabel = 'SHIFT 1 AKTIF';
-  final String shiftTime = '08.00 - 16.30';
+  final ApiClient _api;
+  String? _token;
 
-  final List<Product> catalog;
-  late List<BoothStock> stock;
-  late List<InboundItem>? pendingInbound;
+  bool loggedIn = false;
+  bool loading = false;
+
+  String staffName = '';
+  String boothName = '';
+  String shiftLabel = '';
+  String shiftTime = '';
+  String? shiftSessionId;
+
+  List<Product> catalog = [];
+  List<BoothStock> stock = [];
   final List<CartItem> cart = [];
-  late Map<String, int> soldQtyByProductId;
+  List<InboundItem>? pendingInbound = [
+    InboundItem(
+      product: const Product(id: 'mock-1', name: 'Original', price: 8000, category: 'Coffee Milk', imagePath: ''),
+      expectedQty: 10,
+      actualQty: 10,
+    ),
+    InboundItem(
+      product: const Product(id: 'mock-2', name: 'Brown Sugar', price: 10000, category: 'Coffee Milk', imagePath: ''),
+      expectedQty: 5,
+      actualQty: 5,
+    ),
+  ];
+  final Map<String, int> soldQtyByProductId = {};
 
-  int omzetToday = 1250000;
-  int cupSoldToday = 125;
-  int transactionCount = 32;
+  int omzetToday = 0;
+  int cupSoldToday = 0;
+  int transactionCount = 0;
 
   int get cartCount => cart.fold(0, (sum, item) => sum + item.quantity);
   int get cartTotal => cart.fold(0, (sum, item) => sum + item.totalPrice);
-
   int get lowStockCount => stock.where((s) => s.status != 'Aman').length;
-
   int get averagePerTransaction =>
       transactionCount == 0 ? 0 : (omzetToday / transactionCount).round();
 
@@ -82,17 +76,86 @@ class AppState extends ChangeNotifier {
   }
 
   String productName(String productId) =>
-      catalog.firstWhere((p) => p.id == productId).name;
+      catalog.firstWhere((p) => p.id == productId, orElse: () => catalog.first).name;
 
   int stockQtyFor(String productId) {
     final match = stock.where((s) => s.product.id == productId);
     return match.isEmpty ? 0 : match.first.currentQty;
   }
 
+  Future<void> login(String username, String password) async {
+    loading = true;
+    notifyListeners();
+    try {
+      final result = await _api.login(username, password);
+      _token = result['accessToken'] as String;
+      final profile = result['profile'] as Map<String, dynamic>;
+      staffName = profile['fullName'] as String;
+
+      await _loadShiftAndCatalog();
+      loggedIn = true;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException(
+        'NETWORK_ERROR',
+        'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      );
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  void logout() {
+    _token = null;
+    loggedIn = false;
+    cart.clear();
+    notifyListeners();
+  }
+
+  Future<void> _loadShiftAndCatalog() async {
+    final shift = await _api.getActiveShift(_token!);
+    boothName = (shift['booth'] as Map)['name'] as String;
+    shiftSessionId = shift['shiftSessionId'] as String;
+    shiftLabel = '${shift['shiftName']} AKTIF'.toUpperCase();
+    final startAt = DateTime.parse(shift['scheduledStartAt'] as String).toLocal();
+    final endAt = DateTime.parse(shift['scheduledEndAt'] as String).toLocal();
+    shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
+
+    await refreshCatalog();
+  }
+
+  Future<void> refreshCatalog() async {
+    if (_token == null) return;
+    final items = await _api.getCatalog(_token!);
+    final products = <Product>[];
+    final stocks = <BoothStock>[];
+
+    for (final raw in items) {
+      final map = raw as Map<String, dynamic>;
+      final product = Product(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        price: (map['sellPrice'] as num).toInt(),
+        category: (map['category'] as String?) ?? '',
+        imagePath: '',
+      );
+      final qty = map['qtyOnHand'] as int;
+      products.add(product);
+      stocks.add(BoothStock(product: product, currentQty: qty, status: _statusFor(qty)));
+    }
+
+    catalog = products;
+    stock = stocks;
+    notifyListeners();
+  }
+
   void addToCart(Product product) {
     final available = stockQtyFor(product.id);
-    final inCart = cart.where((c) => c.product.id == product.id);
-    final currentQty = inCart.isEmpty ? 0 : inCart.first.quantity;
+    final currentQty = cart
+        .where((c) => c.product.id == product.id)
+        .fold(0, (sum, c) => sum + c.quantity);
     if (currentQty >= available) return;
 
     final existingIndex = cart.indexWhere((item) => item.product.id == product.id);
@@ -120,34 +183,41 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mengurangi stok sesuai isi cart, mencatat omzet/cup/transaksi, lalu
-  /// mengosongkan cart. Mengembalikan total yang dibayar.
-  int checkout() {
-    final total = cartTotal;
-    final cupCount = cartCount;
+  void clearCart() {
+    cart.clear();
+    notifyListeners();
+  }
 
-    for (final item in cart) {
-      final idx = stock.indexWhere((s) => s.product.id == item.product.id);
-      if (idx >= 0) {
-        stock[idx].currentQty -= item.quantity;
-        stock[idx] = BoothStock(
-          product: stock[idx].product,
-          currentQty: stock[idx].currentQty,
-          status: _statusFor(stock[idx].currentQty),
-        );
-      }
-      soldQtyByProductId.update(
-        item.product.id,
-        (v) => v + item.quantity,
-        ifAbsent: () => item.quantity,
-      );
+  /// Memanggil POST /sales (create_paid_sale). Server yang menghitung
+  /// harga & memotong stok; kita cukup refresh katalog sesudahnya supaya
+  /// tetap sinkron dengan source of truth di backend.
+  Future<int> checkout(String paymentMethod) async {
+    if (_token == null || shiftSessionId == null) {
+      throw ApiException('SHIFT_NOT_OPEN', 'Shift tidak ditemukan, silakan login ulang.');
     }
 
+    final cupCount = cartCount;
+    final soldSnapshot = cart.map((c) => MapEntry(c.product.id, c.quantity)).toList();
+
+    final result = await _api.createSale(
+      _token!,
+      idempotencyKey: _uuid.v4(),
+      shiftSessionId: shiftSessionId!,
+      paymentMethod: paymentMethod,
+      items: cart.map((c) => {'productId': c.product.id, 'qty': c.quantity}).toList(),
+    );
+
+    final total = (result['total'] as num).toInt();
+
+    for (final entry in soldSnapshot) {
+      soldQtyByProductId.update(entry.key, (v) => v + entry.value, ifAbsent: () => entry.value);
+    }
     omzetToday += total;
     cupSoldToday += cupCount;
     transactionCount += 1;
     cart.clear();
-    notifyListeners();
+
+    await refreshCatalog();
     return total;
   }
 
@@ -157,20 +227,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Menambahkan qty yang benar-benar diterima ke stok Booth, lalu
-  /// menghapus daftar stok masuk (dianggap sudah diterima).
+  /// Mock — belum ada endpoint distribusi di Backend API. Menambahkan qty
+  /// ke stok lokal supaya UI tetap bisa didemokan sebelum modul itu ada.
   void receiveInbound() {
     final items = pendingInbound;
     if (items == null) return;
     for (final item in items) {
-      final idx = stock.indexWhere((s) => s.product.id == item.product.id);
+      final idx = stock.indexWhere((s) => s.product.name == item.product.name);
       if (idx >= 0) {
         stock[idx].currentQty += item.actualQty;
-        stock[idx] = BoothStock(
-          product: stock[idx].product,
-          currentQty: stock[idx].currentQty,
-          status: _statusFor(stock[idx].currentQty),
-        );
       }
     }
     pendingInbound = null;

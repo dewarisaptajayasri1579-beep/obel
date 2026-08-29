@@ -203,7 +203,7 @@ class ShiftScreen extends StatelessWidget {
                         foregroundColor: Colors.redAccent,
                       ),
                       onPressed: () {
-                        // Kembali ke halaman Login
+                        context.read<AppState>().logout();
                         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
                       },
                       child: const Text(
