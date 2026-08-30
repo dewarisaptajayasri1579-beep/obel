@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../app_state.dart';
+import '../theme.dart';
 
 final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
@@ -33,88 +34,121 @@ class _BoothDetailScreenState extends State<BoothDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
+    final status = detail?['booth']?['status'] as String?;
+
     return Scaffold(
-      appBar: AppBar(title: Text(widget.boothName)),
+      backgroundColor: ObbelTheme.backgroundLight,
       body: detail == null
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Omzet Hari Ini', style: TextStyle(fontSize: 12)),
-                                Text(_rupiah.format(detail['omzetToday']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
+              child: CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    pinned: true,
+                    expandedHeight: 150,
+                    backgroundColor: ObbelTheme.primaryDark,
+                    foregroundColor: Colors.white,
+                    flexibleSpace: FlexibleSpaceBar(
+                      title: Text(widget.boothName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      background: Container(
+                        decoration: const BoxDecoration(
+                          image: DecorationImage(image: AssetImage('assets/images/back-img.png'), fit: BoxFit.cover),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Cup Terjual', style: TextStyle(fontSize: 12)),
-                                Text('${detail['cupSoldToday']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                    ),
+                    actions: [
+                      if (status != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16, top: 12),
+                          child: Chip(
+                            label: Text(status == 'ACTIVE' ? 'Aktif' : 'Nonaktif', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            backgroundColor: status == 'ACTIVE' ? ObbelTheme.primaryMedium : Colors.grey,
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
                           ),
                         ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Card(
-                    child: ListTile(
-                      title: const Text('Transaksi Hari Ini'),
-                      trailing: Text('${detail['transactionCountToday']}'),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text('Produk Terlaris', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  ...List<Map<String, dynamic>>.from(detail['topProducts'] as List).map(
-                    (p) => Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: ListTile(title: Text(p['productName']), trailing: Text('${p['qty']} cup')),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text('Sisa Stok', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  ...List<Map<String, dynamic>>.from(detail['stockRemaining'] as List).map(
-                    (s) => Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: ListTile(title: Text(s['productName']), trailing: Text('${s['qtyOnHand']}')),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text('Shift Terakhir', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  ...List<Map<String, dynamic>>.from(detail['recentShifts'] as List).map(
-                    (s) => Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: ListTile(
-                        title: Text('${s['shiftName']} — ${s['staffName']}'),
-                        trailing: Text(s['status']),
-                      ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        Row(
+                          children: [
+                            Expanded(child: _statCard('Omzet Hari Ini', _rupiah.format(detail['omzetToday']))),
+                            const SizedBox(width: 12),
+                            Expanded(child: _statCard('Cup Terjual', '${detail['cupSoldToday']} cup')),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: _statCard('Transaksi', '${detail['transactionCountToday']}')),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _statCard(
+                                'Stok Tersedia',
+                                '${(detail['stockRemaining'] as List).fold<int>(0, (sum, s) => sum + (s['qtyOnHand'] as int))} cup',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        const Text('Produk Terlaris', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ObbelTheme.textDark)),
+                        const SizedBox(height: 10),
+                        ...List<Map<String, dynamic>>.from(detail['topProducts'] as List).map(
+                          (p) => _listRow(p['productName'], '${p['qty']} cup'),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text('Sisa Stok', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ObbelTheme.textDark)),
+                        const SizedBox(height: 10),
+                        ...List<Map<String, dynamic>>.from(detail['stockRemaining'] as List).map(
+                          (s) => _listRow(s['productName'], '${s['qtyOnHand']}'),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text('Riwayat Shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ObbelTheme.textDark)),
+                        const SizedBox(height: 10),
+                        ...List<Map<String, dynamic>>.from(detail['recentShifts'] as List).map(
+                          (s) => _listRow('${s['shiftName']} — ${s['staffName']}', s['status']),
+                        ),
+                        const SizedBox(height: 16),
+                      ]),
                     ),
                   ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _statCard(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: ObbelTheme.textLight, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontFamily: 'Outfit', fontSize: 17, fontWeight: FontWeight.w900, color: ObbelTheme.textDark)),
+        ],
+      ),
+    );
+  }
+
+  Widget _listRow(String title, String trailing) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.grey.shade200)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: ObbelTheme.textDark, fontSize: 13))),
+          Text(trailing, style: const TextStyle(fontWeight: FontWeight.w800, color: ObbelTheme.primaryDark, fontSize: 13)),
+        ],
+      ),
     );
   }
 }
