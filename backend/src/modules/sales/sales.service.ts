@@ -18,6 +18,7 @@ import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
 import { VoidSaleDto } from './dto/void-sale.dto';
+import { CreateRefundDto } from './dto/create-refund.dto';
 
 interface StockDelta {
   productId: string;
@@ -486,6 +487,158 @@ export class SalesService {
     });
 
     return this.toSaleResponse(sale.id);
+  }
+
+  /// TX-14 — Customer Sales Return/Refund. BEDA dari Void: sale asli benar
+  /// dan memang terjadi, tetap PAID; ini dokumen baru untuk kejadian bisnis
+  /// setelahnya. Stok hanya bertambah kalau item ditandai stockReturned.
+  async createRefund(user: JwtPayload, saleId: string, dto: CreateRefundDto) {
+    const existingRefund = await this.prisma.saleRefund.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existingRefund) {
+      return this.toRefundResponse(existingRefund.id);
+    }
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { items: true, refunds: { include: { items: true } } },
+    });
+    if (!sale) {
+      throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
+    }
+    if (sale.status !== SaleStatus.PAID) {
+      throw new DomainError('SALE_NOT_REFUNDABLE', 'Hanya sale berstatus PAID yang dapat di-refund.', {
+        status: sale.status,
+      });
+    }
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+
+    const itemBySale = new Map(sale.items.map((i) => [i.productId, i]));
+    const alreadyRefundedByProduct = new Map<string, number>();
+    for (const refund of sale.refunds) {
+      for (const item of refund.items) {
+        alreadyRefundedByProduct.set(item.productId, (alreadyRefundedByProduct.get(item.productId) ?? 0) + item.qty);
+      }
+    }
+
+    let amount = 0n;
+    const refundItemsData: Prisma.SaleRefundItemCreateManySaleRefundInput[] = [];
+    const stockDeltas: { productId: string; qty: number }[] = [];
+
+    for (const item of dto.items) {
+      const saleItem = itemBySale.get(item.productId);
+      if (!saleItem) {
+        throw new DomainError('PRODUCT_NOT_IN_SALE', 'Produk ini tidak ada di sale asli.', { productId: item.productId });
+      }
+      const alreadyRefunded = alreadyRefundedByProduct.get(item.productId) ?? 0;
+      if (alreadyRefunded + item.qty > saleItem.qty) {
+        throw new DomainError('REFUND_EXCEEDS_SALE_QTY', `Qty refund melebihi qty sale untuk produk ini.`, {
+          productId: item.productId,
+          saleQty: saleItem.qty,
+          alreadyRefunded,
+          requested: item.qty,
+        });
+      }
+
+      const lineTotal = saleItem.unitPrice * BigInt(item.qty);
+      amount += lineTotal;
+      refundItemsData.push({
+        productId: item.productId,
+        qty: item.qty,
+        unitPrice: saleItem.unitPrice,
+        lineTotal,
+        stockReturned: dto.condition === 'REFUND_WITH_STOCK_RETURN' || item.stockReturned === true,
+      });
+
+      if (dto.condition === 'REFUND_WITH_STOCK_RETURN' || item.stockReturned === true) {
+        stockDeltas.push({ productId: item.productId, qty: item.qty });
+      }
+    }
+
+    const refundId = randomUUID();
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const { productId, qty } of stockDeltas) {
+        await tx.boothStock.upsert({
+          where: { boothId_productId: { boothId: sale.boothId, productId } },
+          create: { boothId: sale.boothId, productId, qtyOnHand: qty },
+          update: { qtyOnHand: { increment: qty }, version: { increment: 1 } },
+        });
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: StockMovementType.ADJUSTMENT,
+            productId,
+            qty,
+            toBoothId: sale.boothId,
+            referenceType: 'sale_refund',
+            referenceId: refundId,
+            shiftSessionId: sale.shiftSessionId,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: user.sub,
+          },
+        });
+      }
+
+      await tx.saleRefund.create({
+        data: {
+          id: refundId,
+          refundNo: generateDocNo('RFD'),
+          saleId: sale.id,
+          condition: dto.condition,
+          amount,
+          reasonCode: dto.reasonCode,
+          reasonNote: dto.reasonNote,
+          createdById: user.sub,
+          idempotencyKey: dto.idempotencyKey,
+          items: { createMany: { data: refundItemsData } },
+        },
+      });
+    });
+
+    return this.toRefundResponse(refundId);
+  }
+
+  async listRefunds(saleId: string) {
+    const refunds = await this.prisma.saleRefund.findMany({
+      where: { saleId },
+      include: { items: { include: { product: true } }, createdBy: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return refunds.map((r) => this.formatRefund(r));
+  }
+
+  private async toRefundResponse(refundId: string) {
+    const refund = await this.prisma.saleRefund.findUniqueOrThrow({
+      where: { id: refundId },
+      include: { items: { include: { product: true } }, createdBy: true },
+    });
+    return this.formatRefund(refund);
+  }
+
+  private formatRefund(
+    refund: Prisma.SaleRefundGetPayload<{ include: { items: { include: { product: true } }; createdBy: true } }>,
+  ) {
+    return {
+      id: refund.id,
+      refundNo: refund.refundNo,
+      saleId: refund.saleId,
+      condition: refund.condition,
+      amount: Number(refund.amount),
+      reasonCode: refund.reasonCode,
+      reasonNote: refund.reasonNote,
+      createdByName: refund.createdBy.fullName,
+      createdAt: refund.createdAt,
+      items: refund.items.map((i) => ({
+        productId: i.productId,
+        productName: i.product.name,
+        qty: i.qty,
+        unitPrice: Number(i.unitPrice),
+        lineTotal: Number(i.lineTotal),
+        stockReturned: i.stockReturned,
+      })),
+    };
   }
 
   private async loadVoidableSale(saleId: string) {

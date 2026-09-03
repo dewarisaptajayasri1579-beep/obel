@@ -174,6 +174,16 @@ enum OpnameStatus {
   @@map("opname_status")
 }
 
+/// TX-14 — beda dari Void: sale asli tetap PAID (memang pernah terjadi),
+/// lalu ada kejadian bisnis customer return/refund setelahnya.
+enum RefundCondition {
+  REFUND_NO_STOCK_RETURN
+  REFUND_WITH_STOCK_RETURN
+  PARTIAL_REFUND
+
+  @@map("refund_condition")
+}
+
 model Booth {
   id           String      @id @default(uuid())
   code         String      @unique
@@ -220,6 +230,7 @@ model Profile {
   transactionCorrections  TransactionCorrection[]
   resolvedReconciliations ReconciliationCase[]
   stockOpnames            StockOpname[]
+  saleRefunds             SaleRefund[]
 
   @@index([role])
   @@index([defaultBoothId])
@@ -260,6 +271,7 @@ model Product {
   stockReturnItems    StockReturnItem[]
   stockThresholds     BoothStockThreshold[]
   StockOpnameItem     StockOpnameItem[]
+  saleRefundItems     SaleRefundItem[]
 
   @@index([categoryId])
   @@index([active])
@@ -365,6 +377,7 @@ model Sale {
 
   items    SaleItem[]
   payments Payment[]
+  refunds  SaleRefund[]
 
   @@index([boothId, createdAt])
   @@index([shiftSessionId])
@@ -405,6 +418,44 @@ model Payment {
 
   @@index([saleId])
   @@map("payments")
+}
+
+/// TX-14 — dokumen refund terpisah dari sale asli (yang tetap PAID/tidak
+/// dihapus). Stok hanya bertambah jika condition = REFUND_WITH_STOCK_RETURN.
+model SaleRefund {
+  id             String          @id @default(uuid())
+  refundNo       String          @unique @map("refund_no")
+  saleId         String          @map("sale_id")
+  sale           Sale            @relation(fields: [saleId], references: [id])
+  condition      RefundCondition
+  amount         BigInt
+  reasonCode     ReasonCode      @map("reason_code")
+  reasonNote     String?         @map("reason_note")
+  createdById    String          @map("created_by")
+  createdBy      Profile         @relation(fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now()) @map("created_at")
+  idempotencyKey String          @unique @map("idempotency_key")
+
+  items SaleRefundItem[]
+
+  @@index([saleId])
+  @@map("sale_refunds")
+}
+
+model SaleRefundItem {
+  id            String     @id @default(uuid())
+  saleRefundId  String     @map("sale_refund_id")
+  saleRefund    SaleRefund @relation(fields: [saleRefundId], references: [id])
+  productId     String     @map("product_id")
+  product       Product    @relation(fields: [productId], references: [id])
+  qty           Int
+  unitPrice     BigInt     @map("unit_price")
+  lineTotal     BigInt     @map("line_total")
+  stockReturned Boolean    @default(false) @map("stock_returned")
+
+  @@index([saleRefundId])
+  @@index([productId])
+  @@map("sale_refund_items")
 }
 
 model StockMovement {

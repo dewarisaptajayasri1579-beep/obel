@@ -8,6 +8,7 @@ import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
 import { VoidSaleDto } from './dto/void-sale.dto';
+import { CreateRefundDto } from './dto/create-refund.dto';
 import { SalesService } from './sales.service';
 
 @Controller('sales')
@@ -61,5 +62,17 @@ export class SalesController {
   @Roles(UserRole.ADMIN)
   revisePayment(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: RevisePaymentDto) {
     return this.salesService.revisePayment(user, id, dto);
+  }
+
+  @Get(':id/refunds')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  listRefunds(@Param('id') id: string) {
+    return this.salesService.listRefunds(id);
+  }
+
+  @Post(':id/refund')
+  @Roles(UserRole.ADMIN)
+  refund(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: CreateRefundDto) {
+    return this.salesService.createRefund(user, id, dto);
   }
 }

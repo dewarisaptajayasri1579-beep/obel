@@ -193,6 +193,19 @@ export interface SaleDetail {
   items: SaleDetailItem[]
 }
 
+export interface SaleRefund {
+  id: string
+  refundNo: string
+  saleId: string
+  condition: "REFUND_NO_STOCK_RETURN" | "REFUND_WITH_STOCK_RETURN" | "PARTIAL_REFUND"
+  amount: number
+  reasonCode: string
+  reasonNote: string | null
+  createdByName: string
+  createdAt: string
+  items: { productId: string; productName: string; qty: number; unitPrice: number; lineTotal: number; stockReturned: boolean }[]
+}
+
 export interface SaleCorrectionImpact {
   omzetDelta: number
   cupSoldDelta: number
@@ -438,6 +451,17 @@ export const api = {
   ) => request(`/sales/${id}/revise`, { method: "POST", body: input }),
   revisePaymentMethod: (id: string, input: { idempotencyKey: string; method: "CASH" | "QRIS"; reasonCode: ReasonCode; reasonNote?: string }) =>
     request(`/sales/${id}/revise-payment`, { method: "POST", body: input }),
+  getSaleRefunds: (id: string) => request<SaleRefund[]>(`/sales/${id}/refunds`),
+  createSaleRefund: (
+    id: string,
+    input: {
+      idempotencyKey: string
+      items: { productId: string; qty: number; stockReturned?: boolean }[]
+      condition: "REFUND_NO_STOCK_RETURN" | "REFUND_WITH_STOCK_RETURN" | "PARTIAL_REFUND"
+      reasonCode: ReasonCode
+      reasonNote?: string
+    },
+  ) => request<SaleRefund>(`/sales/${id}/refund`, { method: "POST", body: input }),
 
   getShiftTemplates: () => request<ShiftTemplate[]>("/shift-templates"),
   createShiftTemplate: (input: { name: string; startTime: string; endTime: string }) =>

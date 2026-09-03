@@ -31,7 +31,7 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.sale.findMany({
         where: { status: SaleStatus.PAID, paidAt: { gte: todayStart } },
-        include: { items: true },
+        include: { items: true, refunds: true },
       }),
       this.prisma.shiftSession.count({ where: { status: ShiftStatus.OPEN } }),
       this.prisma.boothStock.findMany(),
@@ -55,7 +55,12 @@ export class DashboardService {
       return resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty) !== 'Aman';
     }).length;
 
-    const omzetToday = salesToday.reduce((sum, s) => sum + Number(s.total), 0);
+    // TX-14: refund menurunkan net omzet meski sale asli tetap PAID — cup
+    // sold TIDAK ikut dikurangi (minuman tetap dibuat/dikonsumsi).
+    const omzetToday = salesToday.reduce(
+      (sum, s) => sum + Number(s.total) - s.refunds.reduce((r, ref) => r + Number(ref.amount), 0),
+      0,
+    );
     const cupSoldToday = salesToday.reduce(
       (sum, s) => sum + s.items.reduce((itemSum, i) => itemSum + i.qty, 0),
       0,

@@ -27,8 +27,14 @@ import {
   type SaleCorrectionImpact,
   type SaleDetail,
   type SaleListItem,
+  type SaleRefund,
 } from "@/lib/api-client";
-import { Ban, Pencil } from "lucide-react";
+import { Ban, Pencil, Undo2 } from "lucide-react";
+
+const REFUND_CONDITION_OPTIONS = [
+  { value: "REFUND_NO_STOCK_RETURN", label: "Uang kembali saja (produk sudah dikonsumsi/rusak)" },
+  { value: "REFUND_WITH_STOCK_RETURN", label: "Uang kembali + produk kembali ke stok" },
+];
 
 const STATUS_CONFIG: Record<SaleListItem["status"], { type: StatusBadgeType; label: string }> = {
   PENDING: { type: "expiring_next_month", label: "Pending" },
@@ -71,12 +77,17 @@ function PenjualanContent() {
   const toast = useToast();
   const [sales, setSales] = useState<SaleListItem[] | null>(null);
   const [detail, setDetail] = useState<SaleDetail | null>(null);
-  const [mode, setMode] = useState<"void" | "revise" | null>(null);
+  const [mode, setMode] = useState<"void" | "revise" | "refund" | null>(null);
   const [reviseQty, setReviseQty] = useState<Record<string, number>>({});
   const [reasonCode, setReasonCode] = useState<ReasonCode>("WRONG_QTY");
   const [reasonNote, setReasonNote] = useState("");
   const [impact, setImpact] = useState<SaleCorrectionImpact | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [refunds, setRefunds] = useState<SaleRefund[]>([]);
+  const [refundQty, setRefundQty] = useState<Record<string, number>>({});
+  const [refundCondition, setRefundCondition] = useState<"REFUND_NO_STOCK_RETURN" | "REFUND_WITH_STOCK_RETURN">(
+    "REFUND_NO_STOCK_RETURN",
+  );
 
   async function load() {
     try {
@@ -93,15 +104,49 @@ function PenjualanContent() {
 
   async function openDetail(id: string) {
     try {
-      const d = await api.getSaleDetail(id);
+      const [d, r] = await Promise.all([api.getSaleDetail(id), api.getSaleRefunds(id)]);
       setDetail(d);
+      setRefunds(r);
       setReviseQty(Object.fromEntries(d.items.map((i) => [i.productId, i.qty])));
+      setRefundQty(Object.fromEntries(d.items.map((i) => [i.productId, 0])));
       setReasonCode("WRONG_QTY");
       setReasonNote("");
       setImpact(null);
       setMode(null);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat detail Sale.");
+    }
+  }
+
+  function alreadyRefundedQty(productId: string): number {
+    return refunds.reduce((sum, r) => sum + r.items.filter((i) => i.productId === productId).reduce((s, i) => s + i.qty, 0), 0);
+  }
+
+  async function handleRefundConfirm() {
+    if (!detail) return;
+    const items = Object.entries(refundQty)
+      .filter(([, qty]) => qty > 0)
+      .map(([productId, qty]) => ({ productId, qty }));
+    if (items.length === 0) {
+      toast.error("Pilih minimal 1 produk untuk di-refund.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.createSaleRefund(detail.id, {
+        idempotencyKey: crypto.randomUUID(),
+        items,
+        condition: refundCondition,
+        reasonCode,
+        reasonNote: reasonNote || undefined,
+      });
+      toast.success(`Refund untuk Sale ${detail.saleNo} berhasil dicatat.`);
+      setDetail(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal memproses refund.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -231,7 +276,34 @@ function PenjualanContent() {
               <StatusBadge type={STATUS_CONFIG[detail.status].type} label={STATUS_CONFIG[detail.status].label} />
             </div>
 
-            {mode === "revise" ? (
+            {mode === "refund" ? (
+              <div className="space-y-2">
+                {detail.items.map((item) => {
+                  const refunded = alreadyRefundedQty(item.productId);
+                  const max = item.qty - refunded;
+                  return (
+                    <div key={item.productId} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-fg">{item.productName}</p>
+                        <p className="text-xs text-slate-500 dark:text-fg-muted">
+                          {formatRupiah(item.unitPrice)} · sudah di-refund {refunded}/{item.qty}
+                        </p>
+                      </div>
+                      <QuantityStepperInline
+                        value={refundQty[item.productId] ?? 0}
+                        onChange={(v) => setRefundQty((prev) => ({ ...prev, [item.productId]: Math.min(Math.max(v, 0), max) }))}
+                      />
+                    </div>
+                  );
+                })}
+                <Select
+                  label="Kondisi Refund"
+                  options={REFUND_CONDITION_OPTIONS}
+                  value={refundCondition}
+                  onChange={(v) => setRefundCondition(v as typeof refundCondition)}
+                />
+              </div>
+            ) : mode === "revise" ? (
               <div className="space-y-2">
                 {detail.items.map((item) => (
                   <div key={item.productId} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
@@ -263,6 +335,19 @@ function PenjualanContent() {
                   <span>Total</span>
                   <span>{formatRupiah(detail.total)}</span>
                 </div>
+                {refunds.length > 0 && (
+                  <div className="pt-3 mt-2 border-t border-slate-200 dark:border-line space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-fg-muted">Riwayat Refund</p>
+                    {refunds.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-fg-muted">
+                          {r.refundNo} · {r.condition === "REFUND_WITH_STOCK_RETURN" ? "stok kembali" : "uang saja"}
+                        </span>
+                        <span className="font-semibold text-red-500">-{formatRupiah(r.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -285,10 +370,10 @@ function PenjualanContent() {
                 <div className="flex gap-3">
                   <Button
                     isLoading={submitting}
-                    onClick={mode === "void" ? handleVoidConfirm : handleReviseConfirm}
+                    onClick={mode === "void" ? handleVoidConfirm : mode === "refund" ? handleRefundConfirm : handleReviseConfirm}
                     variant={mode === "void" ? "danger" : "primary"}
                   >
-                    Konfirmasi {mode === "void" ? "Pembatalan" : "Revisi"}
+                    Konfirmasi {mode === "void" ? "Pembatalan" : mode === "refund" ? "Refund" : "Revisi"}
                   </Button>
                   <Button variant="secondary" onClick={() => { setMode(null); setImpact(null); }}>
                     Batal
@@ -298,7 +383,7 @@ function PenjualanContent() {
             )}
 
             {!mode && detail.status === "PAID" && (
-              <div className="flex gap-3 pt-2 border-t border-slate-200 dark:border-line">
+              <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
                 <Button variant="danger" leftIcon={<Ban className="w-4 h-4" />} onClick={loadVoidPreview}>
                   Batalkan Transaksi
                 </Button>
@@ -311,6 +396,16 @@ function PenjualanContent() {
                   }}
                 >
                   Revisi Transaksi
+                </Button>
+                <Button
+                  variant="secondary"
+                  leftIcon={<Undo2 className="w-4 h-4" />}
+                  onClick={() => {
+                    setMode("refund");
+                    setImpact(null);
+                  }}
+                >
+                  Refund Customer
                 </Button>
               </div>
             )}

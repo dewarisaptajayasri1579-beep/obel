@@ -17,7 +17,7 @@ export class ReportsService {
 
     const salesRaw = await this.prisma.sale.findMany({
       where: { status: SaleStatus.PAID, paidAt: { gte: rangeStart } },
-      include: { booth: true, items: { include: { product: true } } },
+      include: { booth: true, items: { include: { product: true } }, refunds: true },
     });
     // Effective versions only — revisi lama tidak boleh dihitung dua kali
     // (docs/24-data-consistency-correction-reversal.md §14).
@@ -34,7 +34,8 @@ export class ReportsService {
 
     for (const sale of sales) {
       const cupCount = sale.items.reduce((sum, i) => sum + i.qty, 0);
-      const total = Number(sale.total);
+      // TX-14: refund menurunkan net omzet; cup sold tidak dikurangi.
+      const total = Number(sale.total) - sale.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
 
       if (sale.paidAt) {
         const key = businessDateKeyJakarta(sale.paidAt);
