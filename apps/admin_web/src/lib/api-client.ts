@@ -378,6 +378,8 @@ export const api = {
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
   createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number }) =>
     request<Product>("/products", { method: "POST", body: input }),
+  updateProduct: (id: string, input: { name?: string; categoryId?: string; sellPrice?: number; active?: boolean }) =>
+    request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
 
   getUsers: () => request<UserAccount[]>("/users"),
   createUser: (input: {

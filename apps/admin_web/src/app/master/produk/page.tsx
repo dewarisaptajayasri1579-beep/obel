@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Switch } from "@/components/ui/Switch";
 import {
   Table,
   TableBody,
@@ -31,10 +32,12 @@ function ProdukContent() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [sellPrice, setSellPrice] = useState(0);
+  const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
   async function load() {
@@ -55,20 +58,41 @@ function ProdukContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function openCreate() {
+    setEditing(null);
+    setSku("");
+    setName("");
+    setCategoryId("");
+    setSellPrice(0);
+    setActive(true);
+    setModalOpen(true);
+  }
+
+  function openEdit(product: Product) {
+    setEditing(product);
+    setSku(product.sku);
+    setName(product.name);
+    setCategoryId(categories.find((c) => c.name === product.category)?.id ?? "");
+    setSellPrice(product.sellPrice);
+    setActive(product.active);
+    setModalOpen(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.createProduct({ sku, name, categoryId: categoryId || undefined, sellPrice });
-      toast.success(`Produk "${name}" berhasil ditambahkan.`);
+      if (editing) {
+        await api.updateProduct(editing.id, { name, categoryId: categoryId || undefined, sellPrice, active });
+        toast.success(`Produk "${name}" berhasil diperbarui.`);
+      } else {
+        await api.createProduct({ sku, name, categoryId: categoryId || undefined, sellPrice });
+        toast.success(`Produk "${name}" berhasil ditambahkan.`);
+      }
       setModalOpen(false);
-      setSku("");
-      setName("");
-      setCategoryId("");
-      setSellPrice(0);
       await load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal menambahkan Produk.");
+      toast.error(err instanceof ApiError ? err.message : "Gagal menyimpan Produk.");
     } finally {
       setSaving(false);
     }
@@ -81,7 +105,7 @@ function ProdukContent() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Master Produk</h1>
           <p className="text-sm text-slate-500 dark:text-fg-muted">Kelola katalog produk siap jual.</p>
         </div>
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openCreate}>
           Tambah Produk
         </Button>
       </div>
@@ -104,7 +128,7 @@ function ProdukContent() {
             </TableHeader>
             <TableBody>
               {products.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className="cursor-pointer" onClick={() => openEdit(p)}>
                   <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                   <TableCell className="font-semibold">{p.name}</TableCell>
                   <TableCell>{p.category ?? "-"}</TableCell>
@@ -126,9 +150,16 @@ function ProdukContent() {
         </TableContainer>
       )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Tambah Produk" size="sm">
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Produk" : "Tambah Produk"} size="sm">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="SKU" placeholder="OBL-XXX" value={sku} onChange={(e) => setSku(e.target.value)} required />
+          <Input
+            label="SKU"
+            placeholder="OBL-XXX"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            required
+            disabled={!!editing}
+          />
           <Input label="Nama Produk" placeholder="Nama menu" value={name} onChange={(e) => setName(e.target.value)} required />
           <Select
             label="Kategori"
@@ -138,6 +169,9 @@ function ProdukContent() {
             onChange={setCategoryId}
           />
           <CurrencyInput label="Harga Jual" value={sellPrice} onChange={setSellPrice} />
+          {editing && (
+            <Switch label="Produk Aktif" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          )}
           <Button type="submit" fullWidth isLoading={saving}>
             Simpan
           </Button>
