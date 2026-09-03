@@ -7,7 +7,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ReceiveReturnDto } from './dto/receive-return.dto';
-import { CancelReturnDto, CorrectReturnReceiptDto } from './dto/correction.dto';
+import { CancelReturnDto, CorrectReturnReceiptDto, ReviseReturnDto } from './dto/correction.dto';
 import { ReturnsService } from './returns.service';
 
 @Controller('returns')
@@ -49,6 +49,12 @@ export class ReturnsController {
   @Roles(UserRole.ADMIN)
   cancel(@Param('id') id: string, @Body() dto: CancelReturnDto, @CurrentUser() user: JwtPayload) {
     return this.returnsService.cancelReturn(user, id, dto);
+  }
+
+  @Post(':id/revise')
+  @Roles(UserRole.ADMIN)
+  revise(@Param('id') id: string, @Body() dto: ReviseReturnDto, @CurrentUser() user: JwtPayload) {
+    return this.returnsService.reviseReturn(user, id, dto);
   }
 
   @Post(':id/correct-receipt')

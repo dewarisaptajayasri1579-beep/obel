@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { CorrectionsService } from '../corrections/corrections.service';
+import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateDistributionDto } from './dto/create-distribution.dto';
 import { ReceiveDistributionDto } from './dto/receive-distribution.dto';
@@ -19,6 +20,7 @@ export class DistributionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
+    private readonly reconciliationCases: ReconciliationCasesService,
   ) {}
 
   findAll() {
@@ -403,61 +405,79 @@ export class DistributionsService {
       if (delta !== 0) deltas.push({ productId: item.productId, delta });
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const { productId, delta } of deltas) {
-        if (delta > 0) {
-          await tx.boothStock.upsert({
-            where: { boothId_productId: { boothId: distribution.boothId, productId } },
-            create: { boothId: distribution.boothId, productId, qtyOnHand: delta },
-            update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
-          });
-        } else {
-          const decremented = await tx.boothStock.updateMany({
-            where: { boothId: distribution.boothId, productId, qtyOnHand: { gte: -delta } },
-            data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
-          });
-          if (decremented.count !== 1) {
-            throw new DomainError('INSUFFICIENT_STOCK', 'Koreksi akan membuat stok Booth negatif.', { productId });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        for (const { productId, delta } of deltas) {
+          if (delta > 0) {
+            await tx.boothStock.upsert({
+              where: { boothId_productId: { boothId: distribution.boothId, productId } },
+              create: { boothId: distribution.boothId, productId, qtyOnHand: delta },
+              update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
+            });
+          } else {
+            const decremented = await tx.boothStock.updateMany({
+              where: { boothId: distribution.boothId, productId, qtyOnHand: { gte: -delta } },
+              data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
+            });
+            if (decremented.count !== 1) {
+              throw new DomainError('INSUFFICIENT_STOCK', 'Koreksi akan membuat stok Booth negatif.', { productId });
+            }
           }
+
+          await tx.stockMovement.create({
+            data: {
+              movementNo: generateDocNo('MOV'),
+              movementType: StockMovementType.ADJUSTMENT,
+              productId,
+              qty: Math.abs(delta),
+              toBoothId: delta > 0 ? distribution.boothId : null,
+              fromBoothId: delta < 0 ? distribution.boothId : null,
+              referenceType: 'distribution_receipt_correction',
+              referenceId: distribution.id,
+              businessDate: businessDateOf(now),
+              occurredAt: now,
+              createdBy: user.sub,
+            },
+          });
         }
 
-        await tx.stockMovement.create({
-          data: {
-            movementNo: generateDocNo('MOV'),
-            movementType: StockMovementType.ADJUSTMENT,
-            productId,
-            qty: Math.abs(delta),
-            toBoothId: delta > 0 ? distribution.boothId : null,
-            fromBoothId: delta < 0 ? distribution.boothId : null,
-            referenceType: 'distribution_receipt_correction',
-            referenceId: distribution.id,
-            businessDate: businessDateOf(now),
-            occurredAt: now,
-            createdBy: user.sub,
-          },
-        });
-      }
+        if (deltas.length > 0 && distribution.status !== DistributionStatus.DISCREPANCY) {
+          await tx.stockDistribution.update({
+            where: { id: distribution.id },
+            data: { status: DistributionStatus.DISCREPANCY },
+          });
+        }
 
-      if (deltas.length > 0 && distribution.status !== DistributionStatus.DISCREPANCY) {
-        await tx.stockDistribution.update({
-          where: { id: distribution.id },
-          data: { status: DistributionStatus.DISCREPANCY },
+        await this.corrections.record(tx, {
+          entityType: 'stock_distribution',
+          entityId: distribution.id,
+          transactionGroupId: distribution.transactionGroupId,
+          correctionType: 'ADJUSTMENT',
+          originalVersionId: distribution.id,
+          reasonCode: dto.reasonCode,
+          reasonNote: dto.reasonNote,
+          impactSnapshot: { deltas },
+          createdById: user.sub,
+          idempotencyKey: dto.idempotencyKey,
         });
-      }
-
-      await this.corrections.record(tx, {
-        entityType: 'stock_distribution',
-        entityId: distribution.id,
-        transactionGroupId: distribution.transactionGroupId,
-        correctionType: 'ADJUSTMENT',
-        originalVersionId: distribution.id,
-        reasonCode: dto.reasonCode,
-        reasonNote: dto.reasonNote,
-        impactSnapshot: { deltas },
-        createdById: user.sub,
-        idempotencyKey: dto.idempotencyKey,
       });
-    });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'stock_distribution',
+          sourceEntityId: distribution.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { deltas, error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Koreksi tidak bisa diterapkan otomatis karena stok Booth akan negatif. Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo} untuk ditindaklanjuti Admin.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.toResponse((await this.loadWithRelations(distribution.id))!);
   }

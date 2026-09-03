@@ -64,6 +64,14 @@ class ApiClient {
     return result as List<dynamic>;
   }
 
+  Future<String> exportReportsCsv(String token) async {
+    final response = await http.get(Uri.parse('$baseUrl/reports/export'), headers: _headers(token));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body;
+    }
+    throw ApiException('EXPORT_FAILED', 'Gagal mengunduh laporan (${response.statusCode}).');
+  }
+
   Future<dynamic> _get(String path, {String? token}) async {
     final response = await http.get(Uri.parse('$baseUrl$path'), headers: _headers(token));
     return _decode(response);

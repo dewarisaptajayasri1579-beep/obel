@@ -6,6 +6,7 @@ import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
+import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ConfirmOpnameDto, RecountOpnameDto, StartOpnameDto } from './dto/opname.dto';
 
@@ -20,6 +21,7 @@ export class StockOpnameService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
+    private readonly reconciliationCases: ReconciliationCasesService,
   ) {}
 
   findAll() {
@@ -198,7 +200,8 @@ export class StockOpnameService {
     const now = new Date();
     const businessDate = businessDateOf(now);
 
-    await this.prisma.$transaction(async (tx) => {
+    try {
+      await this.prisma.$transaction(async (tx) => {
       const newItemsData = [];
       for (const item of previous.items) {
         const newActual = newActualByProduct.get(item.productId) ?? item.actualQty;
@@ -279,7 +282,26 @@ export class StockOpnameService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
-    });
+      });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        // Doc §12 contoh ke-3: "physical count conflict" — recount tidak
+        // boleh memaksa balance, buka kasus rekonsiliasi untuk Admin.
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'stock_opname',
+          sourceEntityId: previous.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Recount tidak bisa diterapkan otomatis karena akan membuat stok negatif. Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo}.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.loadWithRelations(newOpnameId);
   }

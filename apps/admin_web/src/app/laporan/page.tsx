@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { LineChartCard, BarChartCard, PieChartCard } from "@/components/ui/charts";
 import { api, ApiError, type ReportsSummary } from "@/lib/api-client";
+import { Download } from "lucide-react";
 
 function formatRupiah(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
@@ -15,6 +17,7 @@ function formatRupiah(n: number) {
 function LaporanContent() {
   const toast = useToast();
   const [data, setData] = useState<ReportsSummary | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     api
@@ -24,11 +27,35 @@ function LaporanContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await api.exportReportsCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "laporan-obbel.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengunduh laporan.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Laporan</h1>
-        <p className="text-sm text-slate-500 dark:text-fg-muted">Tren penjualan, ranking Booth, dan ranking produk 7 hari terakhir.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Laporan</h1>
+          <p className="text-sm text-slate-500 dark:text-fg-muted">Tren penjualan, ranking Booth, dan ranking produk 7 hari terakhir.</p>
+        </div>
+        <Button leftIcon={<Download className="w-4 h-4" />} onClick={handleExport} isLoading={exporting}>
+          Export CSV
+        </Button>
       </div>
 
       {!data ? (

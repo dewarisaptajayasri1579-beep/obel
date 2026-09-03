@@ -355,6 +355,17 @@ export interface StockAdjustmentRecord {
   createdAt: string
 }
 
+async function fetchCsvBlob(path: string): Promise<Blob> {
+  const token = getToken()
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  })
+  if (!res.ok) {
+    throw new ApiError("EXPORT_FAILED", `Gagal mengunduh laporan (${res.status}).`)
+  }
+  return res.blob()
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<LoginResponse>("/auth/login", { method: "POST", body: { username, password } }),
@@ -404,6 +415,7 @@ export const api = {
 
   getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
+  exportReportsCsv: () => fetchCsvBlob("/reports/export"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
   getSales: () => request<SaleListItem[]>("/sales"),
   getSaleDetail: (id: string) => request<SaleDetail>(`/sales/${id}`),

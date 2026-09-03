@@ -5,10 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { CorrectionsService } from '../corrections/corrections.service';
+import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ReceiveReturnDto } from './dto/receive-return.dto';
-import { CancelReturnDto, CorrectReturnReceiptDto } from './dto/correction.dto';
+import { CancelReturnDto, CorrectReturnReceiptDto, ReviseReturnDto } from './dto/correction.dto';
 
 function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -18,6 +19,7 @@ function businessDateOf(date: Date): Date {
 export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly reconciliationCases: ReconciliationCasesService,
     private readonly corrections: CorrectionsService,
   ) {}
 
@@ -216,6 +218,130 @@ export class ReturnsService {
     return this.loadWithRelations(stockReturn.id);
   }
 
+  /// TX-09 — Revisi qty/produk return yang masih SUBMITTED (belum diterima
+  /// Gudang). Reverse V1 sepenuhnya ke Booth, lalu post V2 dengan qty baru
+  /// (DC-003), sama seperti reviseDistribution.
+  async reviseReturn(user: JwtPayload, id: string, dto: ReviseReturnDto) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return this.loadWithRelations(existing.replacementVersionId ?? existing.entityId);
+    }
+
+    const stockReturn = await this.loadWithRelations(id);
+    if (!stockReturn) {
+      throw new DomainError('NOT_FOUND', 'Return tidak ditemukan.');
+    }
+    if (stockReturn.status !== ReturnStatus.SUBMITTED) {
+      throw new DomainError('RETURN_NOT_REVISABLE', 'Hanya return SUBMITTED yang dapat direvisi.', {
+        status: stockReturn.status,
+      });
+    }
+    this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
+
+    const productIds = dto.items.map((i) => i.productId);
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
+    const productById = new Map(products.map((p) => [p.id, p]));
+    for (const item of dto.items) {
+      const product = productById.get(item.productId);
+      if (!product || !product.active) {
+        throw new DomainError('PRODUCT_INACTIVE', 'Salah satu produk tidak aktif atau tidak ditemukan.', {
+          productId: item.productId,
+        });
+      }
+    }
+
+    const oldQtyByProduct = new Map(stockReturn.items.map((i) => [i.productId, i.qtySubmitted]));
+    const newQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
+    const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+
+    const newReturnId = randomUUID();
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const productId of allProductIds) {
+        const oldQty = oldQtyByProduct.get(productId) ?? 0;
+        const newQty = newQtyByProduct.get(productId) ?? 0;
+        const delta = newQty - oldQty;
+        if (delta === 0) continue;
+
+        if (delta > 0) {
+          const decremented = await tx.boothStock.updateMany({
+            where: { boothId: stockReturn.boothId, productId, qtyOnHand: { gte: delta } },
+            data: { qtyOnHand: { decrement: delta }, version: { increment: 1 } },
+          });
+          if (decremented.count !== 1) {
+            throw new DomainError('INSUFFICIENT_STOCK', 'Stok Booth tidak cukup untuk revisi return.', { productId });
+          }
+        } else {
+          await tx.boothStock.upsert({
+            where: { boothId_productId: { boothId: stockReturn.boothId, productId } },
+            create: { boothId: stockReturn.boothId, productId, qtyOnHand: -delta },
+            update: { qtyOnHand: { increment: -delta }, version: { increment: 1 } },
+          });
+        }
+
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: delta > 0 ? StockMovementType.RETURN_TO_WAREHOUSE : StockMovementType.VOID_REVERSAL,
+            productId,
+            qty: Math.abs(delta),
+            fromBoothId: delta > 0 ? stockReturn.boothId : null,
+            toBoothId: delta < 0 ? stockReturn.boothId : null,
+            referenceType: 'return_revision',
+            referenceId: newReturnId,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: user.sub,
+          },
+        });
+      }
+
+      await tx.stockReturn.update({ where: { id: stockReturn.id }, data: { status: ReturnStatus.CANCELLED } });
+
+      await tx.stockReturn.create({
+        data: {
+          id: newReturnId,
+          returnNo: generateDocNo('RTN'),
+          boothId: stockReturn.boothId,
+          status: ReturnStatus.SUBMITTED,
+          idempotencyKey: dto.idempotencyKey,
+          submittedById: user.sub,
+          note: stockReturn.note,
+          transactionGroupId: stockReturn.transactionGroupId,
+          versionNo: stockReturn.versionNo + 1,
+          revisionOfId: stockReturn.id,
+          items: {
+            createMany: {
+              data: dto.items.map((item) => ({ productId: item.productId, qtySubmitted: item.qty })),
+            },
+          },
+        },
+      });
+
+      await this.corrections.record(tx, {
+        entityType: 'stock_return',
+        entityId: stockReturn.id,
+        transactionGroupId: stockReturn.transactionGroupId,
+        correctionType: 'REVISION',
+        originalVersionId: stockReturn.id,
+        replacementVersionId: newReturnId,
+        reasonCode: dto.reasonCode,
+        reasonNote: dto.reasonNote,
+        impactSnapshot: {
+          deltas: [...allProductIds].map((productId) => ({
+            productId,
+            delta: (newQtyByProduct.get(productId) ?? 0) - (oldQtyByProduct.get(productId) ?? 0),
+          })),
+        },
+        createdById: user.sub,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    });
+
+    return this.loadWithRelations(newReturnId);
+  }
+
   /// TX-10 — Koreksi penerimaan return setelah RECEIVED/DISCREPANCY.
   /// `qty_received` lama tidak diedit (DC-008); delta diterapkan langsung
   /// ke warehouse_stocks (COR-08).
@@ -248,56 +374,76 @@ export class ReturnsService {
       if (delta !== 0) deltas.push({ productId: item.productId, delta });
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const { productId, delta } of deltas) {
-        if (delta > 0) {
-          await tx.warehouseStock.upsert({
-            where: { productId },
-            create: { productId, qtyOnHand: delta },
-            update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
-          });
-        } else {
-          const decremented = await tx.warehouseStock.updateMany({
-            where: { productId, qtyOnHand: { gte: -delta } },
-            data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
-          });
-          if (decremented.count !== 1) {
-            throw new DomainError('INSUFFICIENT_STOCK', 'Koreksi akan membuat stok Gudang negatif.', { productId });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        for (const { productId, delta } of deltas) {
+          if (delta > 0) {
+            await tx.warehouseStock.upsert({
+              where: { productId },
+              create: { productId, qtyOnHand: delta },
+              update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
+            });
+          } else {
+            const decremented = await tx.warehouseStock.updateMany({
+              where: { productId, qtyOnHand: { gte: -delta } },
+              data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
+            });
+            if (decremented.count !== 1) {
+              throw new DomainError('INSUFFICIENT_STOCK', 'Koreksi akan membuat stok Gudang negatif.', { productId });
+            }
           }
+
+          await tx.stockMovement.create({
+            data: {
+              movementNo: generateDocNo('MOV'),
+              movementType: StockMovementType.ADJUSTMENT,
+              productId,
+              qty: Math.abs(delta),
+              referenceType: 'return_receipt_correction',
+              referenceId: stockReturn.id,
+              businessDate: businessDateOf(now),
+              occurredAt: now,
+              createdBy: user.sub,
+            },
+          });
         }
 
-        await tx.stockMovement.create({
-          data: {
-            movementNo: generateDocNo('MOV'),
-            movementType: StockMovementType.ADJUSTMENT,
-            productId,
-            qty: Math.abs(delta),
-            referenceType: 'return_receipt_correction',
-            referenceId: stockReturn.id,
-            businessDate: businessDateOf(now),
-            occurredAt: now,
-            createdBy: user.sub,
-          },
+        if (deltas.length > 0 && stockReturn.status !== ReturnStatus.DISCREPANCY) {
+          await tx.stockReturn.update({ where: { id: stockReturn.id }, data: { status: ReturnStatus.DISCREPANCY } });
+        }
+
+        await this.corrections.record(tx, {
+          entityType: 'stock_return',
+          entityId: stockReturn.id,
+          transactionGroupId: stockReturn.transactionGroupId,
+          correctionType: 'ADJUSTMENT',
+          originalVersionId: stockReturn.id,
+          reasonCode: dto.reasonCode,
+          reasonNote: dto.reasonNote,
+          impactSnapshot: { deltas },
+          createdById: user.sub,
+          idempotencyKey: dto.idempotencyKey,
         });
-      }
-
-      if (deltas.length > 0 && stockReturn.status !== ReturnStatus.DISCREPANCY) {
-        await tx.stockReturn.update({ where: { id: stockReturn.id }, data: { status: ReturnStatus.DISCREPANCY } });
-      }
-
-      await this.corrections.record(tx, {
-        entityType: 'stock_return',
-        entityId: stockReturn.id,
-        transactionGroupId: stockReturn.transactionGroupId,
-        correctionType: 'ADJUSTMENT',
-        originalVersionId: stockReturn.id,
-        reasonCode: dto.reasonCode,
-        reasonNote: dto.reasonNote,
-        impactSnapshot: { deltas },
-        createdById: user.sub,
-        idempotencyKey: dto.idempotencyKey,
       });
-    });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        // Skenario persis contoh dokumen §12: "received return sudah dipakai
+        // distribusi lain" — jangan paksa balance, buka kasus rekonsiliasi.
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'stock_return',
+          sourceEntityId: stockReturn.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { deltas, error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Koreksi tidak bisa diterapkan otomatis karena stok Gudang akan negatif (kemungkinan sudah didistribusikan lagi). Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo}.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.loadWithRelations(stockReturn.id);
   }

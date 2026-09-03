@@ -67,4 +67,38 @@ export class ReportsService {
         .slice(0, 10),
     };
   }
+
+  /// Export CSV untuk tombol "Download/Export Laporan" (Admin Web & Owner
+  /// app). Satu file berisi tiga section: tren penjualan, ranking Booth,
+  /// ranking produk — sama persis dengan data /reports/summary.
+  async exportCsv(): Promise<string> {
+    const summary = await this.getSummary();
+    const lines: string[] = [];
+
+    lines.push('Tren Penjualan (7 Hari Terakhir)');
+    lines.push('Tanggal,Omzet,Cup Terjual');
+    for (const row of summary.salesTrend) {
+      lines.push(`${row.date},${row.omzet},${row.cup}`);
+    }
+    lines.push('');
+
+    lines.push('Booth Ranking');
+    lines.push('Booth,Omzet,Cup Terjual');
+    for (const row of summary.boothRanking) {
+      lines.push(`${csvEscape(row.boothName)},${row.omzet},${row.cup}`);
+    }
+    lines.push('');
+
+    lines.push('Produk Ranking');
+    lines.push('Produk,Qty Terjual');
+    for (const row of summary.productRanking) {
+      lines.push(`${csvEscape(row.productName)},${row.qty}`);
+    }
+
+    return lines.join('\n');
+  }
+}
+
+function csvEscape(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }

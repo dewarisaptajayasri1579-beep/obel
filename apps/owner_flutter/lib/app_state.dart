@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'api_client.dart';
 
@@ -82,5 +85,16 @@ class AppState extends ChangeNotifier {
     if (_token == null) return;
     reportsSummary = await _api.getReportsSummary(_token!);
     notifyListeners();
+  }
+
+  /// Simpan laporan CSV ke penyimpanan lokal aplikasi dan kembalikan path
+  /// filenya untuk ditampilkan ke Owner.
+  Future<String> exportReportsCsv() async {
+    final csv = await _api.exportReportsCsv(_token!);
+    final dir = await getApplicationDocumentsDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File('${dir.path}/laporan-obbel-$timestamp.csv');
+    await file.writeAsString(csv);
+    return file.path;
   }
 }

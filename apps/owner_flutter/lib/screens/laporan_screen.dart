@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../theme.dart';
 import 'discrepancy_screen.dart';
+import 'penjualan_screen.dart';
 import 'stock_condition_screen.dart';
 
 final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
@@ -17,6 +18,8 @@ class LaporanScreen extends StatefulWidget {
 }
 
 class _LaporanScreenState extends State<LaporanScreen> {
+  bool _exporting = false;
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +27,20 @@ class _LaporanScreenState extends State<LaporanScreen> {
       context.read<AppState>().refreshDiscrepancy();
       context.read<AppState>().refreshStockCondition();
     });
+  }
+
+  Future<void> _handleExport() async {
+    setState(() => _exporting = true);
+    try {
+      final path = await context.read<AppState>().exportReportsCsv();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Laporan tersimpan: $path')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal mengunduh laporan.')));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   @override
@@ -121,9 +138,27 @@ class _LaporanScreenState extends State<LaporanScreen> {
               physics: const NeverScrollableScrollPhysics(),
               childAspectRatio: 1.6,
               children: [
-                _menuCard(context, Icons.receipt_long_outlined, 'Laporan Penjualan', 'Ringkasan detail', null),
-                _menuCard(context, Icons.storefront_outlined, 'Per Booth', 'Analisa setiap booth', null),
-                _menuCard(context, Icons.local_cafe_outlined, 'Per Produk', 'Analisa produk', null),
+                _menuCard(
+                  context,
+                  Icons.receipt_long_outlined,
+                  'Laporan Penjualan',
+                  'Ringkasan detail',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PenjualanScreen())),
+                ),
+                _menuCard(
+                  context,
+                  Icons.storefront_outlined,
+                  'Per Booth',
+                  'Analisa setiap booth',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PenjualanScreen())),
+                ),
+                _menuCard(
+                  context,
+                  Icons.local_cafe_outlined,
+                  'Per Produk',
+                  'Analisa produk',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PenjualanScreen())),
+                ),
                 _menuCard(
                   context,
                   Icons.inventory_2_outlined,
@@ -137,8 +172,14 @@ class _LaporanScreenState extends State<LaporanScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export laporan segera hadir.'))),
-                icon: const Icon(Icons.download_outlined, color: Colors.white),
+                onPressed: _exporting ? null : _handleExport,
+                icon: _exporting
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.download_outlined, color: Colors.white),
                 label: const Text('Download / Export Laporan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ObbelTheme.primaryDark,

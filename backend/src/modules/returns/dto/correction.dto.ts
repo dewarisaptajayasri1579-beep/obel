@@ -23,6 +23,24 @@ export class CancelReturnDto {
   reasonNote?: string;
 }
 
+export class ReviseReturnDto {
+  @IsUUID()
+  idempotencyKey!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ReturnItemQtyDto)
+  items!: ReturnItemQtyDto[];
+
+  @IsEnum(ReasonCode)
+  reasonCode!: ReasonCode;
+
+  @IsOptional()
+  @IsString()
+  reasonNote?: string;
+}
+
 export class CorrectReturnReceiptDto {
   @IsUUID()
   idempotencyKey!: string;
