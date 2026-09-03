@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Bell } from "lucide-react"
+import { api } from "@/lib/api-client"
 
 interface NotificationItem {
   id: string
@@ -22,16 +23,16 @@ const TYPE_DOT: Record<NotificationItem["type"], string> = {
 export function NotificationBell({ iconButtonClass }: { iconButtonClass: string }) {
   const [items, setItems] = useState<NotificationItem[]>([])
   const [open, setOpen] = useState(false)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
 
-  const unreadCount = items.filter((n) => !n.readAt).length
+  const unreadCount = items.filter((n) => !dismissedIds.has(n.id)).length
 
   async function load() {
     try {
-      const res = await fetch("/api/notifications")
-      if (!res.ok) return
-      setItems(await res.json())
+      const data = await api.getNotifications()
+      setItems(data)
     } catch {
-      // Endpoint notifikasi belum ada di Backend API — abaikan sampai modul itu dibuat.
+      // Backend belum bisa dihubungi — bell tetap tampil kosong, tidak error keras.
     }
   }
 
@@ -39,11 +40,11 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
     load()
     const interval = setInterval(load, 30_000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function markRead(id: string) {
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)))
-    await fetch(`/api/notifications/${id}/read`, { method: "PATCH" })
+  function markRead(id: string) {
+    setDismissedIds((prev) => new Set(prev).add(id))
   }
 
   return (
@@ -66,9 +67,9 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
           {items.map((n) => (
             <button
               key={n.id}
-              onClick={() => !n.readAt && markRead(n.id)}
+              onClick={() => markRead(n.id)}
               className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-surface-hover ${
-                n.readAt ? "opacity-60" : ""
+                dismissedIds.has(n.id) ? "opacity-60" : ""
               }`}
             >
               <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${TYPE_DOT[n.type]}`} />

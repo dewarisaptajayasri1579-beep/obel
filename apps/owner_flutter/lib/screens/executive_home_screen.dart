@@ -20,7 +20,55 @@ class _ExecutiveHomeScreenState extends State<ExecutiveHomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AppState>().refreshExecutiveHome();
+      context.read<AppState>().refreshNotifications();
     });
+  }
+
+  void _showNotifications(AppState state) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        final items = List<Map<String, dynamic>>.from(state.notifications);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Notifikasi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: ObbelTheme.textDark)),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('Belum ada notifikasi.', style: TextStyle(color: ObbelTheme.textLight)),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final n = items[index];
+                        final isError = n['type'] == 'error';
+                        return ListTile(
+                          leading: Icon(
+                            isError ? Icons.error_outline : Icons.info_outline,
+                            color: isError ? ObbelTheme.accentRed : ObbelTheme.primaryMedium,
+                          ),
+                          title: Text(n['title'], style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          subtitle: Text(n['message'], style: const TextStyle(fontSize: 12)),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -42,7 +90,25 @@ class _ExecutiveHomeScreenState extends State<ExecutiveHomeScreen> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined, color: ObbelTheme.textDark), onPressed: () {}),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: ObbelTheme.textDark),
+                onPressed: () => _showNotifications(state),
+              ),
+              if (state.notifications.isNotEmpty)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: ObbelTheme.accentRed, shape: BoxShape.circle),
+                  ),
+                ),
+            ],
+          ),
           IconButton(icon: const Icon(Icons.logout, color: ObbelTheme.textDark), onPressed: state.logout),
         ],
       ),

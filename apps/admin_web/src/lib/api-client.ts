@@ -480,6 +480,11 @@ export const api = {
 
   getTransactionCorrections: () => request<TransactionCorrectionRecord[]>("/transaction-corrections"),
 
+  getNotifications: () =>
+    request<{ id: string; title: string; message: string; type: "info" | "success" | "warning" | "error"; readAt: string | null; createdAt: string }[]>(
+      "/notifications",
+    ),
+
   getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),
   resolveReconciliationCase: (id: string, input: { status: "RESOLVED" | "IGNORED"; resolutionNote?: string }) =>
     request<ReconciliationCaseRecord>(`/reconciliation-cases/${id}/resolve`, { method: "POST", body: input }),

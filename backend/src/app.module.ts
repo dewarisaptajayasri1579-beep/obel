@@ -21,6 +21,7 @@ import { StockOpnameModule } from './modules/stock-opname/stock-opname.module';
 import { StockAdjustmentsModule } from './modules/stock-adjustments/stock-adjustments.module';
 import { ReconciliationCasesModule } from './modules/reconciliation-cases/reconciliation-cases.module';
 import { OwnerModule } from './modules/owner/owner.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { OwnerModule } from './modules/owner/owner.module';
     StockAdjustmentsModule,
     ReconciliationCasesModule,
     OwnerModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

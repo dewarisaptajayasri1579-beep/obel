@@ -20,6 +20,7 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? stockCondition;
   List<dynamic> discrepancy = [];
   Map<String, dynamic>? reportsSummary;
+  List<dynamic> notifications = [];
 
   bool get isLoggedIn => _token != null;
   String? get fullName => _fullName;
@@ -84,6 +85,12 @@ class AppState extends ChangeNotifier {
   Future<void> refreshReportsSummary() async {
     if (_token == null) return;
     reportsSummary = await _api.getReportsSummary(_token!);
+    notifyListeners();
+  }
+
+  Future<void> refreshNotifications() async {
+    if (_token == null) return;
+    notifications = await _api.getNotifications(_token!);
     notifyListeners();
   }
 

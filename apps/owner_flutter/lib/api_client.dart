@@ -64,6 +64,11 @@ class ApiClient {
     return result as List<dynamic>;
   }
 
+  Future<List<dynamic>> getNotifications(String token) async {
+    final result = await _get('/notifications', token: token);
+    return result as List<dynamic>;
+  }
+
   Future<String> exportReportsCsv(String token) async {
     final response = await http.get(Uri.parse('$baseUrl/reports/export'), headers: _headers(token));
     if (response.statusCode >= 200 && response.statusCode < 300) {
