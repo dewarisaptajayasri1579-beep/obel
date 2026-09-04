@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge, type StatusBadgeType } from "@/components/ui/StatusBadge";
+import { Textarea } from "@/components/ui/Textarea";
 import {
   Table,
   TableBody,
@@ -18,8 +19,16 @@ import {
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
-import { api, ApiError, type Booth, type Distribution, type Product } from "@/lib/api-client";
-import { Plus, Truck } from "lucide-react";
+import {
+  api,
+  ApiError,
+  REASON_CODE_OPTIONS,
+  type Booth,
+  type Distribution,
+  type Product,
+  type ReasonCode,
+} from "@/lib/api-client";
+import { Ban, Pencil, Plus, Truck, Wrench } from "lucide-react";
 
 const STATUS_CONFIG: Record<Distribution["status"], { type: StatusBadgeType; label: string }> = {
   DRAFT: { type: "inactive", label: "Draft" },
@@ -44,6 +53,13 @@ function DistribusiContent() {
   const [qtyByProduct, setQtyByProduct] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
+
+  const [detail, setDetail] = useState<Distribution | null>(null);
+  const [mode, setMode] = useState<"cancel" | "revise" | "correct" | null>(null);
+  const [itemQty, setItemQty] = useState<Record<string, number>>({});
+  const [reasonCode, setReasonCode] = useState<ReasonCode>("WRONG_QTY");
+  const [reasonNote, setReasonNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     try {
@@ -100,13 +116,45 @@ function DistribusiContent() {
     }
   }
 
+  function openDetail(d: Distribution) {
+    setDetail(d);
+    setItemQty(Object.fromEntries(d.items.map((i) => [i.productId, i.qtyReceived ?? i.qtySent])));
+    setReasonCode("WRONG_QTY");
+    setReasonNote("");
+    setMode(null);
+  }
+
+  async function handleConfirmCorrection() {
+    if (!detail) return;
+    setSubmitting(true);
+    try {
+      const items = Object.entries(itemQty).map(([productId, qty]) => ({ productId, qty }));
+      if (mode === "cancel") {
+        await api.cancelDistribution(detail.id, { idempotencyKey: crypto.randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
+        toast.success(`Distribusi ${detail.distributionNo} dibatalkan.`);
+      } else if (mode === "revise") {
+        await api.reviseDistribution(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        toast.success(`Distribusi ${detail.distributionNo} direvisi.`);
+      } else if (mode === "correct") {
+        await api.correctDistributionReceipt(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        toast.success(`Penerimaan Distribusi ${detail.distributionNo} dikoreksi.`);
+      }
+      setDetail(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal memproses koreksi.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Distribusi Stok</h1>
           <p className="text-sm text-slate-500 dark:text-fg-muted">
-            Kirim stok dari Gudang Pusat ke Booth. Booth menerima lewat app Petugas Booth.
+            Kirim stok dari Gudang Pusat ke Booth. Klik baris untuk detail/koreksi.
           </p>
         </div>
         <Button leftIcon={<Truck className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
@@ -132,7 +180,7 @@ function DistribusiContent() {
             </TableHeader>
             <TableBody>
               {distributions.map((d) => (
-                <TableRow key={d.id}>
+                <TableRow key={d.id} className="cursor-pointer" onClick={() => openDetail(d)}>
                   <TableCell className="font-mono text-xs">{d.distributionNo}</TableCell>
                   <TableCell className="font-semibold">{d.boothName}</TableCell>
                   <TableCell className="text-sm text-slate-500 dark:text-fg-muted">
@@ -208,6 +256,93 @@ function DistribusiContent() {
             Kirim Distribusi
           </Button>
         </div>
+      </Modal>
+
+      <Modal isOpen={!!detail} onClose={() => setDetail(null)} title={detail ? `Distribusi ${detail.distributionNo}` : ""} size="lg">
+        {detail && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-slate-500 dark:text-fg-muted">{detail.boothName}</div>
+              <StatusBadge type={STATUS_CONFIG[detail.status].type} label={STATUS_CONFIG[detail.status].label} />
+            </div>
+
+            {mode ? (
+              <div className="space-y-2">
+                {detail.items.map((item) => (
+                  <div key={item.productId} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-fg">{item.productName}</p>
+                      <p className="text-xs text-slate-500 dark:text-fg-muted">
+                        Dikirim {item.qtySent} · Diterima {item.qtyReceived ?? "-"}
+                      </p>
+                    </div>
+                    {mode !== "cancel" && (
+                      <QuantityStepperInline
+                        value={itemQty[item.productId] ?? item.qtySent}
+                        onChange={(v) => setItemQty((prev) => ({ ...prev, [item.productId]: v }))}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {detail.items.map((item) => (
+                  <div key={item.productId} className="flex items-center justify-between text-sm">
+                    <span>{item.productName}</span>
+                    <span>
+                      Dikirim {item.qtySent} · Diterima {item.qtyReceived ?? "-"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {mode && (
+              <div className="space-y-3">
+                <Select
+                  label="Alasan Koreksi"
+                  options={REASON_CODE_OPTIONS}
+                  value={reasonCode}
+                  onChange={(v) => setReasonCode(v as ReasonCode)}
+                />
+                <Textarea
+                  label="Catatan (wajib jika alasan Lainnya)"
+                  value={reasonNote}
+                  onChange={(e) => setReasonNote(e.target.value)}
+                  placeholder="Catatan tambahan..."
+                />
+                <div className="flex gap-3">
+                  <Button isLoading={submitting} variant={mode === "cancel" ? "danger" : "primary"} onClick={handleConfirmCorrection}>
+                    Konfirmasi {mode === "cancel" ? "Pembatalan" : mode === "revise" ? "Revisi" : "Koreksi"}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setMode(null)}>
+                    Batal
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!mode && detail.status === "SENT" && (
+              <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
+                <Button variant="danger" leftIcon={<Ban className="w-4 h-4" />} onClick={() => setMode("cancel")}>
+                  Batalkan Distribusi
+                </Button>
+                <Button variant="secondary" leftIcon={<Pencil className="w-4 h-4" />} onClick={() => setMode("revise")}>
+                  Revisi Distribusi
+                </Button>
+              </div>
+            )}
+
+            {!mode && (detail.status === "RECEIVED" || detail.status === "DISCREPANCY") && (
+              <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
+                <Button variant="secondary" leftIcon={<Wrench className="w-4 h-4" />} onClick={() => setMode("correct")}>
+                  Koreksi Penerimaan
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

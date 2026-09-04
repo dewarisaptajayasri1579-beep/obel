@@ -417,6 +417,16 @@ export const api = {
     items: { productId: string; qty: number }[]
     note?: string
   }) => request<Distribution>("/distributions", { method: "POST", body: input }),
+  cancelDistribution: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request<Distribution>(`/distributions/${id}/cancel`, { method: "POST", body: input }),
+  reviseDistribution: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<Distribution>(`/distributions/${id}/revise`, { method: "POST", body: input }),
+  correctDistributionReceipt: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<Distribution>(`/distributions/${id}/correct-receipt`, { method: "POST", body: input }),
 
   getRestockRequests: () => request<RestockRequest[]>("/restock-requests"),
   approveRestockRequest: (id: string, items: { productId: string; qtyApproved: number }[]) =>
@@ -427,6 +437,16 @@ export const api = {
   getReturns: () => request<StockReturn[]>("/returns"),
   receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[]) =>
     request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
+  cancelReturn: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request<StockReturn>(`/returns/${id}/cancel`, { method: "POST", body: input }),
+  reviseReturn: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<StockReturn>(`/returns/${id}/revise`, { method: "POST", body: input }),
+  correctReturnReceipt: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<StockReturn>(`/returns/${id}/correct-receipt`, { method: "POST", body: input }),
 
   getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
