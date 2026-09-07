@@ -324,14 +324,25 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  bool submittingReturn = false;
+
   /// Memanggil POST /returns. Server otomatis memakai seluruh sisa stok
   /// Booth sebagai qty return (BR-013), lalu mengeluarkannya dari
   /// booth_stocks supaya tidak bisa dijual lagi. Kita refresh stok
-  /// sesudahnya supaya UI (harusnya 0 semua) tetap sinkron.
+  /// sesudahnya supaya UI (harusnya 0 semua) tetap sinkron. `submittingReturn`
+  /// dipakai UI untuk menonaktifkan tombol selama request berjalan supaya
+  /// tidak submit dua kali (docs/11-notification-printing-offline.md §8).
   Future<void> submitReturn() async {
-    if (_token == null) return;
-    await _api.createReturn(_token!);
-    await refreshCatalog();
+    if (_token == null || submittingReturn) return;
+    submittingReturn = true;
+    notifyListeners();
+    try {
+      await _api.createReturn(_token!);
+      await refreshCatalog();
+    } finally {
+      submittingReturn = false;
+      notifyListeners();
+    }
   }
 }
 

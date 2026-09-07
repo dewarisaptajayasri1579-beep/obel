@@ -26,19 +26,38 @@ function getToken(): string | null {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function request<T>(
   path: string,
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const token = getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    // Timeout & putus koneksi selalu jadi ApiError berpesan jelas
+    // (docs/11-notification-printing-offline.md §8: "timeout message jelas"),
+    // bukan TypeError mentah dari fetch() yang jatuh ke toast generik.
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError("TIMEOUT", "Koneksi ke server timeout. Periksa jaringan Anda lalu coba lagi.")
+    }
+    throw new ApiError("NETWORK_ERROR", "Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.")
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   const text = await res.text()
   const data = text ? JSON.parse(text) : null

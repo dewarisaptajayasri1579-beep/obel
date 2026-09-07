@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, SocketException;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+
+const _requestTimeout = Duration(seconds: 15);
 
 /// Error dari Backend API, mengikuti envelope {code, message, details} di
 /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
@@ -70,7 +73,7 @@ class ApiClient {
   }
 
   Future<String> exportReportsCsv(String token) async {
-    final response = await http.get(Uri.parse('$baseUrl/reports/export'), headers: _headers(token));
+    final response = await _send(() => http.get(Uri.parse('$baseUrl/reports/export'), headers: _headers(token)));
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body;
     }
@@ -78,17 +81,34 @@ class ApiClient {
   }
 
   Future<dynamic> _get(String path, {String? token}) async {
-    final response = await http.get(Uri.parse('$baseUrl$path'), headers: _headers(token));
+    final response = await _send(() => http.get(Uri.parse('$baseUrl$path'), headers: _headers(token)));
     return _decode(response);
   }
 
   Future<Map<String, dynamic>> _post(String path, {String? token, Map<String, dynamic>? body}) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-      body: jsonEncode(body ?? {}),
-    );
+    final response = await _send(() => http.post(
+          Uri.parse('$baseUrl$path'),
+          headers: _headers(token),
+          body: jsonEncode(body ?? {}),
+        ));
     return _decode(response) as Map<String, dynamic>;
+  }
+
+  /// Timeout & putus koneksi selalu jadi ApiException berpesan jelas
+  /// (docs/11-notification-printing-offline.md §8: "timeout message jelas"),
+  /// bukan exception mentah yang lolos dari `on ApiException catch` di layar.
+  Future<http.Response> _send(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw ApiException('TIMEOUT', 'Koneksi ke server timeout. Periksa jaringan Anda lalu coba lagi.');
+    } on SocketException {
+      throw ApiException('NETWORK_ERROR', 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('NETWORK_ERROR', 'Terjadi masalah koneksi. Periksa jaringan Anda lalu coba lagi.');
+    }
   }
 
   Map<String, String> _headers(String? token) => {

@@ -232,14 +232,22 @@ class ShiftScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () => _confirmAndSubmitReturn(context, appState),
-                      child: const Text(
-                        'KEMBALIKAN STOK',
-                        style: TextStyle(
-                          color: ObbelTheme.accentOrange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      onPressed: appState.submittingReturn
+                          ? null
+                          : () => _confirmAndSubmitReturn(context, appState),
+                      child: appState.submittingReturn
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: ObbelTheme.accentOrange),
+                            )
+                          : const Text(
+                              'KEMBALIKAN STOK',
+                              style: TextStyle(
+                                color: ObbelTheme.accentOrange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 10),
