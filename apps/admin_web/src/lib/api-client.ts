@@ -348,6 +348,7 @@ export interface TransactionCorrectionRecord {
   impactSnapshot: Record<string, unknown>
   createdBy: { id: string; fullName: string }
   createdAt: string
+  entityLabel: string | null
 }
 
 export interface StockAdjustmentRecord {
