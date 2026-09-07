@@ -40,6 +40,9 @@ dependencies:
   provider: ^6.1.2
   http: ^1.6.0
   uuid: ^4.6.0
+  shared_preferences: ^2.5.5
+  print_bluetooth_thermal: ^1.2.4
+  esc_pos_utils_plus: ^2.0.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

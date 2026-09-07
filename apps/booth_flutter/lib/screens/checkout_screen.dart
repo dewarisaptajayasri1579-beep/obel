@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../api_client.dart';
 import '../app_state.dart';
+import '../printing/bluetooth_receipt_printer.dart';
+import '../printing/receipt.dart';
 import '../theme.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -17,24 +19,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _pay() async {
     setState(() => _paying = true);
+    final appState = context.read<AppState>();
+    final boothName = appState.boothName;
+    final staffName = appState.staffName;
+    CompletedSale? sale;
     try {
-      await context.read<AppState>().checkout(_paymentMethod == 'Tunai' ? 'CASH' : 'QRIS');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pembayaran sukses! Mencetak nota...'),
-          backgroundColor: ObbelTheme.primaryDark,
-        ),
-      );
-      Navigator.popUntil(context, ModalRoute.withName('/home'));
+      sale = await appState.checkout(_paymentMethod == 'Tunai' ? 'CASH' : 'QRIS');
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
       );
+      return;
     } finally {
       if (mounted) setState(() => _paying = false);
     }
+
+    // Sale sudah sukses di server pada titik ini — print gagal TIDAK boleh
+    // membatalkan/mengulang sale (docs/11-notification-printing-offline.md
+    // §5). Nota bisa dicetak ulang lewat tombol "Print Ulang" di snackbar.
+    final receipt = Receipt(
+      boothName: boothName,
+      saleNo: sale.saleNo,
+      time: DateTime.now(),
+      items: sale.items.map((i) => ReceiptItem(name: i.name, qty: i.qty, price: i.price)).toList(),
+      total: sale.total,
+      paymentMethod: _paymentMethod,
+      staffName: staffName,
+    );
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.popUntil(context, ModalRoute.withName('/home'));
+    await _printWithFeedback(messenger, receipt);
+  }
+
+  Future<void> _printWithFeedback(ScaffoldMessengerState messenger, Receipt receipt) async {
+    final printer = BluetoothReceiptPrinter();
+    final preferred = await BluetoothReceiptPrinter.loadPreferred();
+    if (preferred == null) {
+      messenger.showSnackBar(SnackBar(
+        content: const Text('Pembayaran sukses. Printer belum diatur — struk tidak dicetak.'),
+        backgroundColor: ObbelTheme.primaryDark,
+        action: SnackBarAction(label: 'Print Ulang', onPressed: () => _printWithFeedback(messenger, receipt)),
+      ));
+      return;
+    }
+
+    final ok = await printer.printReceipt(receipt);
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok ? 'Pembayaran sukses! Nota tercetak.' : 'Pembayaran sukses. Gagal mencetak nota.'),
+      backgroundColor: ok ? ObbelTheme.primaryDark : ObbelTheme.accentRed,
+      action: SnackBarAction(label: 'Print Ulang', onPressed: () => _printWithFeedback(messenger, receipt)),
+    ));
   }
 
   @override

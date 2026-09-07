@@ -218,14 +218,18 @@ class AppState extends ChangeNotifier {
 
   /// Memanggil POST /sales (create_paid_sale). Server yang menghitung
   /// harga & memotong stok; kita cukup refresh katalog sesudahnya supaya
-  /// tetap sinkron dengan source of truth di backend.
-  Future<int> checkout(String paymentMethod) async {
+  /// tetap sinkron dengan source of truth di backend. Mengembalikan
+  /// saleNo/total/item snapshot (untuk cetak struk) sebelum cart di-clear.
+  Future<CompletedSale> checkout(String paymentMethod) async {
     if (_token == null || shiftSessionId == null) {
       throw ApiException('SHIFT_NOT_OPEN', 'Shift tidak ditemukan, silakan login ulang.');
     }
 
     final cupCount = cartCount;
     final soldSnapshot = cart.map((c) => MapEntry(c.product.id, c.quantity)).toList();
+    final itemSnapshot = cart
+        .map((c) => CompletedSaleItem(name: c.product.name, qty: c.quantity, price: c.product.price))
+        .toList();
 
     final result = await _api.createSale(
       _token!,
@@ -246,7 +250,12 @@ class AppState extends ChangeNotifier {
     cart.clear();
 
     await refreshCatalog();
-    return total;
+    return CompletedSale(
+      saleNo: result['saleNo'] as String,
+      total: total,
+      paymentMethod: paymentMethod,
+      items: itemSnapshot,
+    );
   }
 
   void updateInboundQty(InboundItem item, int qty) {
@@ -324,4 +333,26 @@ class AppState extends ChangeNotifier {
     await _api.createReturn(_token!);
     await refreshCatalog();
   }
+}
+
+class CompletedSaleItem {
+  CompletedSaleItem({required this.name, required this.qty, required this.price});
+
+  final String name;
+  final int qty;
+  final int price;
+}
+
+class CompletedSale {
+  CompletedSale({
+    required this.saleNo,
+    required this.total,
+    required this.paymentMethod,
+    required this.items,
+  });
+
+  final String saleNo;
+  final int total;
+  final String paymentMethod;
+  final List<CompletedSaleItem> items;
 }

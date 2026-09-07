@@ -6,6 +6,7 @@ import 'screens/main_shell.dart';
 import 'screens/inbound_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/closing_count_screen.dart';
+import 'screens/printer_settings_screen.dart';
 import 'theme.dart';
 
 void main() {
@@ -33,6 +34,7 @@ class ObbelBoothApp extends StatelessWidget {
         '/inbound': (context) => const InboundScreen(),
         '/checkout': (context) => const CheckoutScreen(),
         '/closing': (context) => const ClosingCountScreen(),
+        '/printer-settings': (context) => const PrinterSettingsScreen(),
       },
     );
   }

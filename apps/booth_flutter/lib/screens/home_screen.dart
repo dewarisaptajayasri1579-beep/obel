@@ -114,6 +114,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined, color: ObbelTheme.textDark),
+            tooltip: 'Pengaturan Printer',
+            onPressed: () => Navigator.pushNamed(context, '/printer-settings'),
+          ),
           Stack(
             alignment: Alignment.center,
             children: [
