@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type Booth, type UserAccount } from "@/lib/api-client";
-import { Plus } from "lucide-react";
+import { KeyRound, Plus } from "lucide-react";
 
 const ROLE_LABEL: Record<UserAccount["role"], string> = {
   BOOTH_STAFF: "Petugas Booth",
@@ -44,6 +44,9 @@ function UserContent() {
   const [role, setRole] = useState<UserAccount["role"]>("BOOTH_STAFF");
   const [defaultBoothId, setDefaultBoothId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resetTarget, setResetTarget] = useState<UserAccount | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   async function load() {
     try {
@@ -86,6 +89,22 @@ function UserContent() {
     }
   }
 
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetTarget) return;
+    setResetting(true);
+    try {
+      await api.resetUserPassword(resetTarget.id, newPassword);
+      toast.success(`Password "${resetTarget.username}" berhasil direset.`);
+      setResetTarget(null);
+      setNewPassword("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal reset password.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -112,6 +131,7 @@ function UserContent() {
                 <TableHead>Role</TableHead>
                 <TableHead>Booth</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -124,11 +144,23 @@ function UserContent() {
                   <TableCell>
                     <StatusBadge type={u.active ? "safe" : "inactive"} label={u.active ? "Aktif" : "Nonaktif"} />
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      leftIcon={<KeyRound className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        setResetTarget(u);
+                        setNewPassword("");
+                      }}
+                    >
+                      Reset Password
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     Belum ada User.
                   </TableCell>
                 </TableRow>
@@ -167,6 +199,32 @@ function UserContent() {
           )}
           <Button type="submit" fullWidth isLoading={saving}>
             Simpan
+          </Button>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={resetTarget !== null}
+        onClose={() => setResetTarget(null)}
+        title={`Reset Password — ${resetTarget?.username ?? ""}`}
+        size="sm"
+      >
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-fg-muted">
+            Password baru untuk <span className="font-semibold">{resetTarget?.fullName}</span> berlaku langsung
+            tanpa konfirmasi email — beri tahu user secara langsung.
+          </p>
+          <Input
+            label="Password Baru"
+            isPassword
+            helperText="Minimal 6 karakter"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={6}
+          />
+          <Button type="submit" fullWidth isLoading={resetting}>
+            Reset Password
           </Button>
         </form>
       </Modal>

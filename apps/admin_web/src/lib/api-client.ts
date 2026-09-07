@@ -403,6 +403,8 @@ export const api = {
     role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
     defaultBoothId?: string
   }) => request<UserAccount>("/users", { method: "POST", body: input }),
+  resetUserPassword: (id: string, newPassword: string) =>
+    request<UserAccount>(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
 
   getWarehouseStock: () => request<WarehouseStockItem[]>("/warehouse-stock"),
   adjustWarehouseStock: (input: { productId: string; targetQty: number; reason?: string }) =>

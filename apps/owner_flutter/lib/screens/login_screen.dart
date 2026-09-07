@@ -66,11 +66,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text('Lupa password?', style: TextStyle(color: Colors.white70)),
+                  child: Text(
+                    'Lupa password? Hubungi Admin Pusat.',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
                   ),
                 ),
+                const SizedBox(height: 8),
                 if (state.error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),

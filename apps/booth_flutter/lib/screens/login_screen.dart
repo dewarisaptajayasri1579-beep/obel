@@ -256,17 +256,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Need help?
-                    Center(
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text(
-                          'Butuh bantuan?',
-                          style: TextStyle(
-                            color: Color(0xFF138E4E),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
+                    // Lupa password ditangani Admin Pusat (reset manual dari
+                    // Master User), belum ada self-service email/OTP.
+                    const Center(
+                      child: Text(
+                        'Lupa password? Hubungi Admin Pusat.',
+                        style: TextStyle(
+                          color: Color(0xFF7A8B84),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ),
