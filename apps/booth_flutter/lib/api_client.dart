@@ -108,6 +108,11 @@ class ApiClient {
     );
   }
 
+  Future<List<dynamic>> getNotifications(String token) async {
+    final result = await _get('/notifications', token: token);
+    return result as List<dynamic>;
+  }
+
   Future<dynamic> _get(String path, {String? token}) async {
     final response = await http.get(
       Uri.parse('$baseUrl$path'),

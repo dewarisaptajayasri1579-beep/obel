@@ -4,8 +4,80 @@ import '../app_state.dart';
 import '../obbel_icons.dart';
 import '../theme.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().refreshNotifications();
+    });
+  }
+
+  void _showNotifications(AppState appState) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        final items = List<Map<String, dynamic>>.from(appState.notifications);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Notifikasi',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: ObbelTheme.textDark),
+                ),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('Belum ada notifikasi.', style: TextStyle(color: ObbelTheme.textLight)),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final n = items[index];
+                        final isError = n['type'] == 'error';
+                        final isWarning = n['type'] == 'warning';
+                        return ListTile(
+                          leading: Icon(
+                            isError
+                                ? Icons.error_outline
+                                : isWarning
+                                    ? Icons.warning_amber_outlined
+                                    : Icons.info_outline,
+                            color: isError
+                                ? Colors.redAccent
+                                : isWarning
+                                    ? ObbelTheme.accentOrange
+                                    : ObbelTheme.textDark,
+                          ),
+                          title: Text(n['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          subtitle: Text(n['message'] as String, style: const TextStyle(fontSize: 12)),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +114,24 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: ObbelTheme.textDark),
-            onPressed: () {},
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: ObbelTheme.textDark),
+                onPressed: () => _showNotifications(appState),
+              ),
+              if (appState.hasUnreadNotifications)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: ObbelTheme.accentOrange, shape: BoxShape.circle),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

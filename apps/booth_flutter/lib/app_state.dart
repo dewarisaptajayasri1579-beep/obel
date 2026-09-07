@@ -38,6 +38,9 @@ class AppState extends ChangeNotifier {
   int cupSoldToday = 0;
   int transactionCount = 0;
 
+  List<Map<String, dynamic>> notifications = [];
+  bool get hasUnreadNotifications => notifications.isNotEmpty;
+
   int get cartCount => cart.fold(0, (sum, item) => sum + item.quantity);
   int get cartTotal => cart.fold(0, (sum, item) => sum + item.totalPrice);
   int get lowStockCount => stock.where((s) => s.status != 'Aman').length;
@@ -105,6 +108,16 @@ class AppState extends ChangeNotifier {
 
     await refreshCatalog();
     await refreshPendingDistribution();
+    await refreshNotifications();
+  }
+
+  /// Memanggil GET /notifications (khusus Booth: stok kritis di booth ini,
+  /// distribusi menunggu diterima, restock yang sudah disetujui).
+  Future<void> refreshNotifications() async {
+    if (_token == null) return;
+    final items = await _api.getNotifications(_token!);
+    notifications = items.cast<Map<String, dynamic>>();
+    notifyListeners();
   }
 
   /// Mengambil distribusi SENT pertama yang menunggu diterima booth ini
