@@ -29,7 +29,7 @@ import {
   type SaleListItem,
   type SaleRefund,
 } from "@/lib/api-client";
-import { Ban, Pencil, Undo2 } from "lucide-react";
+import { Ban, CreditCard, Pencil, Undo2 } from "lucide-react";
 
 const REFUND_CONDITION_OPTIONS = [
   { value: "REFUND_NO_STOCK_RETURN", label: "Uang kembali saja (produk sudah dikonsumsi/rusak)" },
@@ -77,7 +77,8 @@ function PenjualanContent() {
   const toast = useToast();
   const [sales, setSales] = useState<SaleListItem[] | null>(null);
   const [detail, setDetail] = useState<SaleDetail | null>(null);
-  const [mode, setMode] = useState<"void" | "revise" | "refund" | null>(null);
+  const [mode, setMode] = useState<"void" | "revise" | "refund" | "payment" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "QRIS">("CASH");
   const [reviseQty, setReviseQty] = useState<Record<string, number>>({});
   const [reasonCode, setReasonCode] = useState<ReasonCode>("WRONG_QTY");
   const [reasonNote, setReasonNote] = useState("");
@@ -109,6 +110,7 @@ function PenjualanContent() {
       setRefunds(r);
       setReviseQty(Object.fromEntries(d.items.map((i) => [i.productId, i.qty])));
       setRefundQty(Object.fromEntries(d.items.map((i) => [i.productId, 0])));
+      setPaymentMethod(d.paymentMethod === "QRIS" ? "CASH" : "QRIS");
       setReasonCode("WRONG_QTY");
       setReasonNote("");
       setImpact(null);
@@ -145,6 +147,26 @@ function PenjualanContent() {
       await load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memproses refund.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handlePaymentConfirm() {
+    if (!detail) return;
+    setSubmitting(true);
+    try {
+      await api.revisePaymentMethod(detail.id, {
+        idempotencyKey: crypto.randomUUID(),
+        method: paymentMethod,
+        reasonCode,
+        reasonNote: reasonNote || undefined,
+      });
+      toast.success(`Metode pembayaran Sale ${detail.saleNo} diubah ke ${paymentMethod}.`);
+      setDetail(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal merevisi metode pembayaran.");
     } finally {
       setSubmitting(false);
     }
@@ -303,6 +325,21 @@ function PenjualanContent() {
                   onChange={(v) => setRefundCondition(v as typeof refundCondition)}
                 />
               </div>
+            ) : mode === "payment" ? (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500 dark:text-fg-muted">
+                  Metode saat ini: <span className="font-semibold text-slate-800 dark:text-fg">{detail.paymentMethod === "CASH" ? "Tunai" : "QRIS"}</span>
+                </p>
+                <Select
+                  label="Metode Baru"
+                  options={[
+                    { value: "CASH", label: "Tunai" },
+                    { value: "QRIS", label: "QRIS" },
+                  ]}
+                  value={paymentMethod}
+                  onChange={(v) => setPaymentMethod(v as "CASH" | "QRIS")}
+                />
+              </div>
             ) : mode === "revise" ? (
               <div className="space-y-2">
                 {detail.items.map((item) => (
@@ -370,10 +407,18 @@ function PenjualanContent() {
                 <div className="flex gap-3">
                   <Button
                     isLoading={submitting}
-                    onClick={mode === "void" ? handleVoidConfirm : mode === "refund" ? handleRefundConfirm : handleReviseConfirm}
+                    onClick={
+                      mode === "void"
+                        ? handleVoidConfirm
+                        : mode === "refund"
+                          ? handleRefundConfirm
+                          : mode === "payment"
+                            ? handlePaymentConfirm
+                            : handleReviseConfirm
+                    }
                     variant={mode === "void" ? "danger" : "primary"}
                   >
-                    Konfirmasi {mode === "void" ? "Pembatalan" : mode === "refund" ? "Refund" : "Revisi"}
+                    Konfirmasi {mode === "void" ? "Pembatalan" : mode === "refund" ? "Refund" : mode === "payment" ? "Perubahan Metode" : "Revisi"}
                   </Button>
                   <Button variant="secondary" onClick={() => { setMode(null); setImpact(null); }}>
                     Batal
@@ -406,6 +451,16 @@ function PenjualanContent() {
                   }}
                 >
                   Refund Customer
+                </Button>
+                <Button
+                  variant="secondary"
+                  leftIcon={<CreditCard className="w-4 h-4" />}
+                  onClick={() => {
+                    setMode("payment");
+                    setImpact(null);
+                  }}
+                >
+                  Revisi Metode Pembayaran
                 </Button>
               </div>
             )}

@@ -3,6 +3,7 @@ import { ReconciliationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ResolveReconciliationCaseDto } from './dto/resolve-case.dto';
 
@@ -15,7 +16,7 @@ export class ReconciliationCasesService {
 
   findAll() {
     return this.prisma.reconciliationCase.findMany({
-      include: { resolvedBy: true },
+      include: { resolvedBy: { select: SAFE_PROFILE_SELECT } },
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     });
   }

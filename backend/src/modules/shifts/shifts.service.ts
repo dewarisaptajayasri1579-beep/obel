@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
@@ -236,7 +237,7 @@ export class ShiftsService {
   async correctShift(shiftSessionId: string, dto: CorrectShiftDto, user: JwtPayload) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
-      return this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include: { booth: true, shiftTemplate: true, staff: true } });
+      return this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include: { booth: true, shiftTemplate: true, staff: { select: SAFE_PROFILE_SELECT } } });
     }
 
     const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId } });
@@ -284,7 +285,7 @@ export class ShiftsService {
 
     return this.prisma.shiftSession.findUnique({
       where: { id: shiftSessionId },
-      include: { booth: true, shiftTemplate: true, staff: true },
+      include: { booth: true, shiftTemplate: true, staff: { select: SAFE_PROFILE_SELECT } },
     });
   }
 

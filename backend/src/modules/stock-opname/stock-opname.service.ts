@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -26,7 +27,7 @@ export class StockOpnameService {
 
   findAll() {
     return this.prisma.stockOpname.findMany({
-      include: { booth: true, countedBy: true, items: { include: { product: true } } },
+      include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
       orderBy: { snapshotAt: 'desc' },
     });
   }
@@ -63,7 +64,7 @@ export class StockOpnameService {
           },
         },
       },
-      include: { booth: true, countedBy: true, items: { include: { product: true } } },
+      include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
     });
 
     return opname;
@@ -107,7 +108,8 @@ export class StockOpnameService {
     const now = new Date();
     const businessDate = businessDateOf(now);
 
-    await this.prisma.$transaction(async (tx) => {
+    try {
+      await this.prisma.$transaction(async (tx) => {
       for (const item of opname.items) {
         const actualQty = actualByProduct.get(item.productId) ?? item.expectedQty;
         const discrepancy = actualQty - item.expectedQty;
@@ -170,7 +172,24 @@ export class StockOpnameService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
-    });
+      });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'stock_opname',
+          sourceEntityId: opname.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Konfirmasi opname tidak bisa diterapkan otomatis karena akan membuat stok negatif. Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo}.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.loadWithRelations(opname.id);
   }
@@ -350,7 +369,7 @@ export class StockOpnameService {
   private loadWithRelations(id: string) {
     return this.prisma.stockOpname.findUnique({
       where: { id },
-      include: { booth: true, countedBy: true, items: { include: { product: true } } },
+      include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
     });
   }
 }

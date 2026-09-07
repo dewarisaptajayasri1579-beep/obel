@@ -14,6 +14,7 @@ import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { effectiveByGroup } from '../../common/effective-version';
 import { CorrectionsService } from '../corrections/corrections.service';
+import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
@@ -35,6 +36,7 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
+    private readonly reconciliationCases: ReconciliationCasesService,
   ) {}
 
   /// Mirrors create_paid_sale from
@@ -340,7 +342,8 @@ export class SalesService {
     const revisedAt = new Date();
     const businessDate = businessDateOf(sale.paidAt ?? revisedAt);
 
-    await this.prisma.$transaction(async (tx) => {
+    try {
+      await this.prisma.$transaction(async (tx) => {
       for (const delta of impact.stockDeltas) {
         if (delta.qtyDelta > 0) {
           const decremented = await tx.boothStock.updateMany({
@@ -440,7 +443,24 @@ export class SalesService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
-    });
+      });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'sale',
+          sourceEntityId: sale.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { impact, error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Revisi tidak bisa diterapkan otomatis karena stok Booth akan negatif. Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo}.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.toSaleResponse(newSaleId);
   }

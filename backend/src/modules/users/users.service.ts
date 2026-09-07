@@ -1,17 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CreateUserDto } from './dto/create-user.dto';
 
-const SELECT_SAFE_FIELDS = {
-  id: true,
-  username: true,
-  fullName: true,
-  role: true,
-  defaultBoothId: true,
-  active: true,
-  createdAt: true,
-} as const;
+const SELECT_SAFE_FIELDS = { ...SAFE_PROFILE_SELECT, createdAt: true } as const;
 
 @Injectable()
 export class UsersService {

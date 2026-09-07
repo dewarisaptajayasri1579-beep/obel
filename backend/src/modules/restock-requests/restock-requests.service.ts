@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { DistributionsService } from '../distributions/distributions.service';
+import { CorrectionsService } from '../corrections/corrections.service';
 import { ApproveRestockRequestDto } from './dto/approve-restock-request.dto';
 import { CreateRestockRequestDto } from './dto/create-restock-request.dto';
 import { RejectRestockRequestDto } from './dto/reject-restock-request.dto';
@@ -14,6 +15,7 @@ export class RestockRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly distributionsService: DistributionsService,
+    private readonly corrections: CorrectionsService,
   ) {}
 
   findAll() {
@@ -105,7 +107,7 @@ export class RestockRequestsService {
   /// TX-05 — Revisi qty selama masih REQUESTED. Belum ada efek stok
   /// (BR-008), jadi ini edit langsung, bukan reversal/replacement seperti
   /// dokumen yang sudah SENT.
-  async reviseRequestedItems(id: string, dto: CreateRestockRequestDto) {
+  async reviseRequestedItems(id: string, dto: CreateRestockRequestDto, actorId: string) {
     const request = await this.prisma.restockRequest.findUnique({ where: { id } });
     if (!request) {
       throw new DomainError('NOT_FOUND', 'Permintaan restock tidak ditemukan.');
@@ -128,6 +130,8 @@ export class RestockRequestsService {
       }
     }
 
+    const oldItems = await this.prisma.restockRequestItem.findMany({ where: { restockRequestId: id } });
+
     await this.prisma.$transaction(async (tx) => {
       await tx.restockRequestItem.deleteMany({ where: { restockRequestId: id } });
       await tx.restockRequestItem.createMany({
@@ -136,6 +140,21 @@ export class RestockRequestsService {
       if (dto.note !== undefined) {
         await tx.restockRequest.update({ where: { id }, data: { note: dto.note } });
       }
+
+      await this.corrections.record(tx, {
+        entityType: 'restock_request',
+        entityId: id,
+        transactionGroupId: id,
+        correctionType: 'REVISION',
+        reasonCode: 'DATA_ENTRY_ERROR',
+        reasonNote: 'Revisi qty permintaan restock sebelum disetujui.',
+        impactSnapshot: {
+          before: oldItems.map((i) => ({ productId: i.productId, qty: i.qtyRequested })),
+          after: dto.items,
+        },
+        createdById: actorId,
+        idempotencyKey: randomUUID(),
+      });
     });
 
     return this.prisma.restockRequest.findUnique({
@@ -153,9 +172,29 @@ export class RestockRequestsService {
       throw new DomainError('RESTOCK_NOT_PENDING', 'Permintaan ini sudah diproses sebelumnya.');
     }
 
-    return this.prisma.restockRequest.update({
-      where: { id },
-      data: { status: RestockRequestStatus.REJECTED, approvedById: actorId, rejectReason: dto.reason },
-    });
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.restockRequest.update({
+        where: { id },
+        data: { status: RestockRequestStatus.REJECTED, approvedById: actorId, rejectReason: dto.reason },
+      }),
+      this.prisma.transactionCorrection.create({
+        data: {
+          id: randomUUID(),
+          entityType: 'restock_request',
+          entityId: id,
+          transactionGroupId: id,
+          correctionType: 'VOID',
+          reasonCode: 'OTHER',
+          reasonNote: dto.reason,
+          impactSnapshot: { status: 'REJECTED' },
+          status: 'POSTED',
+          createdById: actorId,
+          postedAt: new Date(),
+          idempotencyKey: randomUUID(),
+        },
+      }),
+    ]);
+
+    return updated;
   }
 }

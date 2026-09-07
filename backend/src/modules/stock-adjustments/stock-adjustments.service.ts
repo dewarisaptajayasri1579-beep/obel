@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { CorrectionsService } from '../corrections/corrections.service';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateStockAdjustmentDto, ReverseStockAdjustmentDto } from './dto/create-stock-adjustment.dto';
 
@@ -25,7 +26,7 @@ export class StockAdjustmentsService {
   findAll() {
     return this.prisma.transactionCorrection.findMany({
       where: { entityType: 'stock_adjustment' },
-      include: { createdBy: true },
+      include: { createdBy: { select: SAFE_PROFILE_SELECT } },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });

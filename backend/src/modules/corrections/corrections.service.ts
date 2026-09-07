@@ -3,6 +3,7 @@ import { CorrectionType, Prisma, ReasonCode } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { DomainError } from '../../common/domain-error';
 import { reasonRequiresNote } from '../../common/reason-code';
+import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export interface RecordCorrectionInput {
@@ -45,7 +46,7 @@ export class CorrectionsService {
   /// seluruh correction lintas entity, terbaru dulu.
   findAll() {
     return this.prisma.transactionCorrection.findMany({
-      include: { createdBy: true },
+      include: { createdBy: { select: SAFE_PROFILE_SELECT } },
       orderBy: { createdAt: 'desc' },
       take: 300,
     });

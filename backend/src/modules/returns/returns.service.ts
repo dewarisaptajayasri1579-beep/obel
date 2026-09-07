@@ -257,7 +257,8 @@ export class ReturnsService {
     const newReturnId = randomUUID();
     const now = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+    try {
+      await this.prisma.$transaction(async (tx) => {
       for (const productId of allProductIds) {
         const oldQty = oldQtyByProduct.get(productId) ?? 0;
         const newQty = newQtyByProduct.get(productId) ?? 0;
@@ -337,7 +338,24 @@ export class ReturnsService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
-    });
+      });
+    } catch (err) {
+      if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
+        const reconciliationCase = await this.reconciliationCases.create({
+          sourceEntityType: 'stock_return',
+          sourceEntityId: stockReturn.id,
+          severity: 'CRITICAL',
+          reasonCode: dto.reasonCode,
+          details: { error: err.message, correctionInput: dto },
+        });
+        throw new DomainError(
+          'RECONCILIATION_REQUIRED',
+          `Revisi tidak bisa diterapkan otomatis karena stok Booth akan negatif. Dibuat kasus rekonsiliasi ${reconciliationCase.caseNo}.`,
+          { caseId: reconciliationCase.id, caseNo: reconciliationCase.caseNo },
+        );
+      }
+      throw err;
+    }
 
     return this.loadWithRelations(newReturnId);
   }
