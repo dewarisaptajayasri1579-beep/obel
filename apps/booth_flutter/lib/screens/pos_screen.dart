@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../app_state.dart';
 import '../theme.dart';
 
@@ -29,10 +30,7 @@ class _PosScreenState extends State<PosScreen> {
       appBar: AppBar(
         title: const Text('Jual / POS'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {},
-          )
+          IconButton(icon: const Icon(Icons.history), onPressed: () {}),
         ],
       ),
       body: Column(
@@ -62,38 +60,44 @@ class _PosScreenState extends State<PosScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['Semua', 'Coffee Milk', 'Non Coffee', 'Coffee'].map((cat) {
-                      final isSelected = _selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text(cat),
-                          selected: isSelected,
-                          selectedColor: ObbelTheme.primaryDark,
-                          backgroundColor: Colors.white,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : ObbelTheme.textDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(
-                              color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                    children: ['Semua', 'Coffee Milk', 'Non Coffee', 'Coffee']
+                        .map((cat) {
+                          final isSelected = _selectedCategory == cat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(cat),
+                              selected: isSelected,
+                              selectedColor: ObbelTheme.primaryDark,
+                              backgroundColor: Colors.white,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : ObbelTheme.textDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? Colors.transparent
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedCategory = cat;
+                                  });
+                                }
+                              },
                             ),
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedCategory = cat;
-                              });
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        })
+                        .toList(),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -119,7 +123,7 @@ class _PosScreenState extends State<PosScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.01),
+                          color: Colors.black.withValues(alpha: 0.01),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -178,7 +182,10 @@ class _PosScreenState extends State<PosScreen> {
             SafeArea(
               child: Container(
                 margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: ObbelTheme.primaryDark,
                   borderRadius: BorderRadius.circular(12),
@@ -194,7 +201,11 @@ class _PosScreenState extends State<PosScreen> {
                             color: Colors.white24,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.shopping_cart, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.shopping_cart,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Column(
@@ -210,8 +221,15 @@ class _PosScreenState extends State<PosScreen> {
                               ),
                             ),
                             Text(
-                              cart.map((e) => '${e.product.name} x${e.quantity}').join(', '),
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              cart
+                                  .map(
+                                    (e) => '${e.product.name} x${e.quantity}',
+                                  )
+                                  .join(', '),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -230,17 +248,20 @@ class _PosScreenState extends State<PosScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right, color: Colors.white),
+                          icon: const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white,
+                          ),
                           onPressed: () {
                             Navigator.pushNamed(context, '/checkout');
                           },
-                        )
+                        ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
-            )
+            ),
         ],
       ),
     );

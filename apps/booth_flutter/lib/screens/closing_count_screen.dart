@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../api_client.dart';
 import '../app_state.dart';
 import '../models.dart';
@@ -66,7 +67,9 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                 const Text('Selisih ditemukan:'),
                 const SizedBox(height: 8),
                 for (final item in discrepant)
-                  Text('${item.productName}: ${item.expectedQty} → ${item.actualQty} (${item.reasonCode})'),
+                  Text(
+                    '${item.productName}: ${item.expectedQty} → ${item.actualQty} (${item.reasonCode})',
+                  ),
               ],
             ],
           ),
@@ -84,6 +87,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
       ),
     );
     if (proceed != true) return;
+    if (!mounted) return;
 
     setState(() => _confirming = true);
     final appState = context.read<AppState>();
@@ -98,7 +102,10 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: ObbelTheme.accentRed),
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: ObbelTheme.accentRed,
+        ),
       );
     } finally {
       if (mounted) setState(() => _confirming = false);
@@ -153,11 +160,19 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(item.productName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text(
+                                item.productName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
                               Text(
                                 'Expected ${item.expectedQty} cup',
-                                style: const TextStyle(color: ObbelTheme.textLight, fontSize: 12.5),
+                                style: const TextStyle(
+                                  color: ObbelTheme.textLight,
+                                  fontSize: 12.5,
+                                ),
                               ),
                             ],
                           ),
@@ -169,8 +184,13 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                           icon: const Icon(Icons.remove_circle_outline),
                           color: ObbelTheme.primaryMedium,
                         ),
-                        Text('${item.actualQty}',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          '${item.actualQty}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         IconButton(
                           onPressed: () => setState(() => item.actualQty++),
                           icon: const Icon(Icons.add_circle_outline),
@@ -186,7 +206,9 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                             : 'Selisih ${item.discrepancy} cup',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: item.discrepancy > 0 ? Colors.blue.shade700 : ObbelTheme.accentRed,
+                          color: item.discrepancy > 0
+                              ? Colors.blue.shade700
+                              : ObbelTheme.accentRed,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -197,10 +219,13 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                             ChoiceChip(
                               label: Text(reason),
                               selected: item.reasonCode == reason,
-                              onSelected: (_) => setState(() => item.reasonCode = reason),
+                              onSelected: (_) =>
+                                  setState(() => item.reasonCode = reason),
                               selectedColor: ObbelTheme.primaryDark,
                               labelStyle: TextStyle(
-                                color: item.reasonCode == reason ? Colors.white : ObbelTheme.textDark,
+                                color: item.reasonCode == reason
+                                    ? Colors.white
+                                    : ObbelTheme.textDark,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12.5,
                               ),
@@ -228,7 +253,10 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                   ? const SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
                     )
                   : const Text('Konfirmasi Closing'),
             ),

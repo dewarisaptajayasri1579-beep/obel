@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../app_state.dart';
 import '../obbel_icons.dart';
 import '../theme.dart';
@@ -23,7 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showNotifications(AppState appState) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         final items = List<Map<String, dynamic>>.from(appState.notifications);
         return SafeArea(
@@ -35,13 +38,20 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Text(
                   'Notifikasi',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: ObbelTheme.textDark),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: ObbelTheme.textDark,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (items.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text('Belum ada notifikasi.', style: TextStyle(color: ObbelTheme.textLight)),
+                    child: Text(
+                      'Belum ada notifikasi.',
+                      style: TextStyle(color: ObbelTheme.textLight),
+                    ),
                   )
                 else
                   Flexible(
@@ -57,16 +67,25 @@ class _HomeScreenState extends State<HomeScreen> {
                             isError
                                 ? Icons.error_outline
                                 : isWarning
-                                    ? Icons.warning_amber_outlined
-                                    : Icons.info_outline,
+                                ? Icons.warning_amber_outlined
+                                : Icons.info_outline,
                             color: isError
                                 ? Colors.redAccent
                                 : isWarning
-                                    ? ObbelTheme.accentOrange
-                                    : ObbelTheme.textDark,
+                                ? ObbelTheme.accentOrange
+                                : ObbelTheme.textDark,
                           ),
-                          title: Text(n['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          subtitle: Text(n['message'] as String, style: const TextStyle(fontSize: 12)),
+                          title: Text(
+                            n['title'] as String,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: Text(
+                            n['message'] as String,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                         );
                       },
                     ),
@@ -123,7 +142,10 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: ObbelTheme.textDark),
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: ObbelTheme.textDark,
+                ),
                 onPressed: () => _showNotifications(appState),
               ),
               if (appState.hasUnreadNotifications)
@@ -133,7 +155,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(color: ObbelTheme.accentOrange, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                      color: ObbelTheme.accentOrange,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
             ],
@@ -149,7 +174,10 @@ class _HomeScreenState extends State<HomeScreen> {
               // Active Shift Information Card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   image: const DecorationImage(
@@ -197,142 +225,153 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Orange action banner for incoming stock
               if (appState.pendingInbound != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF9F5), // Background cream-orange hangat
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFFFFDEC9), // Border oranye hangat
-                    width: 1.5,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ObbelTheme.accentOrange.withOpacity(0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+                  decoration: BoxDecoration(
+                    color: const Color(
+                      0xFFFFF9F5,
+                    ), // Background cream-orange hangat
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFFFFDEC9), // Border oranye hangat
+                      width: 1.5,
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Orange Box Icon with Pulse Decoration
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: ObbelTheme.accentOrange.withOpacity(0.12),
-                                blurRadius: 8,
-                                spreadRadius: 1,
+                    boxShadow: [
+                      BoxShadow(
+                        color: ObbelTheme.accentOrange.withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Orange Box Icon with Pulse Decoration
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: ObbelTheme.accentOrange.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: CustomPaint(
+                              size: const Size(28, 28),
+                              painter: ObbelIconPainter(
+                                iconType: 'box_open',
+                                color: ObbelTheme.accentOrange,
                               ),
-                            ],
+                            ),
                           ),
-                          child: CustomPaint(
-                            size: const Size(28, 28),
-                            painter: ObbelIconPainter(
-                              iconType: 'box_open',
-                              color: ObbelTheme.accentOrange,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Ada stok masuk',
+                                      style: TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: ObbelTheme.textDark,
+                                      ),
+                                    ),
+                                    // 'PENTING' Badge tag
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: ObbelTheme.accentOrange,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'PENTING',
+                                        style: TextStyle(
+                                          fontFamily: 'Outfit',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Text(
+                                  'untuk Shift 1',
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: ObbelTheme.textDark,
+                                    height: 1.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Silakan periksa & terima stok untuk memulai penjualan.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: ObbelTheme.textLight,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ObbelTheme.accentOrange,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/inbound');
+                          },
+                          child: const Text(
+                            'Lihat & Terima Stok',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Ada stok masuk',
-                                    style: TextStyle(
-                                      fontFamily: 'Outfit',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: ObbelTheme.textDark,
-                                    ),
-                                  ),
-                                  // 'PENTING' Badge tag
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: ObbelTheme.accentOrange,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'PENTING',
-                                      style: TextStyle(
-                                        fontFamily: 'Outfit',
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Text(
-                                'untuk Shift 1',
-                                style: TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: ObbelTheme.textDark,
-                                  height: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Silakan periksa & terima stok untuk memulai penjualan.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: ObbelTheme.textLight,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.35,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ObbelTheme.accentOrange,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/inbound');
-                        },
-                        child: const Text(
-                          'Lihat & Terima Stok',
-                          style: TextStyle(
-                            fontFamily: 'Outfit',
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.white,
-                          ),
-                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 24),
 
               // Summary Section Header
@@ -408,13 +447,13 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isWarning
-              ? ObbelTheme.accentOrange.withOpacity(0.3)
+              ? ObbelTheme.accentOrange.withValues(alpha: 0.3)
               : Colors.grey.shade200,
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -447,9 +486,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         value,
                         style: TextStyle(
                           fontFamily: 'Outfit',
-                          fontSize: valueFontSize ?? 26, // Dinamis menggunakan ukuran kustom jika ada
+                          fontSize:
+                              valueFontSize ??
+                              26, // Dinamis menggunakan ukuran kustom jika ada
                           fontWeight: FontWeight.w900,
-                          color: isWarning ? ObbelTheme.accentOrange : ObbelTheme.textDark,
+                          color: isWarning
+                              ? ObbelTheme.accentOrange
+                              : ObbelTheme.textDark,
                         ),
                       ),
                       if (extraWidget != null) ...[
@@ -464,12 +507,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: const Size(32, 32),
                   painter: ObbelIconPainter(
                     iconType: iconName,
-                    color: isWarning ? ObbelTheme.accentOrange : const Color(0xFFC4C9C6),
+                    color: isWarning
+                        ? ObbelTheme.accentOrange
+                        : const Color(0xFFC4C9C6),
                   ),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -480,7 +525,8 @@ class SparklinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0E6F3F) // Warna hijau Obbel untuk grafik
+      ..color =
+          const Color(0xFF0E6F3F) // Warna hijau Obbel untuk grafik
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+
 import 'home_screen.dart';
 import 'pos_screen.dart';
 import 'stock_screen.dart';
 import 'shift_screen.dart';
 import '../obbel_icons.dart';
-import '../theme.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -12,7 +12,6 @@ class MainShell extends StatefulWidget {
   @override
   State<MainShell> createState() => _MainShellState();
 }
-
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
@@ -27,10 +26,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -71,14 +67,20 @@ class _MainShellState extends State<MainShell> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'home', color: const Color(0xFF8D9690)),
+                  painter: ObbelIconPainter(
+                    iconType: 'home',
+                    color: const Color(0xFF8D9690),
+                  ),
                 ),
               ),
               activeIcon: Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'home', color: const Color(0xFF0E6F3F)),
+                  painter: ObbelIconPainter(
+                    iconType: 'home',
+                    color: const Color(0xFF0E6F3F),
+                  ),
                 ),
               ),
               label: 'Beranda',
@@ -88,14 +90,20 @@ class _MainShellState extends State<MainShell> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'register', color: const Color(0xFF8D9690)),
+                  painter: ObbelIconPainter(
+                    iconType: 'register',
+                    color: const Color(0xFF8D9690),
+                  ),
                 ),
               ),
               activeIcon: Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'register', color: const Color(0xFF0E6F3F)),
+                  painter: ObbelIconPainter(
+                    iconType: 'register',
+                    color: const Color(0xFF0E6F3F),
+                  ),
                 ),
               ),
               label: 'Jual / POS',
@@ -105,14 +113,20 @@ class _MainShellState extends State<MainShell> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'box_closed', color: const Color(0xFF8D9690)),
+                  painter: ObbelIconPainter(
+                    iconType: 'box_closed',
+                    color: const Color(0xFF8D9690),
+                  ),
                 ),
               ),
               activeIcon: Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'box_closed', color: const Color(0xFF0E6F3F)),
+                  painter: ObbelIconPainter(
+                    iconType: 'box_closed',
+                    color: const Color(0xFF0E6F3F),
+                  ),
                 ),
               ),
               label: 'Stok',
@@ -122,14 +136,20 @@ class _MainShellState extends State<MainShell> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'badge', color: const Color(0xFF8D9690)),
+                  painter: ObbelIconPainter(
+                    iconType: 'badge',
+                    color: const Color(0xFF8D9690),
+                  ),
                 ),
               ),
               activeIcon: Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: CustomPaint(
                   size: const Size(22, 22),
-                  painter: ObbelIconPainter(iconType: 'badge', color: const Color(0xFF0E6F3F)),
+                  painter: ObbelIconPainter(
+                    iconType: 'badge',
+                    color: const Color(0xFF0E6F3F),
+                  ),
                 ),
               ),
               label: 'Shift',
