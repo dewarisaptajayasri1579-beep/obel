@@ -28,13 +28,16 @@ class ApiClient {
   final String baseUrl;
 
   static String _defaultBaseUrl() {
-    if (kIsWeb) return 'http://localhost:3000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:3000';
-    return 'http://localhost:3000';
+    if (kIsWeb) return 'http://localhost:4000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:4000';
+    return 'http://localhost:4000';
   }
 
   Future<Map<String, dynamic>> login(String username, String password) {
-    return _post('/auth/login', body: {'username': username, 'password': password});
+    return _post(
+      '/auth/login',
+      body: {'username': username, 'password': password},
+    );
   }
 
   Future<List<dynamic>> getCatalog(String token) async {
@@ -57,7 +60,11 @@ class ApiClient {
     String distributionId,
     List<Map<String, dynamic>> items,
   ) {
-    return _post('/distributions/$distributionId/receive', token: token, body: {'items': items});
+    return _post(
+      '/distributions/$distributionId/receive',
+      token: token,
+      body: {'items': items},
+    );
   }
 
   Future<Map<String, dynamic>> createRestockRequest(
@@ -72,7 +79,10 @@ class ApiClient {
     );
   }
 
-  Future<Map<String, dynamic>> startShiftClosing(String token, String shiftSessionId) {
+  Future<Map<String, dynamic>> startShiftClosing(
+    String token,
+    String shiftSessionId,
+  ) {
     return _post('/shifts/$shiftSessionId/closing/start', token: token);
   }
 
@@ -117,10 +127,9 @@ class ApiClient {
   }
 
   Future<dynamic> _get(String path, {String? token}) async {
-    final response = await _send(() => http.get(
-          Uri.parse('$baseUrl$path'),
-          headers: _headers(token),
-        ));
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl$path'), headers: _headers(token)),
+    );
     return _decode(response);
   }
 
@@ -129,11 +138,13 @@ class ApiClient {
     String? token,
     Map<String, dynamic>? body,
   }) async {
-    final response = await _send(() => http.post(
-          Uri.parse('$baseUrl$path'),
-          headers: _headers(token),
-          body: jsonEncode(body ?? {}),
-        ));
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl$path'),
+        headers: _headers(token),
+        body: jsonEncode(body ?? {}),
+      ),
+    );
     return _decode(response) as Map<String, dynamic>;
   }
 
@@ -165,9 +176,9 @@ class ApiClient {
   }
 
   Map<String, String> _headers(String? token) => {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   dynamic _decode(http.Response response) {
     final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
@@ -177,13 +188,18 @@ class ApiClient {
 
     if (decoded is Map<String, dynamic> && decoded['code'] != null) {
       final rawMessage = decoded['message'];
-      final message = rawMessage is List ? rawMessage.join(', ') : rawMessage.toString();
+      final message = rawMessage is List
+          ? rawMessage.join(', ')
+          : rawMessage.toString();
       throw ApiException(
         decoded['code'] as String,
         message,
         decoded['details'] as Map<String, dynamic>?,
       );
     }
-    throw ApiException('UNKNOWN_ERROR', 'Terjadi kesalahan (${response.statusCode}).');
+    throw ApiException(
+      'UNKNOWN_ERROR',
+      'Terjadi kesalahan (${response.statusCode}).',
+    );
   }
 }

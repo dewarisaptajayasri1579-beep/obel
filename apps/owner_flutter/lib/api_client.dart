@@ -28,13 +28,16 @@ class ApiClient {
   final String baseUrl;
 
   static String _defaultBaseUrl() {
-    if (kIsWeb) return 'http://localhost:3000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:3000';
-    return 'http://localhost:3000';
+    if (kIsWeb) return 'http://localhost:4000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:4000';
+    return 'http://localhost:4000';
   }
 
   Future<Map<String, dynamic>> login(String username, String password) {
-    return _post('/auth/login', body: {'username': username, 'password': password});
+    return _post(
+      '/auth/login',
+      body: {'username': username, 'password': password},
+    );
   }
 
   Future<Map<String, dynamic>> getExecutiveHome(String token) async {
@@ -43,11 +46,17 @@ class ApiClient {
   }
 
   Future<List<dynamic>> getBoothRanking(String token, String period) async {
-    final result = await _get('/owner/booth-ranking?period=$period', token: token);
+    final result = await _get(
+      '/owner/booth-ranking?period=$period',
+      token: token,
+    );
     return result as List<dynamic>;
   }
 
-  Future<Map<String, dynamic>> getBoothDetail(String token, String boothId) async {
+  Future<Map<String, dynamic>> getBoothDetail(
+    String token,
+    String boothId,
+  ) async {
     final result = await _get('/owner/booths/$boothId', token: token);
     return result as Map<String, dynamic>;
   }
@@ -73,24 +82,40 @@ class ApiClient {
   }
 
   Future<String> exportReportsCsv(String token) async {
-    final response = await _send(() => http.get(Uri.parse('$baseUrl/reports/export'), headers: _headers(token)));
+    final response = await _send(
+      () => http.get(
+        Uri.parse('$baseUrl/reports/export'),
+        headers: _headers(token),
+      ),
+    );
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body;
     }
-    throw ApiException('EXPORT_FAILED', 'Gagal mengunduh laporan (${response.statusCode}).');
+    throw ApiException(
+      'EXPORT_FAILED',
+      'Gagal mengunduh laporan (${response.statusCode}).',
+    );
   }
 
   Future<dynamic> _get(String path, {String? token}) async {
-    final response = await _send(() => http.get(Uri.parse('$baseUrl$path'), headers: _headers(token)));
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl$path'), headers: _headers(token)),
+    );
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> _post(String path, {String? token, Map<String, dynamic>? body}) async {
-    final response = await _send(() => http.post(
-          Uri.parse('$baseUrl$path'),
-          headers: _headers(token),
-          body: jsonEncode(body ?? {}),
-        ));
+  Future<Map<String, dynamic>> _post(
+    String path, {
+    String? token,
+    Map<String, dynamic>? body,
+  }) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl$path'),
+        headers: _headers(token),
+        body: jsonEncode(body ?? {}),
+      ),
+    );
     return _decode(response) as Map<String, dynamic>;
   }
 
@@ -101,20 +126,29 @@ class ApiClient {
     try {
       return await request().timeout(_requestTimeout);
     } on TimeoutException {
-      throw ApiException('TIMEOUT', 'Koneksi ke server timeout. Periksa jaringan Anda lalu coba lagi.');
+      throw ApiException(
+        'TIMEOUT',
+        'Koneksi ke server timeout. Periksa jaringan Anda lalu coba lagi.',
+      );
     } on SocketException {
-      throw ApiException('NETWORK_ERROR', 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      throw ApiException(
+        'NETWORK_ERROR',
+        'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      );
     } on ApiException {
       rethrow;
     } catch (_) {
-      throw ApiException('NETWORK_ERROR', 'Terjadi masalah koneksi. Periksa jaringan Anda lalu coba lagi.');
+      throw ApiException(
+        'NETWORK_ERROR',
+        'Terjadi masalah koneksi. Periksa jaringan Anda lalu coba lagi.',
+      );
     }
   }
 
   Map<String, String> _headers(String? token) => {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   dynamic _decode(http.Response response) {
     final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
@@ -124,9 +158,18 @@ class ApiClient {
 
     if (decoded is Map<String, dynamic> && decoded['code'] != null) {
       final rawMessage = decoded['message'];
-      final message = rawMessage is List ? rawMessage.join(', ') : rawMessage.toString();
-      throw ApiException(decoded['code'] as String, message, decoded['details'] as Map<String, dynamic>?);
+      final message = rawMessage is List
+          ? rawMessage.join(', ')
+          : rawMessage.toString();
+      throw ApiException(
+        decoded['code'] as String,
+        message,
+        decoded['details'] as Map<String, dynamic>?,
+      );
     }
-    throw ApiException('UNKNOWN_ERROR', 'Terjadi kesalahan (${response.statusCode}).');
+    throw ApiException(
+      'UNKNOWN_ERROR',
+      'Terjadi kesalahan (${response.statusCode}).',
+    );
   }
 }
