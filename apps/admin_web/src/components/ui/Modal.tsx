@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export interface ModalProps {
@@ -24,6 +25,12 @@ export const Modal: React.FC<ModalProps> = ({
   size = "md",
   closeOnBackdropClick = true,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -42,7 +49,7 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const sizeClasses = {
     sm: "max-w-md",
@@ -52,36 +59,40 @@ export const Modal: React.FC<ModalProps> = ({
     full: "max-w-[95vw] h-[90vh]",
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={closeOnBackdropClick ? onClose : undefined}
       />
 
       {/* Modal Card */}
       <div
-        className={`relative w-full ${sizeClasses[size]} glass-modal p-6 sm:p-8 rounded-[32px] shadow-2xl z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]`}
+        className={`relative w-full ${sizeClasses[size]} glass-modal p-6 sm:p-8 rounded-4xl shadow-2xl z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] my-auto`}
       >
         {/* Header */}
         {(title || subtitle) && (
           <div className="flex items-start justify-between pb-4 border-b border-slate-200/60 dark:border-line mb-5 gap-4">
             <div>
               {title && typeof title === "string" ? (
-                <h3 className="text-xl font-bold text-slate-800 dark:text-fg tracking-tight">{title}</h3>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-fg tracking-tight">
+                  {title}
+                </h3>
               ) : (
                 title
               )}
               {subtitle && typeof subtitle === "string" ? (
-                <p className="text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">{subtitle}</p>
+                <p className="text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
+                  {subtitle}
+                </p>
               ) : (
                 subtitle
               )}
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-slate-100/80 dark:bg-surface-hover hover:bg-slate-200/80 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-secondary flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+              className="w-10 h-10 rounded-xl bg-slate-100/80 dark:bg-surface-hover hover:bg-slate-200/80 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-secondary flex items-center justify-center transition-colors cursor-pointer shrink-0"
               aria-label="Tutup modal"
             >
               <X className="w-5 h-5 stroke-[2.2]" />
@@ -99,6 +110,7 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
