@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required to reach the Backend API; the main manifest does not inherit
+         INTERNET from the debug/profile manifests, so release builds need it here. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="owner_flutter"
         android:name="${applicationName}"

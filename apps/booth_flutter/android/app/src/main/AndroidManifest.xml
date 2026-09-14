@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Printer struk thermal Bluetooth (docs/11-notification-printing-offline.md §4) -->
+    <!-- Required to reach the Backend API; the main manifest does not inherit
+         INTERNET from the debug/profile manifests, so release builds need it here. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Bluetooth thermal receipt printer (docs/11-notification-printing-offline.md §4) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
