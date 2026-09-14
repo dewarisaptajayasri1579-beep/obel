@@ -1,11 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, SocketException;
+import 'dart:io' show SocketException;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 const _requestTimeout = Duration(seconds: 15);
+
+/// Override via `--dart-define=API_BASE_URL=http://10.0.2.2:4000` saat build
+/// untuk mengarah ke backend lokal. Tanpa flag ini, default menuju backend
+/// production di Coolify (lihat docs/17-deployment-environment.md).
+const _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
+const _defaultProductionBaseUrl = 'https://obel-backend.apps.7smarts.id';
 
 /// Error dari Backend API, mengikuti envelope {code, message, details} di
 /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
@@ -20,17 +25,17 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Client HTTP tipis ke Backend API (Node.js/NestJS). Emulator Android tidak
-/// bisa memakai "localhost" untuk mengakses host — dipetakan ke 10.0.2.2.
+/// Client HTTP tipis ke Backend API (Node.js/NestJS). Default menuju backend
+/// production di Coolify; override dengan `--dart-define=API_BASE_URL=...`
+/// untuk development lokal (mis. `http://10.0.2.2:4000` di emulator Android).
 class ApiClient {
   ApiClient({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl();
 
   final String baseUrl;
 
   static String _defaultBaseUrl() {
-    if (kIsWeb) return 'http://localhost:4000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:4000';
-    return 'http://localhost:4000';
+    if (_apiBaseUrlOverride.isNotEmpty) return _apiBaseUrlOverride;
+    return _defaultProductionBaseUrl;
   }
 
   Future<Map<String, dynamic>> login(String username, String password) {
