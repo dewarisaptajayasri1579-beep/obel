@@ -39,6 +39,7 @@ class AppState extends ChangeNotifier {
   int transactionCount = 0;
 
   List<Map<String, dynamic>> notifications = [];
+  List<SaleHistoryRecord> sales = [];
   bool get hasUnreadNotifications => notifications.isNotEmpty;
 
   int get cartCount => cart.fold(0, (sum, item) => sum + item.quantity);
@@ -94,6 +95,7 @@ class AppState extends ChangeNotifier {
     _token = null;
     loggedIn = false;
     cart.clear();
+    sales.clear();
     notifyListeners();
   }
 
@@ -107,6 +109,7 @@ class AppState extends ChangeNotifier {
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
 
     await refreshCatalog();
+    await refreshSales();
     await refreshPendingDistribution();
     await refreshNotifications();
   }
@@ -179,6 +182,33 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshSales() async {
+    if (_token == null) return;
+    try {
+      final items = await _api.getSales(_token!);
+      sales = items.map((raw) {
+        final item = raw as Map<String, dynamic>;
+        return SaleHistoryRecord(
+          saleNo: item['saleNo'] as String,
+          total: (item['total'] as num).toInt(),
+          paymentMethod: item['paymentMethod'] as String,
+          status: item['status'] as String,
+          paidAt: DateTime.parse(item['paidAt'] as String).toLocal(),
+          items: (item['items'] as List<dynamic>).map((rawItem) {
+            final saleItem = rawItem as Map<String, dynamic>;
+            return SaleHistoryItem(
+              productName: saleItem['productName'] as String,
+              qty: saleItem['qty'] as int,
+            );
+          }).toList(),
+        );
+      }).toList();
+      notifyListeners();
+    } on ApiException {
+      // History is supplementary; it must not block login or checkout.
+    }
+  }
+
   void addToCart(Product product) {
     final available = stockQtyFor(product.id);
     final currentQty = cart
@@ -249,7 +279,28 @@ class AppState extends ChangeNotifier {
     transactionCount += 1;
     cart.clear();
 
+    sales.insert(
+      0,
+      SaleHistoryRecord(
+        saleNo: result['saleNo'] as String,
+        total: total,
+        paymentMethod: paymentMethod,
+        status: 'PAID',
+        paidAt: DateTime.now(),
+        items: itemSnapshot
+            .map(
+              (item) => SaleHistoryItem(
+                productName: item.name,
+                qty: item.qty,
+              ),
+            )
+            .toList(),
+      ),
+    );
+    notifyListeners();
+
     await refreshCatalog();
+    await refreshSales();
     return CompletedSale(
       saleNo: result['saleNo'] as String,
       total: total,
@@ -366,4 +417,29 @@ class CompletedSale {
   final int total;
   final String paymentMethod;
   final List<CompletedSaleItem> items;
+}
+
+class SaleHistoryItem {
+  SaleHistoryItem({required this.productName, required this.qty});
+
+  final String productName;
+  final int qty;
+}
+
+class SaleHistoryRecord {
+  SaleHistoryRecord({
+    required this.saleNo,
+    required this.total,
+    required this.paymentMethod,
+    required this.status,
+    required this.paidAt,
+    required this.items,
+  });
+
+  final String saleNo;
+  final int total;
+  final String paymentMethod;
+  final String status;
+  final DateTime paidAt;
+  final List<SaleHistoryItem> items;
 }

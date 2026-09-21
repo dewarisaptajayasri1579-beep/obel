@@ -183,9 +183,14 @@ export class SalesService {
   /// lama yang sudah direvisi disembunyikan dari list ini (tetap terlihat
   /// di Riwayat & Koreksi Data), sesuai "effective sale versions"
   /// (docs/24-data-consistency-correction-reversal.md §14).
-  async findAll() {
+  async findAll(user?: JwtPayload) {
     const sales = await this.prisma.sale.findMany({
-      where: { status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] } },
+      where: {
+        status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] },
+        ...(user?.role === UserRole.BOOTH_STAFF && user.boothId
+          ? { boothId: user.boothId }
+          : {}),
+      },
       include: { booth: true, staff: true, items: true },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -203,6 +208,10 @@ export class SalesService {
         total: Number(s.total),
         cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
         paymentMethod: s.paymentMethod,
+        items: s.items.map((item) => ({
+          productName: item.productNameSnapshot,
+          qty: item.qty,
+        })),
         paidAt: s.paidAt,
         createdAt: s.createdAt,
         versionNo: s.versionNo,

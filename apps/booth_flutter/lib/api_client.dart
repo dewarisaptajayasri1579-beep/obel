@@ -55,6 +55,11 @@ class ApiClient {
     return result as Map<String, dynamic>;
   }
 
+  Future<List<dynamic>> getSales(String token) async {
+    final result = await _get('/sales', token: token);
+    return result as List<dynamic>;
+  }
+
   Future<List<dynamic>> getPendingDistributions(String token) async {
     final result = await _get('/distributions/pending', token: token);
     return result as List<dynamic>;

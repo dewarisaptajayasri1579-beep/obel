@@ -17,9 +17,9 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
-  findAll() {
-    return this.salesService.findAll();
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.salesService.findAll(user);
   }
 
   @Post()
