@@ -49,7 +49,8 @@ class AppState extends ChangeNotifier {
       transactionCount == 0 ? 0 : (omzetToday / transactionCount).round();
 
   List<BoothStock> get topStock {
-    final sorted = [...stock]..sort((a, b) => b.currentQty.compareTo(a.currentQty));
+    final sorted = [...stock]
+      ..sort((a, b) => b.currentQty.compareTo(a.currentQty));
     return sorted.take(3).toList();
   }
 
@@ -59,8 +60,9 @@ class AppState extends ChangeNotifier {
     return entries.take(3).toList();
   }
 
-  String productName(String productId) =>
-      catalog.firstWhere((p) => p.id == productId, orElse: () => catalog.first).name;
+  String productName(String productId) => catalog
+      .firstWhere((p) => p.id == productId, orElse: () => catalog.first)
+      .name;
 
   int stockQtyFor(String productId) {
     final match = stock.where((s) => s.product.id == productId);
@@ -104,7 +106,9 @@ class AppState extends ChangeNotifier {
     boothName = (shift['booth'] as Map)['name'] as String;
     shiftSessionId = shift['shiftSessionId'] as String;
     shiftLabel = '${shift['shiftName']} AKTIF'.toUpperCase();
-    final startAt = DateTime.parse(shift['scheduledStartAt'] as String).toLocal();
+    final startAt = DateTime.parse(
+      shift['scheduledStartAt'] as String,
+    ).toLocal();
     final endAt = DateTime.parse(shift['scheduledEndAt'] as String).toLocal();
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
 
@@ -144,6 +148,7 @@ class AppState extends ChangeNotifier {
       return InboundItem(
         product: Product(
           id: item['productId'] as String,
+          sku: '',
           name: item['productName'] as String,
           price: (item['sellPrice'] as num).toInt(),
           category: '',
@@ -166,6 +171,7 @@ class AppState extends ChangeNotifier {
       final map = raw as Map<String, dynamic>;
       final product = Product(
         id: map['id'] as String,
+        sku: (map['sku'] as String?) ?? '',
         name: map['name'] as String,
         price: (map['sellPrice'] as num).toInt(),
         category: (map['category'] as String?) ?? '',
@@ -209,6 +215,18 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<String> submitRestock(List<Map<String, dynamic>> items) async {
+    if (_token == null) {
+      throw ApiException(
+        'AUTH_REQUIRED',
+        'Sesi login berakhir, silakan login ulang.',
+      );
+    }
+
+    final result = await _api.createRestockRequest(_token!, items);
+    return result['requestNo'] as String;
+  }
+
   void addToCart(Product product) {
     final available = stockQtyFor(product.id);
     final currentQty = cart
@@ -216,7 +234,9 @@ class AppState extends ChangeNotifier {
         .fold(0, (sum, c) => sum + c.quantity);
     if (currentQty >= available) return;
 
-    final existingIndex = cart.indexWhere((item) => item.product.id == product.id);
+    final existingIndex = cart.indexWhere(
+      (item) => item.product.id == product.id,
+    );
     if (existingIndex >= 0) {
       cart[existingIndex].quantity++;
     } else {
@@ -252,13 +272,24 @@ class AppState extends ChangeNotifier {
   /// saleNo/total/item snapshot (untuk cetak struk) sebelum cart di-clear.
   Future<CompletedSale> checkout(String paymentMethod) async {
     if (_token == null || shiftSessionId == null) {
-      throw ApiException('SHIFT_NOT_OPEN', 'Shift tidak ditemukan, silakan login ulang.');
+      throw ApiException(
+        'SHIFT_NOT_OPEN',
+        'Shift tidak ditemukan, silakan login ulang.',
+      );
     }
 
     final cupCount = cartCount;
-    final soldSnapshot = cart.map((c) => MapEntry(c.product.id, c.quantity)).toList();
+    final soldSnapshot = cart
+        .map((c) => MapEntry(c.product.id, c.quantity))
+        .toList();
     final itemSnapshot = cart
-        .map((c) => CompletedSaleItem(name: c.product.name, qty: c.quantity, price: c.product.price))
+        .map(
+          (c) => CompletedSaleItem(
+            name: c.product.name,
+            qty: c.quantity,
+            price: c.product.price,
+          ),
+        )
         .toList();
 
     final result = await _api.createSale(
@@ -266,13 +297,19 @@ class AppState extends ChangeNotifier {
       idempotencyKey: _uuid.v4(),
       shiftSessionId: shiftSessionId!,
       paymentMethod: paymentMethod,
-      items: cart.map((c) => {'productId': c.product.id, 'qty': c.quantity}).toList(),
+      items: cart
+          .map((c) => {'productId': c.product.id, 'qty': c.quantity})
+          .toList(),
     );
 
     final total = (result['total'] as num).toInt();
 
     for (final entry in soldSnapshot) {
-      soldQtyByProductId.update(entry.key, (v) => v + entry.value, ifAbsent: () => entry.value);
+      soldQtyByProductId.update(
+        entry.key,
+        (v) => v + entry.value,
+        ifAbsent: () => entry.value,
+      );
     }
     omzetToday += total;
     cupSoldToday += cupCount;
@@ -326,7 +363,9 @@ class AppState extends ChangeNotifier {
     await _api.receiveDistribution(
       _token!,
       distributionId,
-      items.map((i) => {'productId': i.product.id, 'actualQty': i.actualQty}).toList(),
+      items
+          .map((i) => {'productId': i.product.id, 'actualQty': i.actualQty})
+          .toList(),
     );
 
     await refreshCatalog();
@@ -337,16 +376,18 @@ class AppState extends ChangeNotifier {
   /// approve (BR-008/BR-009) — Booth hanya mengajukan permintaan di sini.
   Future<void> requestRestock(Product product, int qty) async {
     if (_token == null) return;
-    await _api.createRestockRequest(
-      _token!,
-      [{'productId': product.id, 'qty': qty}],
-    );
+    await _api.createRestockRequest(_token!, [
+      {'productId': product.id, 'qty': qty},
+    ]);
   }
 
   /// Memanggil POST /shifts/:id/closing/start (get_expected_stock snapshot).
   Future<List<ClosingCountItem>> startShiftClosing() async {
     if (_token == null || shiftSessionId == null) {
-      throw ApiException('SHIFT_NOT_OPEN', 'Shift tidak ditemukan, silakan login ulang.');
+      throw ApiException(
+        'SHIFT_NOT_OPEN',
+        'Shift tidak ditemukan, silakan login ulang.',
+      );
     }
     final result = await _api.startShiftClosing(_token!, shiftSessionId!);
     return (result['items'] as List<dynamic>).map((raw) {
@@ -367,11 +408,15 @@ class AppState extends ChangeNotifier {
     await _api.confirmShiftClosing(
       _token!,
       shiftSessionId!,
-      items.map((i) => {
-            'productId': i.productId,
-            'actualQty': i.actualQty,
-            if (i.reasonCode != null) 'reasonCode': i.reasonCode,
-          }).toList(),
+      items
+          .map(
+            (i) => {
+              'productId': i.productId,
+              'actualQty': i.actualQty,
+              if (i.reasonCode != null) 'reasonCode': i.reasonCode,
+            },
+          )
+          .toList(),
     );
   }
 
@@ -398,7 +443,11 @@ class AppState extends ChangeNotifier {
 }
 
 class CompletedSaleItem {
-  CompletedSaleItem({required this.name, required this.qty, required this.price});
+  CompletedSaleItem({
+    required this.name,
+    required this.qty,
+    required this.price,
+  });
 
   final String name;
   final int qty;

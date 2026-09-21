@@ -1,5 +1,6 @@
 class Product {
   final String id;
+  final String sku;
   final String name;
   final int price;
   final String category;
@@ -7,6 +8,7 @@ class Product {
 
   const Product({
     required this.id,
+    this.sku = '',
     required this.name,
     required this.price,
     required this.category,
@@ -18,10 +20,7 @@ class CartItem {
   final Product product;
   int quantity;
 
-  CartItem({
-    required this.product,
-    this.quantity = 1,
-  });
+  CartItem({required this.product, this.quantity = 1});
 
   int get totalPrice => product.price * quantity;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppLogo } from "../ui/AppLogo";
@@ -30,46 +30,56 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
   const isActive = isItemActive(pathname, item.href);
   const Icon = item.icon;
 
+  useEffect(() => {
+    if (activeChild) {
+      setIsOpen(true);
+    }
+  }, [pathname, activeChild]);
+
   if (hasChildren) {
     return (
-      <div>
+      <div className="space-y-1">
         <button
           type="button"
           onClick={() => setIsOpen((v) => !v)}
           title={isCollapsed ? item.label : undefined}
-          className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 cursor-pointer ${
             activeChild
-              ? "text-white bg-white/10 dark:bg-[rgba(59,130,246,0.10)] dark:text-[#60A5FA] dark:shadow-[0_0_18px_rgba(59,130,246,0.12)]"
-              : "text-slate-300 hover:bg-white/10 hover:text-white dark:hover:bg-[rgba(59,130,246,0.06)]"
+              ? "text-white bg-white/10"
+              : "text-slate-300 hover:bg-white/5 hover:text-white"
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
           {Icon && (
-            <span className={`flex-shrink-0 ${activeChild ? "text-white dark:text-[#60A5FA]" : "text-slate-300"}`}>
-              <Icon className="w-5 h-5" />
+            <span className={`flex-shrink-0 ${activeChild ? "text-white" : "text-slate-400"}`}>
+              <Icon className="w-4 h-4" />
             </span>
           )}
           {!isCollapsed && (
             <>
-              <span className="truncate flex-1 text-left">{item.label}</span>
-              <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+              <span className="truncate flex-1 text-left text-sm font-semibold">{item.label}</span>
+              <ChevronDown className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </>
           )}
         </button>
+
         {!isCollapsed && isOpen && (
-          <div className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1">
-            {item.children!.map((child) => (
-              <Link
-                key={child.href}
-                href={child.href!}
-                className={`block px-3 py-2 rounded-xl text-sm font-semibold transition-colors dark:border-l-2 dark:border-l-transparent ${
-                  isItemActive(pathname, child.href)
-                    ? "text-white bg-white/10 dark:bg-[rgba(59,130,246,0.10)] dark:text-[#60A5FA] dark:border-l-[#3B82F6] dark:shadow-[0_0_18px_rgba(59,130,246,0.12)]"
-                    : "text-slate-400 hover:text-white hover:bg-white/5 dark:hover:bg-[rgba(59,130,246,0.06)]"
-                }`}
-              >
-                {child.label}
-              </Link>
-            ))}
+          <div className="ml-4 pl-3 border-l border-white/15 space-y-0.5 my-1">
+            {item.children!.map((child) => {
+              const childActive = isItemActive(pathname, child.href);
+              return (
+                <Link
+                  key={child.label}
+                  href={child.href!}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    childActive
+                      ? "text-blue-400 font-semibold bg-blue-500/10"
+                      : "text-slate-300 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <span className="truncate">{child.label}</span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
@@ -80,15 +90,15 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
     <Link
       href={item.href!}
       title={isCollapsed ? item.label : undefined}
-      className={`flex items-center gap-3.5 px-3.5 py-3 rounded-2xl font-bold text-sm transition-all duration-200 ${
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
         isActive
-          ? "bg-gradient-to-r from-[#0544cc] to-[#2563eb] text-white shadow-[0_0_22px_-2px_rgba(37,99,235,0.65)] border border-blue-400/50 translate-x-1 dark:shadow-[0_0_18px_rgba(59,130,246,0.3)] dark:border-blue-500/50"
-          : "text-slate-300 hover:bg-white/10 hover:text-white dark:hover:bg-[rgba(59,130,246,0.06)]"
+          ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+          : "text-slate-300 hover:bg-white/5 hover:text-white"
       } ${isCollapsed ? "justify-center px-0" : ""}`}
     >
       {Icon && (
-        <span className={`flex-shrink-0 ${isActive ? "text-white dark:text-[#60A5FA]" : "text-slate-300"}`}>
-          <Icon className="w-5 h-5" />
+        <span className={`flex-shrink-0 ${isActive ? "text-white" : "text-slate-400"}`}>
+          <Icon className="w-4 h-4" />
         </span>
       )}
       {!isCollapsed && <span className="truncate">{item.label}</span>}

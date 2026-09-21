@@ -1,15 +1,24 @@
+// src/lib/nav-config.ts
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
+  BarChart3,
+  ShoppingCart,
+  TrendingUp,
   Truck,
   PackageSearch,
-  Warehouse,
   Undo2,
   Receipt,
-  BarChart3,
-  Settings,
+  Database,
+  Package,
+  Warehouse,
   ClipboardCheck,
-  History,
+  Settings,
+  Sliders,
+  Store,
+  Clock,
+  SlidersHorizontal,
+  Users,
   BookOpen,
 } from "lucide-react";
 
@@ -26,11 +35,12 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-/** Menu Admin Pusat sesuai docs/obbel-coffee-ai-docs/05-feature-specification.md §B
- *  dan 21-screen-route-map.md §B. Rute di bawah "Segera" belum tersambung ke
- *  Backend API — menyusul setelah endpoint terkait dibuat. */
+/** 
+ * Konfigurasi Menu Navigasi Obbel Admin
+ */
 export const NAV_GROUPS: NavGroup[] = [
   {
+    // Group Tanpa Label (Top-Level)
     items: [
       {
         label: "Dashboard",
@@ -38,87 +48,104 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: LayoutGrid,
         bottomBar: true,
       },
-    ],
-  },
-  {
-    group: "Stok",
-    items: [
       {
-        label: "Distribusi Stok",
-        href: "/distribusi",
-        icon: Truck,
+        label: "Laporan",
+        href: "/laporan",
+        icon: BarChart3,
         bottomBar: true,
-      },
-      {
-        label: "Restock Booth",
-        href: "/restock",
-        icon: PackageSearch,
-        bottomBar: true,
-      },
-      {
-        label: "Monitor Stok Booth",
-        href: "/stok/booth",
-        icon: PackageSearch,
-        bottomBar: false,
-      },
-      {
-        label: "Stok Gudang",
-        href: "/stok/gudang",
-        icon: Warehouse,
-        bottomBar: false,
-      },
-      {
-        label: "Stok Opname",
-        href: "/stok/opname",
-        icon: ClipboardCheck,
-        bottomBar: false,
-      },
-      {
-        label: "Adjustment / Koreksi Stok",
-        href: "/stok/adjustment",
-        icon: Undo2,
-        bottomBar: false,
-      },
-      { label: "Return Stok", href: "/return", icon: Undo2, bottomBar: false },
-    ],
-  },
-  {
-    group: "Penjualan & Laporan",
-    items: [
-      {
-        label: "Penjualan",
-        href: "/penjualan",
-        icon: Receipt,
-        bottomBar: true,
-      },
-      { label: "Laporan", href: "/laporan", icon: BarChart3, bottomBar: false },
-      {
-        label: "Riwayat & Koreksi Data",
-        href: "/koreksi",
-        icon: History,
-        bottomBar: false,
       },
     ],
   },
   {
-    group: "Master Data",
+    group: "TRANSAKSI",
     items: [
       {
-        label: "Master Data",
-        icon: Settings,
+        label: "Pembelian & Stok",
+        icon: ShoppingCart,
         children: [
-          { label: "Produk", href: "/master/produk" },
-          { label: "Booth", href: "/master/booth" },
-          { label: "Shift", href: "/master/shift" },
-          { label: "Threshold Stok Booth", href: "/master/threshold" },
-          { label: "User", href: "/master/user" },
+          {
+            label: "Distribusi Stok",
+            href: "/distribusi",
+            icon: Truck,
+            bottomBar: true,
+          },
+          {
+            label: "Restock Booth",
+            href: "/restock",
+            icon: PackageSearch,
+            bottomBar: true,
+          },
+          {
+            label: "Return Stok",
+            href: "/return",
+            icon: Undo2,
+            bottomBar: false,
+          },
+        ],
+      },
+      {
+        label: "Aktivitas Sales",
+        icon: TrendingUp,
+        children: [
+          {
+            label: "Penjualan",
+            href: "/penjualan",
+            icon: Receipt,
+            bottomBar: true,
+          },
         ],
       },
     ],
   },
   {
-    group: "Bantuan & Panduan",
+    group: "DATA",
     items: [
+      {
+        label: "Data Operasional",
+        icon: Database,
+        children: [
+          {
+            label: "Monitor Stok Booth",
+            href: "/stok/booth",
+            icon: Package,
+            bottomBar: false,
+          },
+          {
+            label: "Stok Gudang",
+            href: "/stok/gudang",
+            icon: Warehouse,
+            bottomBar: false,
+          },
+          {
+            label: "Stok Opname",
+            href: "/stok/opname",
+            icon: ClipboardCheck,
+            bottomBar: false,
+          },
+          {
+            label: "Adjustment / Koreksi Stok",
+            href: "/stok/adjustment",
+            icon: Sliders,
+            bottomBar: false,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    group: "PENGATURAN",
+    items: [
+      {
+        label: "Master Data",
+        icon: Settings,
+        children: [
+          { label: "Produk", href: "/master/produk", icon: Package },
+          { label: "Booth", href: "/master/booth", icon: Store },
+          { label: "Shift", href: "/master/shift", icon: Clock },
+          { label: "Threshold Stok Booth", href: "/master/threshold", icon: SlidersHorizontal },
+          { label: "User", href: "/master/user", icon: Users },
+        ],
+      },
       {
         label: "Dokumentasi Sistem",
         href: "/dokumentasi",
@@ -129,9 +156,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+// Helper untuk perataan hierarki (pencarian/search bar)
 function flattenNavItems(
   items: NavItem[],
-  parentLabel?: string,
+  parentLabel?: string
 ): { label: string; href: string }[] {
   return items.flatMap((item) => {
     const label = parentLabel ? `${parentLabel} / ${item.label}` : item.label;
@@ -144,10 +172,23 @@ function flattenNavItems(
 }
 
 export const FLAT_NAV_ITEMS = flattenNavItems(
-  NAV_GROUPS.flatMap((g) => g.items),
+  NAV_GROUPS.flatMap((g) => g.items)
 );
 
-export const BOTTOM_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items).filter(
-  (i): i is NavItem & { href: string; icon: LucideIcon } =>
-    Boolean(i.bottomBar && i.href && i.icon),
+// Helper untuk menu Bottom Bar Mobile
+function extractBottomNavItems(
+  items: NavItem[]
+): (NavItem & { href: string; icon: LucideIcon })[] {
+  return items.flatMap((item) => {
+    const own =
+      item.bottomBar && item.href && item.icon
+        ? [item as NavItem & { href: string; icon: LucideIcon }]
+        : [];
+    const nested = item.children ? extractBottomNavItems(item.children) : [];
+    return [...own, ...nested];
+  });
+}
+
+export const BOTTOM_NAV_ITEMS = extractBottomNavItems(
+  NAV_GROUPS.flatMap((g) => g.items)
 );

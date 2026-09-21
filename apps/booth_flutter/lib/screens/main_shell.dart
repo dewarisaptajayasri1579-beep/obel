@@ -16,8 +16,25 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
+  // ===================================================================
+  // PINDAH TAB DARI LUAR (mis. tombol "Ajukan Restock" di HomeScreen)
+  // ===================================================================
+
+  /// Dipanggil dari layar lain (lewat callback) untuk berpindah tab
+  /// tanpa kehilangan BottomNavigationBar, karena kita hanya mengganti
+  /// _currentIndex di IndexedStack ini, bukan Navigator.push halaman baru.
+  void _goToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  // late final supaya HomeScreen() dibuat sekali saja (menjaga state-nya),
+  // sekaligus bisa mengakses _goToTab lewat closure.
+  late final List<Widget> _screens = [
+    HomeScreen(
+      onGoToStock: () => _goToTab(2),
+    ),
     const PosScreen(),
     const StockScreen(),
     const ShiftScreen(),
