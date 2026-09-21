@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app_state.dart';
-import '../theme.dart';
 import 'history_screen.dart';
 
 class PosScreen extends StatefulWidget {
@@ -393,15 +392,43 @@ class _PosScreenState extends State<PosScreen> {
                                           ),
                                         ),
                                         child: Center(
-                                          child: Icon(
-                                            _iconForCategory(
-                                              product.category,
-                                            ),
-                                            color: isOutOfStock
-                                                ? const Color(0xFF9AA5AB)
-                                                : const Color(0xFF07563D),
-                                            size: 34,
-                                          ),
+                                          child: product.imageUrl != null
+                                              ? ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                  child: Image.network(
+                                                    product.imageUrl!,
+                                                    width: double.infinity,
+                                                    height: double.infinity,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => Icon(
+                                                      _iconForCategory(
+                                                        product.category,
+                                                      ),
+                                                      color: isOutOfStock
+                                                          ? const Color(
+                                                              0xFF9AA5AB,
+                                                            )
+                                                          : const Color(
+                                                              0xFF07563D,
+                                                            ),
+                                                      size: 34,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Icon(
+                                                  _iconForCategory(
+                                                    product.category,
+                                                  ),
+                                                  color: isOutOfStock
+                                                      ? const Color(0xFF9AA5AB)
+                                                      : const Color(0xFF07563D),
+                                                  size: 34,
+                                                ),
                                         ),
                                       ),
                                       if (isOutOfStock)

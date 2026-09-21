@@ -33,6 +33,7 @@ export class CatalogService {
         name: product.name,
         category: product.category?.name ?? null,
         sellPrice: Number(product.sellPrice),
+        imageUrl: product.imageUrl,
         qtyOnHand,
         status: resolveStockStatus(qtyOnHand, minimumQty, criticalQty),
       };

@@ -19,6 +19,7 @@ export class ProductsService {
       name: p.name,
       category: p.category?.name ?? null,
       sellPrice: Number(p.sellPrice),
+      imageUrl: p.imageUrl,
       active: p.active,
     }));
   }
@@ -38,6 +39,7 @@ export class ProductsService {
         name: dto.name,
         categoryId: dto.categoryId,
         sellPrice: BigInt(dto.sellPrice),
+        imageUrl: dto.imageUrl,
       },
       include: { category: true },
     });
@@ -47,6 +49,7 @@ export class ProductsService {
       name: product.name,
       category: product.category?.name ?? null,
       sellPrice: Number(product.sellPrice),
+      imageUrl: product.imageUrl,
       active: product.active,
     };
   }
@@ -68,6 +71,7 @@ export class ProductsService {
         categoryId: dto.categoryId,
         sellPrice: dto.sellPrice !== undefined ? BigInt(dto.sellPrice) : undefined,
         active: dto.active,
+        imageUrl: dto.imageUrl,
       },
       include: { category: true },
     });
@@ -78,6 +82,7 @@ export class ProductsService {
       name: product.name,
       category: product.category?.name ?? null,
       sellPrice: Number(product.sellPrice),
+      imageUrl: product.imageUrl,
       active: product.active,
     };
   }

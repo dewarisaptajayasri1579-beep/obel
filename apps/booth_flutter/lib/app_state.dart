@@ -152,7 +152,7 @@ class AppState extends ChangeNotifier {
           name: item['productName'] as String,
           price: (item['sellPrice'] as num).toInt(),
           category: '',
-          imagePath: '',
+          imageUrl: null,
         ),
         expectedQty: qtySent,
         actualQty: qtySent,
@@ -169,13 +169,14 @@ class AppState extends ChangeNotifier {
 
     for (final raw in items) {
       final map = raw as Map<String, dynamic>;
+      final rawImageUrl = (map['imageUrl'] as String?)?.trim();
       final product = Product(
         id: map['id'] as String,
         sku: (map['sku'] as String?) ?? '',
         name: map['name'] as String,
         price: (map['sellPrice'] as num).toInt(),
         category: (map['category'] as String?) ?? '',
-        imagePath: '',
+        imageUrl: _resolveImageUrl(rawImageUrl),
       );
       final qty = map['qtyOnHand'] as int;
       final status = map['status'] as String;
@@ -186,6 +187,28 @@ class AppState extends ChangeNotifier {
     catalog = products;
     stock = stocks;
     notifyListeners();
+  }
+
+  String? _resolveImageUrl(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+
+    final imageUri = Uri.tryParse(imageUrl);
+    final apiUri = Uri.tryParse(_api.baseUrl);
+    if (imageUri == null || apiUri == null || !imageUri.hasScheme) {
+      return imageUrl;
+    }
+
+    if (imageUri.host != 'localhost' &&
+        imageUri.host != '127.0.0.1' &&
+        imageUri.host != '0.0.0.0') {
+      return imageUrl;
+    }
+
+    return imageUri.replace(
+      scheme: apiUri.scheme,
+      host: apiUri.host,
+      port: apiUri.hasPort ? apiUri.port : null,
+    ).toString();
   }
 
   Future<void> refreshSales() async {

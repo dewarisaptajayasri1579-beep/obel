@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsUUID, Min, MinLength, IsString } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsUUID, Min, MinLength, IsString, IsUrl } from 'class-validator';
 
 /// TX-15/TX-16 (24-data-consistency-correction-reversal.md): perubahan
 /// master price/nama hanya berlaku untuk transaksi BARU — sale lama tetap
@@ -24,4 +24,8 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false }, { message: 'imageUrl harus berupa URL yang valid.' })
+  imageUrl?: string | null;
 }

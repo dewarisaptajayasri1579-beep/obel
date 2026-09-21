@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength, IsUrl } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -16,4 +16,8 @@ export class CreateProductDto {
   @IsInt()
   @Min(0)
   sellPrice!: number;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  imageUrl?: string;
 }

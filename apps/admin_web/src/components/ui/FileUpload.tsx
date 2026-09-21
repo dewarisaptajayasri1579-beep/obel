@@ -8,11 +8,27 @@ export interface FileUploadProps
   label?: string;
   helperText?: string;
   error?: string;
+  previewUrl?: string | null;
   onFilesChange?: (files: File[]) => void;
 }
 
 export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
-  ({ label, helperText, error, onFilesChange, className = "", disabled, id, multiple, accept, ...props }, ref) => {
+  (
+    {
+      label,
+      helperText,
+      error,
+      previewUrl,
+      onFilesChange,
+      className = "",
+      disabled,
+      id,
+      multiple,
+      accept,
+      ...props
+    },
+    ref
+  ) => {
     const generatedId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
@@ -43,10 +59,14 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
     return (
       <div className="w-full flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={generatedId} className="text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none">
+          <label
+            htmlFor={generatedId}
+            className="text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none"
+          >
             {label}
           </label>
         )}
+
         <div
           onClick={() => !disabled && inputRef.current?.click()}
           onDragOver={(e) => {
@@ -71,10 +91,42 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
               : "border-slate-300 dark:border-[rgba(148,163,184,0.14)]"
           } ${className}`}
         >
-          <Upload className={`w-6 h-6 ${isDragOver ? "text-blue-600 dark:text-[var(--accent-primary)]" : "text-slate-400 dark:text-fg-muted"}`} />
-          <p className="text-sm font-semibold text-slate-600 dark:text-fg-muted">
-            <span className="text-blue-700 dark:text-[var(--accent-primary)]">Klik untuk unggah</span> atau tarik file ke sini
-          </p>
+          {previewUrl ? (
+            <div className="w-full">
+              <div className="relative flex h-40 w-full items-center justify-center overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 dark:text-fg-muted">
+                <Upload className="w-4 h-4 text-blue-700 dark:text-[var(--accent-primary)]" />
+                <span className="text-blue-700 dark:text-[var(--accent-primary)]">
+                  Klik untuk mengganti foto
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Upload
+                className={`w-6 h-6 ${
+                  isDragOver
+                    ? "text-blue-600 dark:text-[var(--accent-primary)]"
+                    : "text-slate-400 dark:text-fg-muted"
+                }`}
+              />
+
+              <p className="text-sm font-semibold text-slate-600 dark:text-fg-muted">
+                <span className="text-blue-700 dark:text-[var(--accent-primary)]">
+                  Klik untuk unggah
+                </span>{" "}
+                atau tarik file ke sini
+              </p>
+            </>
+          )}
+
           <input
             id={generatedId}
             ref={setInputRef}
@@ -96,7 +148,9 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/70 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-xs font-semibold text-slate-700 dark:text-fg-secondary"
               >
                 <FileText className="w-4 h-4 text-slate-400 dark:text-fg-muted flex-shrink-0" />
+
                 <span className="truncate flex-1">{file.name}</span>
+
                 <button
                   type="button"
                   onClick={(e) => {
@@ -114,9 +168,13 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
         )}
 
         {error ? (
-          <span className="text-xs font-semibold text-red-500 dark:text-red-400">{error}</span>
+          <span className="text-xs font-semibold text-red-500 dark:text-red-400">
+            {error}
+          </span>
         ) : helperText ? (
-          <span className="text-xs font-medium text-slate-500 dark:text-fg-muted">{helperText}</span>
+          <span className="text-xs font-medium text-slate-500 dark:text-fg-muted">
+            {helperText}
+          </span>
         ) : null}
       </div>
     );

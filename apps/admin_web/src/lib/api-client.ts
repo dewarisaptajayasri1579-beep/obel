@@ -104,6 +104,7 @@ export interface Product {
   name: string
   category: string | null
   sellPrice: number
+  imageUrl: string | null
   active: boolean
 }
 
@@ -409,9 +410,25 @@ export const api = {
 
   getProducts: () => request<Product[]>("/products"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
-  createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number }) =>
+  uploadProductImage: async (file: File) => {
+    const token = getToken()
+    const body = new FormData()
+    body.append("file", file)
+    const res = await fetch(`${BASE_URL}/products/upload-image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah foto produk.")
+      throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
+    }
+    return data as { imageUrl: string }
+  },
+  createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
     request<Product>("/products", { method: "POST", body: input }),
-  updateProduct: (id: string, input: { name?: string; categoryId?: string; sellPrice?: number; active?: boolean }) =>
+  updateProduct: (id: string, input: { name?: string; categoryId?: string; sellPrice?: number; active?: boolean; imageUrl?: string | null }) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
 
   getUsers: () => request<UserAccount[]>("/users"),
