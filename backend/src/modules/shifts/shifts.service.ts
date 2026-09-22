@@ -1,14 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { Prisma, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
+import { combineJakartaDateAndTime, startOfDayJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { CheckInDto } from './dto/check-in.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
+import { resolveActiveShiftTemplate } from './shift-template-matcher';
+
+const UNIQUE_VIOLATION = 'P2002';
 
 function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -34,9 +39,85 @@ export class ShiftsService {
     });
 
     if (!shift) {
-      throw new NotFoundException('Belum ada shift aktif untuk user ini.');
+      throw new DomainError('NO_ACTIVE_SHIFT', 'Belum ada shift aktif untuk user ini.', undefined, 404);
     }
 
+    return this.toActiveShiftResponse(shift);
+  }
+
+  /// Self-service "check-in" — satu-satunya jalan membuat ShiftSession baru
+  /// selain seed script. Booth & ShiftTemplate di-resolve server-side (Booth
+  /// Staff tidak boleh mengirim boothId/staffId sendiri, dan lagipula tidak
+  /// punya akses baca ke /shift-templates atau /booth-shift-assignments).
+  async checkIn(staffId: string, dto: CheckInDto) {
+    const existing = await this.prisma.shiftSession.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { booth: true, shiftTemplate: true },
+    });
+    if (existing) {
+      return this.toActiveShiftResponse(existing);
+    }
+
+    const active = await this.prisma.shiftSession.findFirst({
+      where: { staffId, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+    });
+    if (active) {
+      throw new DomainError('SHIFT_ALREADY_ACTIVE', 'Anda sudah memiliki shift aktif.', { shiftSessionId: active.id }, 409);
+    }
+
+    const now = new Date();
+    const templates = await this.prisma.shiftTemplate.findMany({ where: { active: true } });
+    const template = resolveActiveShiftTemplate(now, templates);
+    if (!template) {
+      throw new DomainError('NO_SHIFT_TEMPLATE_ACTIVE_NOW', 'Belum ada jadwal shift untuk jam ini.', undefined, 409);
+    }
+
+    const assignment = await this.prisma.boothShiftAssignment.findFirst({
+      where: { staffId, shiftTemplateId: template.id },
+    });
+    const staff = await this.prisma.profile.findUnique({ where: { id: staffId } });
+    const boothId = assignment?.boothId ?? staff?.defaultBoothId ?? null;
+    if (!boothId) {
+      throw new DomainError('NO_BOOTH_ASSIGNED', 'Anda belum ditugaskan ke booth manapun. Hubungi Admin.', undefined, 409);
+    }
+
+    const businessDate = startOfDayJakarta(now);
+    const scheduledStartAt = combineJakartaDateAndTime(businessDate, template.startTime);
+    const scheduledEndAt = combineJakartaDateAndTime(businessDate, template.endTime);
+
+    try {
+      const created = await this.prisma.shiftSession.create({
+        data: {
+          businessDate,
+          boothId,
+          shiftTemplateId: template.id,
+          staffId,
+          status: ShiftStatus.OPEN,
+          scheduledStartAt,
+          scheduledEndAt,
+          openedAt: now,
+          idempotencyKey: dto.idempotencyKey,
+        },
+        include: { booth: true, shiftTemplate: true },
+      });
+      return this.toActiveShiftResponse(created);
+    } catch (err) {
+      const raced = err instanceof Prisma.PrismaClientKnownRequestError && err.code === UNIQUE_VIOLATION;
+      if (raced) {
+        throw new DomainError('SHIFT_ALREADY_ACTIVE', 'Anda sudah memiliki shift aktif.', undefined, 409);
+      }
+      throw err;
+    }
+  }
+
+  private toActiveShiftResponse(shift: {
+    id: string;
+    status: ShiftStatus;
+    scheduledStartAt: Date;
+    scheduledEndAt: Date;
+    booth: { id: string; code: string; name: string };
+    shiftTemplate: { name: string };
+  }) {
     return {
       shiftSessionId: shift.id,
       booth: { id: shift.booth.id, code: shift.booth.code, name: shift.booth.name },
@@ -61,6 +142,8 @@ export class ShiftsService {
   /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
   /// "expected", lalu ubah shift ke CLOSING. Idempotent — kalau closing
   /// draft sudah ada, kembalikan yang itu (bukan bikin snapshot baru).
+  /// Ini + confirmClosing() di bawah adalah "check-out" — tidak ada endpoint
+  /// terpisah untuk itu, checkIn() di atas cuma menambahkan sisi bukanya.
   async startClosing(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
 

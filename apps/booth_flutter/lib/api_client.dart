@@ -55,6 +55,18 @@ class ApiClient {
     return result as Map<String, dynamic>;
   }
 
+  /// Self-service buka shift — booth & shift template di-resolve server-side.
+  Future<Map<String, dynamic>> checkIn(
+    String token, {
+    required String idempotencyKey,
+  }) {
+    return _post(
+      '/shifts/check-in',
+      token: token,
+      body: {'idempotencyKey': idempotencyKey},
+    );
+  }
+
   Future<List<dynamic>> getSales(String token) async {
     final result = await _get('/sales', token: token);
     return result as List<dynamic>;

@@ -458,6 +458,9 @@ model ShiftSession {
   openedAt         DateTime?     @map("opened_at")
   closingStartedAt DateTime?     @map("closing_started_at")
   closedAt         DateTime?     @map("closed_at")
+  /// Dedup key untuk POST /shifts/check-in (self-service open shift). Nullable
+  /// karena baris lama/seed tidak dibuat lewat endpoint ini.
+  idempotencyKey   String?       @unique @map("idempotency_key")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 

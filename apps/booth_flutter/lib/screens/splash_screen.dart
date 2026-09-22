@@ -4,8 +4,8 @@ import '../app_state.dart';
 import '../theme.dart';
 
 /// Layar transisi saat app baru dibuka — mencoba pulihkan sesi login dari
-/// token tersimpan lokal sebelum memutuskan tujuan awal (/home atau
-/// /login), supaya Petugas tidak perlu login ulang tiap app di-restart.
+/// token tersimpan lokal sebelum memutuskan tujuan awal (/home, /check-in,
+/// atau /login), supaya Petugas tidak perlu login ulang tiap app di-restart.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -21,9 +21,16 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _bootstrap() async {
-    final restored = await context.read<AppState>().restoreSession();
+    final appState = context.read<AppState>();
+    final restored = await appState.restoreSession();
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(restored ? '/home' : '/login');
+
+    final route = !restored
+        ? '/login'
+        : appState.needsCheckIn
+            ? '/check-in'
+            : '/home';
+    Navigator.of(context).pushReplacementNamed(route);
   }
 
   @override

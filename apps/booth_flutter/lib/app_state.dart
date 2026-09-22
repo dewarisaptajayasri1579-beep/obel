@@ -26,6 +26,7 @@ class AppState extends ChangeNotifier {
 
   bool loggedIn = false;
   bool loading = false;
+  bool needsCheckIn = false;
 
   String staffName = '';
   String boothName = '';
@@ -170,6 +171,7 @@ class AppState extends ChangeNotifier {
     _token = null;
     staffName = '';
     loggedIn = false;
+    needsCheckIn = false;
     cart.clear();
     sales.clear();
     unawaited(
@@ -181,8 +183,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadShiftAndCatalog() async {
-    final shift = await _api.getActiveShift(_token!);
+  /// Memanggil POST /shifts/check-in — self-service buka shift (booth &
+  /// shift template di-resolve server-side). Dipanggil dari check_in_screen
+  /// saat Petugas belum punya shift aktif (needsCheckIn == true).
+  Future<void> checkIn() async {
+    loading = true;
+    notifyListeners();
+    try {
+      final shift = await _api.checkIn(_token!, idempotencyKey: _uuid.v4());
+      _applyActiveShift(shift);
+      needsCheckIn = false;
+      await refreshCatalog();
+      await refreshSales();
+      await refreshPendingDistribution();
+      await refreshRestockRequests();
+      await refreshNotifications();
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  void _applyActiveShift(Map<String, dynamic> shift) {
     boothName = (shift['booth'] as Map)['name'] as String;
     shiftSessionId = shift['shiftSessionId'] as String;
     shiftLabel = '${shift['shiftName']} AKTIF'.toUpperCase();
@@ -190,6 +212,20 @@ class AppState extends ChangeNotifier {
         .toLocal();
     final endAt = DateTime.parse(shift['scheduledEndAt'] as String).toLocal();
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
+  }
+
+  Future<void> _loadShiftAndCatalog() async {
+    try {
+      final shift = await _api.getActiveShift(_token!);
+      _applyActiveShift(shift);
+      needsCheckIn = false;
+    } on ApiException catch (e) {
+      if (e.code == 'NO_ACTIVE_SHIFT') {
+        needsCheckIn = true;
+        return;
+      }
+      rethrow;
+    }
 
     await refreshCatalog();
     await refreshSales();

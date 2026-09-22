@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app_state.dart';
+import 'screens/check_in_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/inbound_screen.dart';
@@ -32,6 +33,7 @@ class ObbelBoothApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
+        '/check-in': (context) => const CheckInScreen(),
         '/home': (context) => const MainShell(),
         '/inbound': (context) => const InboundScreen(),
         '/checkout': (context) => const CheckoutScreen(),

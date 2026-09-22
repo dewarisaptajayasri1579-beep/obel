@@ -33,9 +33,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await context.read<AppState>().login(username, password);
+      final appState = context.read<AppState>();
+      await appState.login(username, password);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(
+        context,
+        appState.needsCheckIn ? '/check-in' : '/home',
+      );
     } on ApiException catch (e) {
       setState(() => _errorText = e.message);
     } finally {
