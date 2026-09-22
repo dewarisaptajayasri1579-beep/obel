@@ -9,6 +9,7 @@ import 'models.dart';
 
 const _uuid = Uuid();
 const _tokenPrefsKey = 'auth_token';
+const _staffNamePrefsKey = 'auth_staff_name';
 
 String _fmtTime(DateTime dt) =>
     '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')}';
@@ -36,11 +37,6 @@ class AppState extends ChangeNotifier {
   List<BoothStock> stock = [];
   final List<CartItem> cart = [];
   List<InboundItem>? pendingInbound;
-  final Map<String, int> soldQtyByProductId = {};
-
-  int omzetToday = 0;
-  int cupSoldToday = 0;
-  int transactionCount = 0;
 
   List<Map<String, dynamic>> notifications = [];
   List<Map<String, dynamic>> restockRequests = [];
@@ -55,6 +51,30 @@ class AppState extends ChangeNotifier {
   int stockQuantityForStatus(String status) => stock
       .where((s) => s.status.toLowerCase() == status.toLowerCase())
       .fold(0, (total, item) => total + item.currentQty);
+
+  /// Dihitung ulang dari `sales` (hasil GET /sales, sumber kebenaran server),
+  /// bukan counter lokal — supaya angka ini tetap benar setelah app di-restart
+  /// (Hot Restart / OS kill / restoreSession), bukan cuma nambah dalam sesi
+  /// yang sedang berjalan. Hanya sale PAID hari ini yang dihitung, konsisten
+  /// dengan "omzet bersih" di dashboard Admin/Owner.
+  List<SaleHistoryRecord> get _todaysPaidSales {
+    final now = DateTime.now();
+    return sales.where((s) {
+      if (s.status != 'PAID') return false;
+      final paid = s.paidAt;
+      return paid.year == now.year &&
+          paid.month == now.month &&
+          paid.day == now.day;
+    }).toList();
+  }
+
+  int get transactionCount => _todaysPaidSales.length;
+  int get omzetToday =>
+      _todaysPaidSales.fold(0, (sum, s) => sum + s.total);
+  int get cupSoldToday => _todaysPaidSales.fold(
+        0,
+        (sum, s) => sum + s.items.fold(0, (a, item) => a + item.qty),
+      );
   int get averagePerTransaction =>
       transactionCount == 0 ? 0 : (omzetToday / transactionCount).round();
 
@@ -62,6 +82,18 @@ class AppState extends ChangeNotifier {
     final sorted = [...stock]
       ..sort((a, b) => b.currentQty.compareTo(a.currentQty));
     return sorted.take(3).toList();
+  }
+
+  Map<String, int> get soldQtyByProductId {
+    final result = <String, int>{};
+    for (final sale in _todaysPaidSales) {
+      for (final item in sale.items) {
+        final id = item.productId;
+        if (id == null) continue;
+        result.update(id, (v) => v + item.qty, ifAbsent: () => item.qty);
+      }
+    }
+    return result;
   }
 
   List<MapEntry<String, int>> get topSelling {
@@ -93,6 +125,7 @@ class AppState extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_tokenPrefsKey, _token!);
+      await prefs.setString(_staffNamePrefsKey, staffName);
     } on ApiException {
       rethrow;
     } catch (_) {
@@ -116,6 +149,7 @@ class AppState extends ChangeNotifier {
     if (savedToken == null) return false;
 
     _token = savedToken;
+    staffName = prefs.getString(_staffNamePrefsKey) ?? '';
     try {
       await _loadShiftAndCatalog();
       loggedIn = true;
@@ -125,18 +159,24 @@ class AppState extends ChangeNotifier {
       // Token invalid/expired, atau network error saat startup — jangan
       // paksa masuk, biarkan Petugas login manual lagi.
       _token = null;
+      staffName = '';
       await prefs.remove(_tokenPrefsKey);
+      await prefs.remove(_staffNamePrefsKey);
       return false;
     }
   }
 
   void logout() {
     _token = null;
+    staffName = '';
     loggedIn = false;
     cart.clear();
     sales.clear();
     unawaited(
-      SharedPreferences.getInstance().then((p) => p.remove(_tokenPrefsKey)),
+      SharedPreferences.getInstance().then((p) {
+        p.remove(_tokenPrefsKey);
+        p.remove(_staffNamePrefsKey);
+      }),
     );
     notifyListeners();
   }
@@ -279,6 +319,7 @@ class AppState extends ChangeNotifier {
           items: (item['items'] as List<dynamic>).map((rawItem) {
             final saleItem = rawItem as Map<String, dynamic>;
             return SaleHistoryItem(
+              productId: saleItem['productId'] as String?,
               productName: saleItem['productName'] as String,
               qty: saleItem['qty'] as int,
             );
@@ -354,7 +395,6 @@ class AppState extends ChangeNotifier {
       );
     }
 
-    final cupCount = cartCount;
     final soldSnapshot = cart
         .map((c) => MapEntry(c.product.id, c.quantity))
         .toList();
@@ -379,17 +419,6 @@ class AppState extends ChangeNotifier {
     );
 
     final total = (result['total'] as num).toInt();
-
-    for (final entry in soldSnapshot) {
-      soldQtyByProductId.update(
-        entry.key,
-        (v) => v + entry.value,
-        ifAbsent: () => entry.value,
-      );
-    }
-    omzetToday += total;
-    cupSoldToday += cupCount;
-    transactionCount += 1;
     cart.clear();
 
     sales.insert(
@@ -400,11 +429,14 @@ class AppState extends ChangeNotifier {
         paymentMethod: paymentMethod,
         status: 'PAID',
         paidAt: DateTime.now(),
-        items: itemSnapshot
-            .map(
-              (item) => SaleHistoryItem(productName: item.name, qty: item.qty),
-            )
-            .toList(),
+        items: [
+          for (final entry in soldSnapshot)
+            SaleHistoryItem(
+              productId: entry.key,
+              productName: productName(entry.key),
+              qty: entry.value,
+            ),
+        ],
       ),
     );
     notifyListeners();
@@ -542,8 +574,9 @@ class CompletedSale {
 }
 
 class SaleHistoryItem {
-  SaleHistoryItem({required this.productName, required this.qty});
+  SaleHistoryItem({this.productId, required this.productName, required this.qty});
 
+  final String? productId;
   final String productName;
   final int qty;
 }
