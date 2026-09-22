@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
+import { startOfTodayJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { CheckInDto } from './dto/check-in.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 
@@ -14,11 +17,20 @@ function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/// `businessDate` adalah instant UTC yang mewakili tengah malam Jakarta
+/// (lihat `startOfTodayJakarta`); `time` adalah string "HH:mm" milik
+/// ShiftTemplate. Fungsi ini menambahkan jam:menit itu ke businessDate.
+function combineJakartaDateAndTime(businessDate: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
+  return new Date(businessDate.getTime() + (hours * 60 + minutes) * 60 * 1000);
+}
+
 @Injectable()
 export class ShiftsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
+    private readonly jwtService: JwtService,
   ) {}
 
   /// Mirrors get_my_active_shift() from
@@ -37,6 +49,97 @@ export class ShiftsService {
       throw new NotFoundException('Belum ada shift aktif untuk user ini.');
     }
 
+    return this.toActiveShiftResponse(shift);
+  }
+
+  /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
+  /// duluan, jadi langsung create berstatus OPEN). Booth default diambil dari
+  /// BoothShiftAssignment staff ybs (roster tetap Booth+Shift per staff),
+  /// `dto.boothId` boleh override manual. Idempotent terhadap double-tap:
+  /// kalau staff SUDAH aktif di Booth yang sama, kembalikan session yang
+  /// sudah ada apa adanya alih-alih membuat baris baru (tidak ada unique
+  /// constraint di schema yang mencegah dobel, jadi guard ini wajib di sini).
+  async checkIn(user: JwtPayload, dto: CheckInDto) {
+    const existing = await this.prisma.shiftSession.findFirst({
+      where: { staffId: user.sub, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+      include: { booth: true, shiftTemplate: true },
+    });
+    if (existing) {
+      if (dto.boothId && dto.boothId !== existing.boothId) {
+        throw new DomainError(
+          'ALREADY_CHECKED_IN_ELSEWHERE',
+          `Anda masih aktif di Booth "${existing.booth.name}". Checkout dulu sebelum check-in ke Booth lain.`,
+        );
+      }
+      return this.toActiveShiftResponse(existing, await this.reissueToken(user, existing.boothId));
+    }
+
+    const assignment = await this.prisma.boothShiftAssignment.findUnique({
+      where: { staffId: user.sub },
+      include: { shiftTemplate: true },
+    });
+    if (!assignment) {
+      throw new DomainError(
+        'NO_BOOTH_ASSIGNMENT',
+        'Anda belum ditugaskan ke Booth manapun. Hubungi Admin untuk mengatur penugasan Booth/Shift.',
+      );
+    }
+
+    const boothId = dto.boothId ?? assignment.boothId;
+    const booth = await this.prisma.booth.findUnique({ where: { id: boothId } });
+    if (!booth || booth.status !== 'ACTIVE') {
+      throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
+    }
+
+    const businessDate = startOfTodayJakarta();
+    const openedAt = new Date();
+    const scheduledStartAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.startTime);
+    const scheduledEndAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.endTime);
+
+    const created = await this.prisma.shiftSession.create({
+      data: {
+        businessDate,
+        boothId,
+        shiftTemplateId: assignment.shiftTemplateId,
+        staffId: user.sub,
+        status: ShiftStatus.OPEN,
+        scheduledStartAt,
+        scheduledEndAt,
+        openedAt,
+      },
+      include: { booth: true, shiftTemplate: true },
+    });
+
+    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
+  }
+
+  /// JWT `boothId` dipakai banyak endpoint booth-scoped (catalog,
+  /// distributions/pending, restock-requests — lihat masing-masing
+  /// controller) tapi cuma diisi dari `Profile.defaultBoothId` saat login.
+  /// Staff yang boothnya ditentukan lewat BoothShiftAssignment (bukan
+  /// defaultBoothId) akan punya boothId null di token lamanya — reissue di
+  /// sini supaya endpoint-endpoint itu langsung berfungsi begitu Check-In
+  /// selesai, tanpa harus login ulang.
+  private reissueToken(user: JwtPayload, boothId: string) {
+    return this.jwtService.signAsync({
+      sub: user.sub,
+      username: user.username,
+      role: user.role,
+      boothId,
+    });
+  }
+
+  private toActiveShiftResponse(
+    shift: {
+      id: string;
+      booth: { id: string; code: string; name: string };
+      shiftTemplate: { name: string };
+      status: ShiftStatus;
+      scheduledStartAt: Date;
+      scheduledEndAt: Date;
+    },
+    accessToken?: string,
+  ) {
     return {
       shiftSessionId: shift.id,
       booth: { id: shift.booth.id, code: shift.booth.code, name: shift.booth.name },
@@ -44,6 +147,7 @@ export class ShiftsService {
       status: shift.status,
       scheduledStartAt: shift.scheduledStartAt,
       scheduledEndAt: shift.scheduledEndAt,
+      ...(accessToken ? { accessToken } : {}),
     };
   }
 

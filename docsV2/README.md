@@ -18,6 +18,7 @@ Referensi pola: `~/Documents/Projects/ONY/jsBerkah` — modul `goods-receipt`,
 | [06-data-operasional.md](06-data-operasional.md) | Lima poin data operasional + early warning stok menipis |
 | [07-siklus-shift.md](07-siklus-shift.md) | Daftar transaksi per peran + **stok dipegang shift, bukan booth** |
 | [08-rencana-penyesuaian.md](08-rencana-penyesuaian.md) | **Urutan pengerjaan** — mengganti urutan tahap di dok 04 |
+| [09-checkin-checkout-petugas.md](09-checkin-checkout-petugas.md) | Check-In/Check-Out Petugas Booth — topik **berbeda** dari 01–08 (bukan perubahan pencatatan stok), ditaruh di sini atas permintaan langsung, bukan bagian dari rencana rearsitektur stok |
 
 Urutan baca yang disarankan: **07** (siapa memegang stok) → **05** (apa saja yang
 menggerakkannya) → **02** (di mana dicatat) → **03** (bagaimana direkap) → **01**

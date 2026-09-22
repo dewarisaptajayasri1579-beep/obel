@@ -5,6 +5,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { CheckInDto } from './dto/check-in.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 import { ShiftsService } from './shifts.service';
@@ -17,6 +18,12 @@ export class ShiftsController {
   @Get('active')
   getActive(@CurrentUser() user: JwtPayload) {
     return this.shiftsService.getMyActiveShift(user.sub);
+  }
+
+  @Post('check-in')
+  @Roles(UserRole.BOOTH_STAFF)
+  checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {
+    return this.shiftsService.checkIn(user, dto);
   }
 
   @Post(':id/closing/start')

@@ -22,7 +22,13 @@ class AppState extends ChangeNotifier {
   bool loggedIn = false;
   bool loading = false;
 
+  /// true kalau baru saja login tapi belum ada ShiftSession aktif — layar
+  /// Check-In (Absen Berangkat) yang harus tampil dulu, bukan MainShell.
+  bool needsCheckIn = false;
+
+  String? staffId;
   String staffName = '';
+  String? defaultBoothId;
   String boothName = '';
   String shiftLabel = '';
   String shiftTime = '';
@@ -82,9 +88,21 @@ class AppState extends ChangeNotifier {
       final result = await _api.login(username, password);
       _token = result['accessToken'] as String;
       final profile = result['profile'] as Map<String, dynamic>;
+      staffId = profile['id'] as String?;
       staffName = profile['fullName'] as String;
+      defaultBoothId = profile['defaultBoothId'] as String?;
 
-      await _loadShiftAndCatalog();
+      try {
+        await _loadShiftAndCatalog();
+        needsCheckIn = false;
+      } on ApiException catch (e) {
+        if (e.code == 'NOT_FOUND') {
+          // Belum ada shift aktif — bukan error, staff perlu Check-In dulu.
+          needsCheckIn = true;
+        } else {
+          rethrow;
+        }
+      }
       loggedIn = true;
     } on ApiException {
       rethrow;
@@ -109,6 +127,16 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadShiftAndCatalog() async {
     final shift = await _api.getActiveShift(_token!);
+    _applyActiveShift(shift);
+
+    await refreshCatalog();
+    await refreshSales();
+    await refreshPendingDistribution();
+    await refreshRestockRequests();
+    await refreshNotifications();
+  }
+
+  void _applyActiveShift(Map<String, dynamic> shift) {
     boothName = (shift['booth'] as Map)['name'] as String;
     shiftSessionId = shift['shiftSessionId'] as String;
     shiftLabel = '${shift['shiftName']} AKTIF'.toUpperCase();
@@ -116,6 +144,37 @@ class AppState extends ChangeNotifier {
         .toLocal();
     final endAt = DateTime.parse(shift['scheduledEndAt'] as String).toLocal();
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
+  }
+
+  /// Preview Booth/Shift yang otomatis terpilih untuk layar Check-In —
+  /// null kalau staff belum ditugaskan ke Booth manapun.
+  Future<Map<String, dynamic>?> getMyAssignment() async {
+    if (_token == null) return null;
+    return _api.getMyAssignment(_token!);
+  }
+
+  Future<List<dynamic>> getBooths() async {
+    if (_token == null) return [];
+    return _api.getBooths(_token!);
+  }
+
+  /// Absen Berangkat (POST /shifts/check-in). Server yang menentukan Booth
+  /// default dari BoothShiftAssignment kalau `boothId` tidak dikirim.
+  /// Setelah berhasil, ShiftSession-nya OPEN — muat ulang katalog/stok/dll
+  /// persis seperti alur login yang sudah punya shift aktif.
+  Future<void> checkIn({String? boothId}) async {
+    if (_token == null) {
+      throw ApiException(
+        'AUTH_REQUIRED',
+        'Sesi login berakhir, silakan login ulang.',
+      );
+    }
+    final shift = await _api.checkIn(_token!, boothId: boothId);
+    final newToken = shift['accessToken'] as String?;
+    if (newToken != null) _token = newToken;
+    _applyActiveShift(shift);
+    needsCheckIn = false;
+    notifyListeners();
 
     await refreshCatalog();
     await refreshSales();

@@ -435,7 +435,11 @@ model BoothShiftAssignment {
   booth           Booth         @relation(fields: [boothId], references: [id])
   shiftTemplateId String        @map("shift_template_id")
   shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
-  staffId         String?       @map("staff_id")
+  // `@unique` di kolom nullable: Postgres menganggap NULL selalu berbeda dari
+  // NULL lain, jadi banyak baris "belum ditugaskan" tetap boleh — cuma
+  // staffId yang TERISI yang wajib unik. Ini yang menjamin "1 Petugas cuma 1
+  // Booth+Shift" di level database, bukan cuma dicegah di UI.
+  staffId         String?       @unique @map("staff_id")
   staff           Profile?      @relation(fields: [staffId], references: [id])
   updatedAt       DateTime      @updatedAt @map("updated_at")
 

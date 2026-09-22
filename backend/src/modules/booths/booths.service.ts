@@ -49,6 +49,23 @@ export class BoothsService {
       throw new DomainError('NOT_FOUND', 'Booth tidak ditemukan.');
     }
 
+    /// Menonaktifkan Booth yang masih punya petugas di Setting Petugas
+    /// membuat penugasan itu jadi "hilang" diam-diam dari tampilan (difilter
+    /// status ACTIVE) padahal datanya tetap ada — bisa muncul lagi apa
+    /// adanya (basi) kalau Booth diaktifkan ulang. Diblokir di sini, bukan
+    /// cuma diperingatkan, supaya Admin wajib mengosongkan dulu.
+    if (dto.status === 'INACTIVE' && existing.status === 'ACTIVE') {
+      const assignedCount = await this.prisma.boothShiftAssignment.count({
+        where: { boothId: id, staffId: { not: null } },
+      });
+      if (assignedCount > 0) {
+        throw new DomainError(
+          'BOOTH_HAS_ASSIGNED_STAFF',
+          `Booth "${existing.name}" masih punya petugas di Setting Petugas. Kosongkan semua penugasan booth ini dulu (pilih "Belum ditugaskan" di tiap shift) sebelum menonaktifkan.`,
+        );
+      }
+    }
+
     const booth = await this.prisma.booth.update({
       where: { id },
       data: {

@@ -55,6 +55,28 @@ class ApiClient {
     return result as Map<String, dynamic>;
   }
 
+  /// Absen Berangkat. `boothId` opsional — kosong berarti server pakai Booth
+  /// default dari BoothShiftAssignment staff ybs.
+  Future<Map<String, dynamic>> checkIn(String token, {String? boothId}) {
+    return _post(
+      '/shifts/check-in',
+      token: token,
+      body: {if (boothId != null) 'boothId': boothId},
+    );
+  }
+
+  /// Preview Booth/Shift yang bakal otomatis terpilih di layar Check-In.
+  /// Null berarti staff belum ditugaskan ke Booth manapun.
+  Future<Map<String, dynamic>?> getMyAssignment(String token) async {
+    final result = await _get('/booth-shift-assignments/mine', token: token);
+    return result as Map<String, dynamic>?;
+  }
+
+  Future<List<dynamic>> getBooths(String token) async {
+    final result = await _get('/booths', token: token);
+    return result as List<dynamic>;
+  }
+
   Future<List<dynamic>> getSales(String token) async {
     final result = await _get('/sales', token: token);
     return result as List<dynamic>;
