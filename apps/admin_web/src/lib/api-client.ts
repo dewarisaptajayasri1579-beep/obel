@@ -106,6 +106,91 @@ export interface Product {
   sellPrice: number
   imageUrl: string | null
   active: boolean
+  /// Default stok Menipis/Kritis produk ini di seluruh booth — dipakai
+  /// sebagai fallback kalau booth tertentu belum punya threshold sendiri
+  /// (lihat BoothStockThreshold & BR-007).
+  minimumQty: number
+  criticalQty: number
+}
+
+/// Rekap & riwayat mutasi stok (GET /stock-movements/*). Dihitung backend dari
+/// ledger `stock_movements`; klien tidak pernah menyimpulkan arah mutasi sendiri.
+export interface BarisRekapStok {
+  productId: string
+  sku: string
+  name: string
+  saldoAwal: number
+  masuk: number
+  keluar: number
+  saldoAkhir: number
+  perluVerifikasi: boolean
+}
+
+export interface RekapStokResponse {
+  periode: { bulan: number; tahun: number }
+  lokasi: string
+  rows: BarisRekapStok[]
+  total: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number; perluVerifikasi: boolean }
+}
+
+export interface BarisRinciMutasi {
+  id: string
+  tanggal: string
+  movementNo: string
+  keterangan: string
+  arah: "MASUK" | "KELUAR"
+  qty: number
+  saldo: number
+  perluVerifikasi: boolean
+}
+
+export interface RinciMutasiResponse {
+  product: { id: string; sku: string; name: string }
+  periode: { bulan: number; tahun: number }
+  lokasi: string
+  ringkasan: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number }
+  rows: BarisRinciMutasi[]
+  perluVerifikasi: boolean
+}
+
+export interface SaldoLokasi {
+  tipe: "WAREHOUSE" | "BOOTH"
+  lokasiId: string
+  nama: string
+  saldoAwal: number
+  masuk: number
+  keluar: number
+  saldoAkhir: number
+  perluVerifikasi: boolean
+}
+
+export interface RingkasStokProduk {
+  productId: string
+  sku: string
+  name: string
+  lokasi: SaldoLokasi[]
+  total: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number; perluVerifikasi: boolean }
+}
+
+export interface RingkasStokResponse {
+  periode: { bulan: number; tahun: number }
+  rows: RingkasStokProduk[]
+}
+
+export interface CompanyProfile {
+  id: string
+  name: string
+  legalName: string | null
+  address: string | null
+  phone: string | null
+  logoUrl: string | null
+  updatedAt: string
+}
+
+export interface FilterLaporanProduk {
+  q?: string
+  kategoriId?: string
+  status?: "active" | "inactive"
 }
 
 export interface UserAccount {
@@ -143,6 +228,37 @@ export interface Distribution {
   receivedAt: string | null
   note: string | null
   items: DistributionItem[]
+}
+
+/// Tambah Stok Gudang. DRAFT tidak menyentuh stok; POSTED sudah menambah
+/// WarehouseStock dan tercatat di /stock-movements. REVISED = digantikan
+/// versi revisi yang lebih baru (dokumen tetap ada untuk riwayat).
+export interface StockReceiptItem {
+  id: string
+  productId: string
+  qtyReceived: number
+  product: { id: string; sku: string; name: string }
+}
+
+export interface FilterLaporanPenerimaan {
+  q?: string
+  status?: "DRAFT" | "POSTED" | "REVISED"
+}
+
+export interface StockReceipt {
+  id: string
+  receiptNo: string
+  status: "DRAFT" | "POSTED" | "REVISED"
+  receiptDate: string
+  note: string | null
+  postedAt: string | null
+  createdAt: string
+  transactionGroupId: string
+  versionNo: number
+  revisionOfId: string | null
+  items: StockReceiptItem[]
+  createdBy: { id: string; username: string; fullName: string }
+  postedBy: { id: string; username: string; fullName: string } | null
 }
 
 export interface RestockRequestItemView {
@@ -410,6 +526,28 @@ export const api = {
 
   getProducts: () => request<Product[]>("/products"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
+  createProductCategory: (input: { name: string }) =>
+    request<ProductCategory>("/products/categories", { method: "POST", body: input }),
+  getCompanyProfile: () => request<CompanyProfile>("/company-profile"),
+  updateCompanyProfile: (input: { name: string; legalName?: string; address?: string; phone?: string; logoUrl?: string }) =>
+    request<CompanyProfile>("/company-profile", { method: "PATCH", body: input }),
+  uploadCompanyLogo: async (file: File) => {
+    const token = getToken()
+    const body = new FormData()
+    body.append("file", file)
+    const res = await fetch(`${BASE_URL}/company-profile/upload-logo`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah logo.")
+      throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
+    }
+    return data as { logoUrl: string }
+  },
+
   uploadProductImage: async (file: File) => {
     const token = getToken()
     const body = new FormData()
@@ -426,10 +564,26 @@ export const api = {
     }
     return data as { imageUrl: string }
   },
-  createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
+  /// `sku` opsional — backend membuatkannya otomatis (`OBL-0001`). Dikirim
+  /// hanya oleh jalur seed/impor data lama, tidak oleh form.
+  createProduct: (input: { sku?: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
     request<Product>("/products", { method: "POST", body: input }),
-  updateProduct: (id: string, input: { name?: string; categoryId?: string; sellPrice?: number; active?: boolean; imageUrl?: string | null }) =>
-    request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
+  updateProduct: (
+    id: string,
+    input: {
+      name?: string
+      categoryId?: string
+      sellPrice?: number
+      active?: boolean
+      imageUrl?: string | null
+      minimumQty?: number
+      criticalQty?: number
+    },
+  ) => request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
+  /// Ditolak (ApiError code PRODUCT_HAS_HISTORY / PRODUCT_HAS_STOCK) kalau
+  /// produk pernah tersentuh transaksi atau masih ada sisa stok — pesan dari
+  /// backend sudah menjelaskan alasannya, tampilkan apa adanya lewat toast.
+  deleteProduct: (id: string) => request<{ id: string; deleted: boolean }>(`/products/${id}`, { method: "DELETE" }),
 
   getUsers: () => request<UserAccount[]>("/users"),
   createUser: (input: {
@@ -568,6 +722,78 @@ export const api = {
   getNotifications: () =>
     request<{ id: string; title: string; message: string; type: "info" | "success" | "warning" | "error"; readAt: string | null; createdAt: string }[]>(
       "/notifications",
+    ),
+
+  getStockRingkas: (params: { bulan: number; tahun: number }) =>
+    request<RingkasStokResponse>(`/stock-movements/ringkas?bulan=${params.bulan}&tahun=${params.tahun}`),
+
+  getStockReceipts: () => request<StockReceipt[]>("/stock-receipts"),
+  getStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}`),
+  createStockReceipt: (input: {
+    idempotencyKey: string
+    receiptDate: string
+    note?: string
+    status?: "DRAFT" | "POSTED"
+    items: { productId: string; qtyReceived: number }[]
+  }) => request<StockReceipt>("/stock-receipts", { method: "POST", body: input }),
+  updateStockReceipt: (
+    id: string,
+    input: { receiptDate?: string; note?: string; items?: { productId: string; qtyReceived: number }[] },
+  ) => request<StockReceipt>(`/stock-receipts/${id}`, { method: "PATCH", body: input }),
+  postStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}/post`, { method: "PATCH" }),
+  reviseStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}/revise`, { method: "POST" }),
+
+  getStockReceiptReport: async (format: "pdf" | "excel", filter: FilterLaporanPenerimaan = {}) => {
+    const params = new URLSearchParams()
+    if (filter.q) params.set("q", filter.q)
+    if (filter.status) params.set("status", filter.status)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/stock-receipts/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockReceiptNotaPdf: async (id: string) => {
+    const res = await fetch(`${BASE_URL}/reports/stock-receipts/${id}/pdf`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat nota. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  /// Laporan diambil sebagai Blob lewat fetch ber-Authorization, BUKAN <a href>
+  /// langsung ke backend: token Obbel ada di localStorage, bukan cookie, jadi
+  /// navigasi biasa tidak membawa kredensialnya dan selalu kena 401.
+  getProductReport: async (format: "pdf" | "excel", filter: FilterLaporanProduk = {}) => {
+    const params = new URLSearchParams()
+    if (filter.q) params.set("q", filter.q)
+    if (filter.kategoriId) params.set("kategoriId", filter.kategoriId)
+    if (filter.status) params.set("status", filter.status)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/products/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockRekap: (params: { bulan: number; tahun: number; lokasi?: string }) =>
+    request<RekapStokResponse>(
+      `/stock-movements/rekap?bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
+    ),
+  getStockRinci: (params: { productId: string; bulan: number; tahun: number; lokasi?: string }) =>
+    request<RinciMutasiResponse>(
+      `/stock-movements/rinci?productId=${params.productId}&bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
     ),
 
   getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),

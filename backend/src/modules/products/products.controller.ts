@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   FileTypeValidator,
   Get,
   MaxFileSizeValidator,
@@ -21,10 +22,13 @@ import { mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import type { Request } from 'express';
 import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
@@ -48,10 +52,16 @@ export class ProductsController {
     return this.productsService.findCategories();
   }
 
+  @Post('categories')
+  @Roles(UserRole.ADMIN)
+  createCategory(@Body() dto: CreateProductCategoryDto) {
+    return this.productsService.createCategory(dto);
+  }
+
   @Post()
   @Roles(UserRole.ADMIN)
-  create(@Body() dto: CreateProductDto) {
-    return this.productsService.create(dto);
+  create(@Body() dto: CreateProductDto, @CurrentUser() user: JwtPayload) {
+    return this.productsService.create(dto, user.sub, user.username);
   }
 
   @Post('upload-image')
@@ -95,7 +105,14 @@ export class ProductsController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.productsService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto, @CurrentUser() user: JwtPayload) {
+    return this.productsService.update(id, dto, user.sub, user.username);
+  }
+
+  /// Soft delete — lihat ProductsService.remove() untuk syarat penolakannya.
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.remove(id, user.sub, user.username);
   }
 }

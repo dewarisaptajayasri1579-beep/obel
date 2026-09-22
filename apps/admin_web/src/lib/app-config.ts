@@ -3,8 +3,8 @@ import { PackageSearch, Truck, LayoutDashboard } from "lucide-react"
 
 /** Satu sumber kebenaran identitas aplikasi — dipakai AppLogo, Sidebar, Header, AuthLayout. */
 export const APP_CONFIG = {
-  name: "Obbel Admin Pusat",
-  tagline: "Obbel Coffee & Milk",
+  name: "Obbel",
+  tagline: "Coffee & Milk",
   subTagline: "Stock, Sales & Booth Monitoring",
   authDescription: "Kontrol stok Gudang, distribusi ke Booth, dan pantau operasional dalam satu tempat.",
   authFeatures: [

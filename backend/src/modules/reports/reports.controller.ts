@@ -1,14 +1,126 @@
-import { Controller, Get, Header, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Controller, Get, Header, Param, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { StockReceiptStatus, UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ReportsService } from './reports.service';
+import { ProductReportService, type FilterLaporanProduk } from './product-report.service';
+import { StockReceiptReportService, type FilterLaporanPenerimaan } from './stock-receipt-report.service';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly productReport: ProductReportService,
+    private readonly stockReceiptReport: StockReceiptReportService,
+  ) {}
+
+  /// Nama berkas memuat tanggal Asia/Jakarta supaya unduhan berturut-turut
+  /// tidak saling menimpa di folder Downloads.
+  private namaBerkas(dasar: string, ext: string): string {
+    const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return `${dasar}-${jakarta}.${ext}`;
+  }
+
+  private filterDari(q?: string, kategoriId?: string, status?: string, dicetakOleh?: string): FilterLaporanProduk {
+    return {
+      q: q || undefined,
+      kategoriId: kategoriId || undefined,
+      status: status === 'active' || status === 'inactive' ? status : undefined,
+      dicetakOleh,
+    };
+  }
+
+  @Get('products/excel')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async produkExcel(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('q') q?: string,
+    @Query('kategoriId') kategoriId?: string,
+    @Query('status') status?: string,
+  ) {
+    const buffer = await this.productReport.excel(this.filterDari(q, kategoriId, status, user.username));
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${this.namaBerkas('daftar-produk', 'xlsx')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get('products/pdf')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async produkPdf(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('q') q?: string,
+    @Query('kategoriId') kategoriId?: string,
+    @Query('status') status?: string,
+  ) {
+    const buffer = await this.productReport.pdf(this.filterDari(q, kategoriId, status, user.username));
+    res.set({
+      'Content-Type': 'application/pdf',
+      // inline, bukan attachment — berkasnya dipratinjau dulu di modal sebelum
+      // dicetak, sama seperti alur PDF di jsBerkah.
+      'Content-Disposition': `inline; filename="${this.namaBerkas('daftar-produk', 'pdf')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  private filterPenerimaanDari(q?: string, status?: string, dicetakOleh?: string): FilterLaporanPenerimaan {
+    return {
+      q: q || undefined,
+      status: status === 'DRAFT' || status === 'POSTED' || status === 'REVISED' ? (status as StockReceiptStatus) : undefined,
+      dicetakOleh,
+    };
+  }
+
+  @Get('stock-receipts/excel')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async penerimaanExcel(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+  ) {
+    const buffer = await this.stockReceiptReport.excel(this.filterPenerimaanDari(q, status, user.username));
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${this.namaBerkas('terima-stok-gudang', 'xlsx')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get('stock-receipts/pdf')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async penerimaanPdf(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+  ) {
+    const buffer = await this.stockReceiptReport.pdf(this.filterPenerimaanDari(q, status, user.username));
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${this.namaBerkas('terima-stok-gudang', 'pdf')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get('stock-receipts/:id/pdf')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async penerimaanNotaPdf(@Res({ passthrough: true }) res: Response, @Param('id') id: string) {
+    const buffer = await this.stockReceiptReport.nota(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${this.namaBerkas('nota-terima-stok', 'pdf')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
 
   @Get('summary')
   @Roles(UserRole.ADMIN, UserRole.OWNER)

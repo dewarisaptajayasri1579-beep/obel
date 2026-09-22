@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -55,8 +56,11 @@ export class ReturnsService {
     }
 
     const returnId = randomUUID();
+    const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
+      const shiftSessionId = await cariShiftTerbukaBoothStaff(tx, boothId, staffId);
+
       for (const item of items!) {
         const decremented = await tx.boothStock.updateMany({
           where: { boothId, productId: item.productId, qtyOnHand: { gte: item.qty } },
@@ -67,6 +71,34 @@ export class ReturnsService {
             productId: item.productId,
           });
         }
+
+        // Pengurangan stok Booth WAJIB meninggalkan jejak di buku besar.
+        // Sebelumnya baris ini tidak ada: stok booth berkurang saat return
+        // diajukan, tapi satu-satunya movement yang tertulis adalah
+        // RETURN_TO_WAREHOUSE di sisi Gudang saat Admin menerima. Akibatnya
+        // buku besar booth selalu lebih besar dari saldonya, dan selisihnya
+        // tumbuh tiap kali ada return — ini penyebab utama 15 dari 16 produk
+        // Booth 1 tidak bisa direkonsiliasi (lihat scripts/reconcile-stock.ts).
+        //
+        // fromBoothId yang terisi sudah cukup menandai arah keluar, jadi
+        // arahnya tidak pernah ambigu saat riwayat dibaca ulang.
+        await tx.stockMovement.create({
+          data: {
+            movementNo: generateDocNo('MOV'),
+            movementType: StockMovementType.ADJUSTMENT,
+            productId: item.productId,
+            qty: item.qty,
+            fromBoothId: boothId,
+            toBoothId: null,
+            referenceType: 'stock_return_submit',
+            referenceId: returnId,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: staffId,
+            shiftSessionId,
+            note: 'Stok keluar dari Booth saat pengembalian diajukan.',
+          },
+        });
       }
 
       await tx.stockReturn.create({
@@ -417,7 +449,9 @@ export class ReturnsService {
               movementType: StockMovementType.ADJUSTMENT,
               productId,
               qty: Math.abs(delta),
-              referenceType: 'return_receipt_correction',
+              // Arah dikodekan di referenceType — mutasi Gudang tidak punya
+              // from/to booth, dan `qty` selalu positif. Lihat arah.util.ts.
+              referenceType: delta > 0 ? 'return_receipt_correction_in' : 'return_receipt_correction_out',
               referenceId: stockReturn.id,
               businessDate: businessDateOf(now),
               occurredAt: now,

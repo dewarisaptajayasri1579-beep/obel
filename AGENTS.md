@@ -50,6 +50,56 @@ Jika implementasi backend diganti, pertahankan kontrak domain dan business rule 
 10. Realtime, printer adapter, notification, export.
 11. Testing end-to-end seluruh normal flow + correction flow.
 
+## Aturan Soft Delete & Log Aktivitas
+
+Ditetapkan 2026-09-22, berlaku untuk **seluruh** entitas di backend, bukan hanya Produk.
+
+### 1. Gunakan Soft Delete
+
+- **Tidak pernah** `DELETE FROM` baris yang bisa dirujuk dokumen lain. Entitas yang boleh
+  "dihapus" dari sudut pandang pengguna ditandai lewat kolom `deletedAt DateTime?`
+  (pola di `Product.deletedAt`, `prisma/schema.prisma`) — bukan dibuang dari tabel.
+- Baris ber-`deletedAt` terisi disembunyikan dari daftar biasa (`WHERE deletedAt IS NULL`
+  di setiap query `findMany` yang menghadap pengguna) tapi tetap ada di database untuk
+  ditelusuri lewat log aktivitas atau query langsung bila perlu.
+- Soft delete **hanya boleh dieksekusi kalau entitasnya belum pernah tersentuh transaksi
+  apa pun** (lihat `ProductsService.remove()` sebagai contoh — mengecek `StockMovement`,
+  `SaleItem`, `StockDistributionItem`, `RestockRequestItem`, `StockReturnItem`,
+  `StockOpnameItem`, dan sisa stok sebelum mengizinkan). Kalau sudah punya histori, tolak
+  dengan `DomainError` yang menjelaskan alasannya dan arahkan ke jalur
+  **Nonaktifkan** (`active = false`) — bukan hapus.
+- `active = false` (nonaktif) dan `deletedAt` terisi (dihapus) adalah **dua hal berbeda**:
+  nonaktif = disembunyikan dari transaksi baru tapi masih bisa diaktifkan lagi kapan pun;
+  dihapus = ditutup permanen oleh Admin karena tidak pernah dipakai transaksi apa pun.
+- Perkecualian: dokumen transaksi (`Sale`, `StockDistribution`, dst) sudah punya jalur
+  reversal/koreksinya sendiri per `24-data-consistency-correction-reversal.md` — aturan
+  di atas berlaku untuk **master data** (Produk, Booth, User, Kategori, dst), bukan
+  menggantikan mekanisme koreksi transaksi yang sudah ada.
+- Kolom `Shift Delete` (native/hard delete) tidak pernah dipakai sebagai tombol atau
+  endpoint yang menghadap pengguna di aplikasi mana pun. Kalau ada kebutuhan pembersihan
+  data uji/pengembangan yang genuinely butuh hard delete, itu selalu berupa script
+  operasional yang dijalankan manual oleh Admin/pengembang (lihat
+  `backend/scripts/reset-transaksi.ts`), bukan fitur di UI.
+
+### 2. Log Aktivitas per Transaksi
+
+- Setiap aksi bermakna pada satu entitas — dibuat, diubah, dihapus (soft), diaktifkan,
+  disetujui, dibatalkan, dst — **wajib** tercatat lewat `ActivityLogService.record()`
+  (`backend/src/common/activity-log.service.ts`), yang menulis ke tabel `activity_logs`.
+- Satu baris log menjawab tiga hal: **kapan** (`occurredAt`), **siapa**
+  (`actorId` + `actorName` — nama di-snapshot saat penulisan, sama seperti
+  `SaleItem.productNameSnapshot`, supaya baris lama tetap terbaca kalau nama akun
+  pelakunya berubah belakangan), dan **ngapain** (`action` + `note` berbahasa manusia,
+  bukan sekadar kode).
+- `ActivityLog` **bukan pengganti** `StockMovement`/`TransactionCorrection` yang mencatat
+  dampak stok/uang secara presisi — ini mencatat aksinya, termasuk aksi yang tidak
+  mengubah stok sama sekali (mis. menonaktifkan user, mengubah threshold).
+- Status implementasi (2026-09-22): sudah dipasang penuh di modul **Produk**
+  (create/update/aktifkan/nonaktifkan/soft-delete). Modul lain (Distribusi, Restock,
+  Return, Opname, Koreksi, Shift, dst) **belum** dipasangi — ini utang teknis yang harus
+  ditutup bertahap. Setiap kali menyentuh modul transaksi untuk alasan lain, sekalian
+  pasang `ActivityLogService.record()` di jalur tulisnya kalau belum ada.
+
 ## Definition of Done
 Fitur dianggap selesai hanya jika:
 - UI sesuai role dan flow.

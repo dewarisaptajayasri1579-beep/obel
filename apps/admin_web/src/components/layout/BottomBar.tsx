@@ -19,13 +19,13 @@ export const BottomBar: React.FC = () => {
               <span
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-[#0544cc] to-[#2563eb] text-white shadow-lg shadow-blue-600/30 dark:shadow-[0_0_18px_-2px_rgba(37,99,235,0.7)]"
+                    ? "bg-gradient-to-r from-[var(--brand-700)] to-[var(--brand-600)] text-white shadow-lg shadow-black/30 dark:shadow-[0_0_18px_-2px_rgba(31, 115, 80, 0.35)]"
                     : "text-slate-500 dark:text-fg-muted"
                 }`}
               >
                 <Icon className="w-5 h-5" />
               </span>
-              <span className={`text-[11px] font-bold ${isActive ? "text-blue-700 dark:text-[var(--accent-primary)]" : "text-slate-500 dark:text-fg-muted"}`}>{item.label}</span>
+              <span className={`text-[11px] font-bold ${isActive ? "text-[var(--brand-700)] dark:text-[var(--accent-primary)]" : "text-slate-500 dark:text-fg-muted"}`}>{item.label}</span>
             </Link>
           );
         })}

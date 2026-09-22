@@ -31,7 +31,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   const statusColor = {
-    online: "bg-emerald-500",
+    online: "bg-brand-500",
     offline: "bg-slate-400",
     busy: "bg-rose-500",
     away: "bg-amber-500",
@@ -47,7 +47,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   return (
     <div className="relative inline-block select-none">
       <div
-        className={`relative flex items-center justify-center rounded-full font-bold bg-gradient-to-tr from-blue-700 to-indigo-600 text-white shadow-sm overflow-hidden border-2 border-white dark:border-slate-800 ${sizeClasses[size]} ${className}`}
+        className={`relative flex items-center justify-center rounded-full font-bold bg-gradient-to-tr from-brand-700 to-brand-600 text-white shadow-sm overflow-hidden border-2 border-white dark:border-slate-800 ${sizeClasses[size]} ${className}`}
       >
         {src ? (
           <img src={src} alt={name} className="w-full h-full object-cover" />

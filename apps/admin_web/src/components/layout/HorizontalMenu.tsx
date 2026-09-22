@@ -61,7 +61,7 @@ const HorizontalMenuItem: React.FC<{ item: NavItem; pathname: string }> = ({ ite
           onClick={() => setOpen((v) => !v)}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors cursor-pointer ${
             isActive
-              ? "bg-[#0544cc] text-white shadow-md shadow-blue-600/25 dark:shadow-[0_0_18px_-2px_rgba(37,99,235,0.65)]"
+              ? "bg-[var(--brand-700)] text-white shadow-md shadow-black/25 dark:shadow-[0_0_18px_-2px_rgba(31, 115, 80, 0.3)]"
               : "text-slate-600 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
           }`}
         >
@@ -86,7 +86,7 @@ const HorizontalMenuItem: React.FC<{ item: NavItem; pathname: string }> = ({ ite
                   onClick={() => setOpen(false)}
                   className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
                     isItemActive(pathname, child.href)
-                      ? "text-[#0544cc] dark:text-[var(--accent-primary)] bg-blue-50/80 dark:bg-blue-500/10"
+                      ? "text-[var(--brand-700)] dark:text-[var(--accent-primary)] bg-brand-50/80 dark:bg-brand-500/10"
                       : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                   }`}
                 >
@@ -105,7 +105,7 @@ const HorizontalMenuItem: React.FC<{ item: NavItem; pathname: string }> = ({ ite
       href={item.href!}
       className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${
         isActive
-              ? "bg-[#0544cc] text-white shadow-md shadow-blue-600/25 dark:shadow-[0_0_18px_-2px_rgba(37,99,235,0.65)]"
+              ? "bg-[var(--brand-700)] text-white shadow-md shadow-black/25 dark:shadow-[0_0_18px_-2px_rgba(31, 115, 80, 0.3)]"
               : "text-slate-600 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
       }`}
     >

@@ -1,9 +1,13 @@
 import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength, IsUrl } from 'class-validator';
 
 export class CreateProductDto {
+  /// Kode barang dibuat otomatis oleh server (`OBL-0001`). Klien BOLEH tidak
+  /// mengirimnya sama sekali; kalau dikirim, dipakai apa adanya — jalur itu
+  /// disediakan untuk seed dan impor data lama, bukan untuk form.
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  sku!: string;
+  sku?: string;
 
   @IsString()
   @MinLength(1)

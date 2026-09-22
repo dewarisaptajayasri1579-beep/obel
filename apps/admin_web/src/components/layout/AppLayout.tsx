@@ -23,8 +23,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, userName, userRo
 
   return (
     <div className="app-shell min-h-screen bg-app-mesh text-slate-800 dark:text-fg font-sans flex relative overflow-x-clip">
-      <div className="no-print dark:hidden fixed -top-40 -left-40 w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
-      <div className="no-print dark:hidden fixed -bottom-40 -right-40 w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+      <div className="no-print dark:hidden fixed -top-40 -left-40 w-[500px] h-[500px] bg-brand-400/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+      <div className="no-print dark:hidden fixed -bottom-40 -right-40 w-[500px] h-[500px] bg-brand-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
 
       {!isHorizontal && (
         <div className="no-print contents">

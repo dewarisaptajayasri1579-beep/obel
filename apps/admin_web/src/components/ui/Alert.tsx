@@ -18,8 +18,8 @@ export const Alert: React.FC<AlertProps> = ({
 }) => {
   const configs = {
     info: {
-      bg: "bg-sky-50/90 dark:bg-sky-500/10 border-sky-200/90 dark:border-sky-500/30 text-sky-900 dark:text-sky-200",
-      icon: <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />,
+      bg: "bg-teal-50/90 dark:bg-teal-500/10 border-teal-200/90 dark:border-teal-500/30 text-teal-900 dark:text-teal-200",
+      icon: <Info className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0 mt-0.5" />,
     },
     success: {
       bg: "bg-emerald-50/90 dark:bg-emerald-500/10 border-emerald-200/90 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-200",

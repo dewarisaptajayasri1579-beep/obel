@@ -14,7 +14,7 @@ interface NotificationItem {
 }
 
 const TYPE_DOT: Record<NotificationItem["type"], string> = {
-  info: "bg-blue-500",
+  info: "bg-emerald-500",
   success: "bg-emerald-500",
   warning: "bg-amber-500",
   error: "bg-rose-500",

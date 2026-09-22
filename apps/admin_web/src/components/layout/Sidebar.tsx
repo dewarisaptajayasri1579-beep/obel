@@ -71,8 +71,12 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
                   key={child.label}
                   href={child.href!}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    // Teks putih + panel translucent — BUKAN warna aksen — supaya
+                    // baris aktif tetap terbaca tegas tanpa menyala di atas gradien
+                    // gelap. Aksen (brand-*) dipakai di elemen datar yang diam,
+                    // bukan di teks kecil yang harus dibaca cepat.
                     childActive
-                      ? "text-blue-400 font-semibold bg-blue-500/10"
+                      ? "text-white font-semibold bg-white/10"
                       : "text-slate-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
@@ -91,8 +95,11 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
       href={item.href!}
       title={isCollapsed ? item.label : undefined}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
+        // bg-brand-600 (bukan Tailwind brand-600 bawaan): skala brand
+        // sengaja diredupkan supaya pil menu aktif tidak menyala di atas
+        // gradien gelap, dan ikut berganti warna saat accent diganti.
         isActive
-          ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+          ? "bg-brand-600 text-white shadow-md shadow-black/30"
           : "text-slate-300 hover:bg-white/5 hover:text-white"
       } ${isCollapsed ? "justify-center px-0" : ""}`}
     >
@@ -111,17 +118,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
 
   return (
     <aside
-      className={`hidden lg:flex fixed top-0 left-0 bottom-0 z-40 flex-col justify-between transition-all duration-300 select-none bg-gradient-to-b from-[#0a2540] via-[#09356b] to-[#041c38] text-white shadow-2xl border-r border-blue-900/40 dark:bg-none dark:bg-[var(--sidebar-bg)] dark:border-r dark:border-[var(--line)] dark:shadow-none ${
+      // Gradien berakhir di HITAM (bukan brand-900 lagi) — inilah yang paling
+      // menentukan "gelap tidaknya" sidebar. brand-900 saja masih tampak
+      // sebagai hijau redup; ditutup hitam di ujung bawah membuat sidebar
+      // terasa gelap tanpa membuat brand-700 di puncaknya ikut digelapkan
+      // (yang akan mengubah IDENTITAS warnanya, bukan cuma kesan gelapnya).
+      className={`hidden lg:flex fixed top-0 left-0 bottom-0 z-40 flex-col justify-between transition-all duration-300 select-none bg-gradient-to-b from-brand-800 via-brand-900 to-black text-white shadow-2xl border-r border-black/30 dark:bg-none dark:bg-[var(--sidebar-bg)] dark:border-r dark:border-[var(--line)] dark:shadow-none ${
         isCollapsed ? "w-20" : "w-64"
       } ${className}`}
     >
-      <div className="p-4 flex items-center justify-between border-b border-blue-800/40 dark:border-line h-20">
+      <div className="p-4 flex items-center justify-between border-b border-black/20 dark:border-line h-20">
         {!isCollapsed ? (
           <div className="flex items-center gap-3 overflow-hidden">
             <AppLogo size="sm" iconOnly={true} />
             <div className="flex flex-col">
               <span className="font-black text-xl tracking-wide text-white leading-none">{APP_CONFIG.name}</span>
-              <span className="text-[10px] text-blue-200 font-semibold tracking-tight mt-0.5">
+              <span className="text-[10px] text-white/65 font-semibold tracking-tight mt-0.5">
                 {APP_CONFIG.tagline}
               </span>
             </div>
@@ -137,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
         {NAV_GROUPS.map((group, groupIndex) => (
           <div key={group.group ?? groupIndex} className="space-y-2">
             {group.group && !isCollapsed && (
-              <p className="px-3.5 text-[11px] font-bold uppercase tracking-wide text-blue-300/60">{group.group}</p>
+              <p className="px-3.5 text-[11px] font-bold uppercase tracking-wide text-white/45">{group.group}</p>
             )}
             {group.items.map((item) => (
               <SidebarNavItem key={item.label} item={item} isCollapsed={isCollapsed} pathname={pathname} />
@@ -146,14 +158,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
         ))}
       </nav>
 
-      <div className="p-4 border-t border-blue-800/40 dark:border-line bg-black/15">
+      <div className="p-4 border-t border-black/20 dark:border-line bg-black/15">
         {!isCollapsed ? (
-          <div className="p-3 bg-white/5 rounded-2xl border border-white/10 text-xs text-blue-200/90 leading-relaxed mb-3">
+          <div className="p-3 bg-white/5 rounded-2xl border border-white/10 text-xs text-white/80 leading-relaxed mb-3">
             <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 text-blue-300 flex-shrink-0 mt-0.5" />
+              <Info className="w-4 h-4 text-white/70 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-white">Template Sistem</p>
-                <p className="text-[11px] text-blue-200/70 mt-0.5">Template dasar siap pakai.</p>
+                <p className="text-[11px] text-white/60 mt-0.5">Template dasar siap pakai.</p>
               </div>
             </div>
           </div>

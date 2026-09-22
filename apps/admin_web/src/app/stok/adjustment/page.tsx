@@ -156,7 +156,7 @@ function AdjustmentContent() {
                     <TableCell>
                       {r.impactSnapshot.before} → {r.impactSnapshot.after}
                     </TableCell>
-                    <TableCell className={r.impactSnapshot.delta < 0 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                    <TableCell className={r.impactSnapshot.delta < 0 ? "text-red-500 font-semibold" : "text-brand-500 font-semibold"}>
                       {r.impactSnapshot.delta > 0 ? `+${r.impactSnapshot.delta}` : r.impactSnapshot.delta}
                     </TableCell>
                     <TableCell>{REASON_CODE_OPTIONS.find((o) => o.value === r.reasonCode)?.label ?? r.reasonCode}</TableCell>

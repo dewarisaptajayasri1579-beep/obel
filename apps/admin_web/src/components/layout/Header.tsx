@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const iconButtonClass =
-    "flex items-center justify-center w-9 h-9 rounded-2xl dark:rounded-xl bg-white/70 hover:bg-white backdrop-blur-md border border-slate-200/80 shadow-xs text-slate-500 transition-colors cursor-pointer focus:outline-none dark:bg-transparent dark:border-transparent dark:shadow-none dark:hover:bg-surface-hover dark:text-fg-muted dark:hover:text-fg dark:focus-visible:bg-surface-hover dark:focus-visible:ring-2 dark:focus-visible:ring-[rgba(59,130,246,0.35)]";
+    "flex items-center justify-center w-9 h-9 rounded-2xl dark:rounded-xl bg-white/70 hover:bg-white backdrop-blur-md border border-slate-200/80 shadow-xs text-slate-500 transition-colors cursor-pointer focus:outline-none dark:bg-transparent dark:border-transparent dark:shadow-none dark:hover:bg-surface-hover dark:text-fg-muted dark:hover:text-fg dark:focus-visible:bg-surface-hover dark:focus-visible:ring-2 dark:focus-visible:ring-[rgba(79, 169, 125,0.35)]";
 
   return (
     <header className={`h-20 glass-header sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between gap-4 transition-all duration-300 ${className}`}>
@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={() => window.dispatchEvent(new Event("toggle-command-palette"))}
-          className="hidden sm:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl dark:rounded-xl bg-white/70 hover:bg-white backdrop-blur-md border border-slate-200/80 shadow-xs text-xs sm:text-sm font-semibold text-slate-500 transition-colors cursor-pointer w-full max-w-xs focus:outline-none dark:bg-[var(--field-bg)] dark:hover:bg-surface-hover dark:border-line dark:text-fg-muted dark:focus-visible:ring-2 dark:focus-visible:ring-[rgba(59,130,246,0.35)]"
+          className="hidden sm:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl dark:rounded-xl bg-white/70 hover:bg-white backdrop-blur-md border border-slate-200/80 shadow-xs text-xs sm:text-sm font-semibold text-slate-500 transition-colors cursor-pointer w-full max-w-xs focus:outline-none dark:bg-[var(--field-bg)] dark:hover:bg-surface-hover dark:border-line dark:text-fg-muted dark:focus-visible:ring-2 dark:focus-visible:ring-[rgba(79, 169, 125,0.35)]"
           aria-label="Buka pencarian"
         >
           <Search className="w-4 h-4 text-slate-400 dark:text-fg-muted flex-shrink-0" />
@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
         <NotificationBell iconButtonClass={iconButtonClass} />
 
         <div className="hidden lg:flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/70 backdrop-blur-md border border-slate-200/80 shadow-xs text-xs font-bold text-slate-700 dark:bg-transparent dark:border-line dark:text-fg-secondary">
-          <Calendar className="w-3.5 h-3.5 text-blue-700 dark:text-[var(--accent-highlight)]" />
+          <Calendar className="w-3.5 h-3.5 text-brand-700 dark:text-[var(--accent-highlight)]" />
           <span>{currentDateTime}</span>
         </div>
 

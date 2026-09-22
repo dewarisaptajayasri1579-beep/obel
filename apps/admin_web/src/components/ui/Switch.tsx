@@ -25,7 +25,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
               type="checkbox"
               role="switch"
               disabled={disabled}
-              className={`peer appearance-none w-11 h-6 rounded-full bg-slate-300 dark:bg-surface-hover transition-all duration-200 checked:bg-[#0544cc] focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed ${
+              className={`peer appearance-none w-11 h-6 rounded-full bg-slate-300 dark:bg-surface-hover transition-all duration-200 checked:bg-[var(--brand-700)] focus:outline-none focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed ${
                 error ? "ring-2 ring-red-500/40" : ""
               } ${className}`}
               {...props}

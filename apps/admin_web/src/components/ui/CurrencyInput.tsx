@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 
 export interface CurrencyInputProps {
   label?: string;
+  /** Kelas pengganti label bawaan — dipakai form padat (lihat ProdukForm). */
+  labelClassName?: string;
   helperText?: string;
   error?: string;
   value: number;
@@ -30,7 +32,7 @@ function parseDigits(raw: string): number {
  *  (bukan qty, persentase, atau field angka non-uang lain — itu tetap pakai <Input type="number">
  *  biasa). Kalau bikin form input nominal uang baru, pakai komponen ini, jangan Input biasa. */
 export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ label, helperText, error, value, onChange, sizeVariant = "lg", placeholder = "0", disabled, className = "", id }, ref) => {
+  ({ label, labelClassName, helperText, error, value, onChange, sizeVariant = "lg", placeholder = "0", disabled, className = "", id }, ref) => {
     const [display, setDisplay] = useState(() => formatThousands(value));
 
     useEffect(() => {
@@ -54,7 +56,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
     return (
       <div className="w-full flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={generatedId} className="text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none">
+          <label htmlFor={generatedId} className={labelClassName ?? "text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none"}>
             {label}
           </label>
         )}
@@ -69,7 +71,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
             placeholder={placeholder}
             value={display}
             onChange={handleChange}
-            className={`w-full ${sizeClasses[sizeVariant]} bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted font-medium text-right transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-blue-600 dark:focus:border-[#3B82F6] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12),0_0_16px_rgba(59,130,246,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`w-full ${sizeClasses[sizeVariant]} bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted font-medium text-right transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-brand-600 dark:focus:border-[var(--brand-500)] focus:ring-4 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12),0_0_16px_rgba(79, 169, 125,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed ${
               error ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : ""
             } ${className}`}
           />

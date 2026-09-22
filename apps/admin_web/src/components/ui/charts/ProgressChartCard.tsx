@@ -19,7 +19,7 @@ export const ProgressChartCard: React.FC<ProgressChartCardProps> = ({ data, ...c
     <ChartCard {...cardProps}>
       <div className="space-y-4 pt-1 h-full overflow-y-auto">
         {data.map((item, index) => {
-          const color = item.colorClass ?? "bg-blue-600 dark:bg-[#3B82F6]";
+          const color = item.colorClass ?? "bg-brand-600 dark:bg-[var(--brand-500)]";
           return (
             <div key={index} className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-fg-secondary">

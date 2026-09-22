@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -132,6 +133,8 @@ export class DistributionsService {
     const businessDate = businessDateOf(receivedAt);
 
     await this.prisma.$transaction(async (tx) => {
+      const shiftSessionId = await cariShiftTerbukaBoothStaff(tx, distribution.boothId, user.sub);
+
       for (const item of distribution.items) {
         const actualQty = qtyByProduct.get(item.productId) ?? item.qtySent;
 
@@ -159,6 +162,7 @@ export class DistributionsService {
               businessDate,
               occurredAt: receivedAt,
               createdBy: user.sub,
+              shiftSessionId,
             },
           });
         }

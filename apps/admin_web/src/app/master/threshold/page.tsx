@@ -76,7 +76,7 @@ function ThresholdContent() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Threshold Stok Booth</h1>
           <p className="text-sm text-slate-500 dark:text-fg-muted">
             Atur batas minimum &amp; kritis stok per produk untuk tiap Booth. Produk yang belum diatur memakai nilai
-            default (Minimum 25, Kritis 10).
+            default dari Produk &gt; Pengaturan.
           </p>
         </div>
         <Button leftIcon={<Save className="w-4 h-4" />} onClick={handleSave} isLoading={saving} disabled={!rows}>

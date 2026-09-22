@@ -15,6 +15,7 @@ export * from "./AppLogo";
 export * from "./AppLogoAlt";
 export * from "./BackgroundGlossyDecorations";
 export * from "./ColumnVisibilityMenu";
+export * from "./PortalMenu";
 export * from "./Pagination";
 export * from "./CurrencyInput";
 export * from "./Textarea";

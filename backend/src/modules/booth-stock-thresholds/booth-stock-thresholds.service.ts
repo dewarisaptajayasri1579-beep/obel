@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY } from '../../common/stock-status';
 import { BulkUpsertThresholdDto } from './dto/bulk-upsert-threshold.dto';
 
 @Injectable()
@@ -22,8 +21,8 @@ export class BoothStockThresholdsService {
       return {
         productId: p.id,
         productName: p.name,
-        minimumQty: existing?.minimumQty ?? DEFAULT_MINIMUM_QTY,
-        criticalQty: existing?.criticalQty ?? DEFAULT_CRITICAL_QTY,
+        minimumQty: existing?.minimumQty ?? p.minimumQty,
+        criticalQty: existing?.criticalQty ?? p.criticalQty,
         isCustomized: !!existing,
       };
     });

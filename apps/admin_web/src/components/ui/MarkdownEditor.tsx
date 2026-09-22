@@ -48,7 +48,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     html = html.replace(/\*(.*)\*/gim, '<em class="italic">$1</em>');
 
     // Code Blocks
-    html = html.replace(/`(.*?)`/gim, '<code class="bg-slate-100 dark:bg-surface border border-slate-200/80 dark:border-line px-1 py-0.5 rounded text-xs font-mono text-blue-600 dark:text-[var(--accent-highlight)]">$1</code>');
+    html = html.replace(/`(.*?)`/gim, '<code class="bg-slate-100 dark:bg-surface border border-slate-200/80 dark:border-line px-1 py-0.5 rounded text-xs font-mono text-brand-600 dark:text-[var(--accent-highlight)]">$1</code>');
 
     // Bullet Lists
     html = html.replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc text-slate-700 dark:text-fg-secondary font-medium">$1</li>');
@@ -77,7 +77,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             onClick={() => setTab("edit")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
               tab === "edit"
-                ? "bg-white dark:bg-surface text-blue-700 dark:text-[#60A5FA] shadow-xs"
+                ? "bg-white dark:bg-surface text-brand-700 dark:text-[var(--brand-400)] shadow-xs"
                 : "text-slate-500 dark:text-fg-muted hover:text-slate-700 dark:hover:text-fg"
             }`}
           >
@@ -89,7 +89,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             onClick={() => setTab("preview")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
               tab === "preview"
-                ? "bg-white dark:bg-surface text-blue-700 dark:text-[#60A5FA] shadow-xs"
+                ? "bg-white dark:bg-surface text-brand-700 dark:text-[var(--brand-400)] shadow-xs"
                 : "text-slate-500 dark:text-fg-muted hover:text-slate-700 dark:hover:text-fg"
             }`}
           >

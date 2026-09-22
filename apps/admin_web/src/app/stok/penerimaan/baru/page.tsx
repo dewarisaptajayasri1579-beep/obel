@@ -1,0 +1,84 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Keyboard, PackagePlus } from "lucide-react";
+import { RequireAuth } from "@/components/layout/RequireAuth";
+import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Card } from "@/components/ui/Card";
+import { Spinner } from "@/components/ui/Spinner";
+import { useToast } from "@/components/ui/Toast";
+import { api, ApiError, type Product } from "@/lib/api-client";
+import { PenerimaanForm } from "../PenerimaanForm";
+
+function TambahPenerimaanContent() {
+  const toast = useToast();
+  const [products, setProducts] = useState<Product[] | null>(null);
+
+  useEffect(() => {
+    api
+      .getProducts()
+      .then(setProducts)
+      .catch((err) => {
+        toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar produk.");
+        setProducts([]);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-5 max-w-5xl mx-auto">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Transaksi Kantor" },
+          { label: "Tambah Stok Gudang", href: "/stok/penerimaan" },
+          { label: "Tambah Baru" },
+        ]}
+      />
+
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <Link
+            href="/stok/penerimaan"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
+            aria-label="Kembali ke daftar Tambah Stok Gudang"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <PackagePlus className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
+              Tambah Stok Gudang
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
+              Isi Keterangan lalu Enter — kursor lanjut sendiri ke tabel produk.
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-fg-muted">
+          <Keyboard className="w-3.5 h-3.5" />
+          Ctrl+S Simpan Draft · Ctrl+Enter Posting
+        </span>
+      </div>
+
+      <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
+        {!products ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : (
+          <PenerimaanForm products={products} />
+        )}
+      </Card>
+    </div>
+  );
+}
+
+export default function TambahPenerimaanPage() {
+  return (
+    <RequireAuth>
+      <TambahPenerimaanContent />
+    </RequireAuth>
+  );
+}

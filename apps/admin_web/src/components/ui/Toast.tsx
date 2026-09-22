@@ -19,15 +19,15 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const VARIANT_CONFIG: Record<ToastVariant, { bg: string; icon: React.FC<{ className?: string }> }> = {
-  info: { bg: "bg-sky-50/95 dark:bg-elevated border-sky-200/90 dark:border-sky-500/30 text-sky-900 dark:text-sky-200", icon: Info },
-  success: { bg: "bg-emerald-50/95 dark:bg-elevated border-emerald-200/90 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-200", icon: CheckCircle2 },
+  info: { bg: "bg-teal-50/95 dark:bg-elevated border-teal-200/90 dark:border-teal-500/30 text-teal-900 dark:text-teal-200", icon: Info },
+  success: { bg: "bg-brand-50/95 dark:bg-elevated border-brand-200/90 dark:border-brand-500/30 text-brand-900 dark:text-brand-200", icon: CheckCircle2 },
   warning: { bg: "bg-amber-50/95 dark:bg-elevated border-amber-200/90 dark:border-amber-500/30 text-amber-900 dark:text-amber-200", icon: AlertTriangle },
   error: { bg: "bg-rose-50/95 dark:bg-elevated border-rose-200/90 dark:border-rose-500/30 text-rose-900 dark:text-rose-200", icon: AlertCircle },
 };
 
 const ICON_COLOR: Record<ToastVariant, string> = {
-  info: "text-sky-600 dark:text-sky-400",
-  success: "text-emerald-600 dark:text-emerald-400",
+  info: "text-teal-600 dark:text-teal-400",
+  success: "text-brand-600 dark:text-brand-400",
   warning: "text-amber-600 dark:text-amber-400",
   error: "text-rose-600 dark:text-rose-400",
 };

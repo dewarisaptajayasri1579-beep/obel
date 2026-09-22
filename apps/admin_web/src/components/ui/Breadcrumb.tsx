@@ -21,7 +21,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className = "" })
           <span key={`${item.label}-${i}`} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted" />}
             {item.href && !isLast ? (
-              <Link href={item.href} className="text-slate-500 dark:text-fg-muted hover:text-blue-700 dark:hover:text-[var(--accent-highlight)] transition-colors">
+              <Link href={item.href} className="text-slate-500 dark:text-fg-muted hover:text-brand-700 dark:hover:text-[var(--accent-highlight)] transition-colors">
                 {item.label}
               </Link>
             ) : (

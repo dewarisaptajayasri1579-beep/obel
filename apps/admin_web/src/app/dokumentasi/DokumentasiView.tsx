@@ -689,7 +689,7 @@ export const DokumentasiView: React.FC = () => {
                         SFT
                       </span>{" "}
                       &bull; Status:{" "}
-                      <span className="font-semibold text-emerald-600">
+                      <span className="font-semibold text-brand-600">
                         OPEN
                       </span>
                     </div>
@@ -826,7 +826,7 @@ export const DokumentasiView: React.FC = () => {
               {journeyView === "threshold" && (
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-surface border border-slate-200/80 dark:border-line flex items-center gap-2.5 text-xs text-slate-600 dark:text-fg-muted">
-                    <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                    <Info className="w-4 h-4 text-brand-600 shrink-0" />
                     <span>
                       Sistem Obbel mengklasifikasikan 4 level stok otomatis
                       untuk memicu respon restock cepat:
@@ -1066,21 +1066,21 @@ export const DokumentasiView: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-center">
                             {r.boothStaff ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto" />
+                              <CheckCircle2 className="w-4 h-4 text-brand-600 mx-auto" />
                             ) : (
                               <Ban className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
                             )}
                           </TableCell>
                           <TableCell className="text-center">
                             {r.admin ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto" />
+                              <CheckCircle2 className="w-4 h-4 text-brand-600 mx-auto" />
                             ) : (
                               <Ban className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
                             )}
                           </TableCell>
                           <TableCell className="text-center">
                             {r.owner ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto" />
+                              <CheckCircle2 className="w-4 h-4 text-brand-600 mx-auto" />
                             ) : (
                               <Ban className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
                             )}
@@ -1163,7 +1163,7 @@ export const DokumentasiView: React.FC = () => {
                     placeholder="Cari prefix (DIST, RSTK, OBL, RFD...), nama dokumen, atau model database..."
                     value={searchDoc}
                     onChange={(e) => setSearchDoc(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-white dark:bg-surface border border-slate-200 dark:border-line text-slate-900 dark:text-fg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-white dark:bg-surface border border-slate-200 dark:border-line text-slate-900 dark:text-fg focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 <span className="text-xs text-slate-400 dark:text-fg-muted shrink-0">

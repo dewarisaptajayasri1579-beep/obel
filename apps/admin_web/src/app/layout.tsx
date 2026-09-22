@@ -13,6 +13,12 @@ const THEME_INIT_SCRIPT = `
       : stored && stored.theme === "light" ? "light"
       : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     if (theme === "dark") document.documentElement.classList.add("dark");
+    // Accent (palet warna) dipasang di sini juga, bukan cuma di
+    // PreferencesProvider — tanpa ini, muatan pertama selalu memakai palet
+    // hijau bawaan sekejap sebelum React jalan, lalu "meloncat" ke palet
+    // pilihan Admin begitu context terpasang.
+    var accent = stored && typeof stored.accent === "string" ? stored.accent : "hijau";
+    if (accent !== "hijau") document.documentElement.setAttribute("data-accent", accent);
   } catch (e) {}
 })();
 `;

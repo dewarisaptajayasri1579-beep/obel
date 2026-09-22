@@ -64,11 +64,11 @@ export const Tab: React.FC<TabProps> = ({ value, children, disabled }) => {
       disabled={disabled}
       onClick={() => setValue(value)}
       className={`relative px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-        isActive ? "text-blue-700 dark:text-[var(--accent-primary)]" : "text-slate-500 dark:text-fg-muted hover:text-slate-700 dark:hover:text-fg"
+        isActive ? "text-brand-700 dark:text-[var(--accent-primary)]" : "text-slate-500 dark:text-fg-muted hover:text-slate-700 dark:hover:text-fg"
       }`}
     >
       {children}
-      {isActive && <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-[#0544cc]" />}
+      {isActive && <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-[var(--brand-700)]" />}
     </button>
   );
 };

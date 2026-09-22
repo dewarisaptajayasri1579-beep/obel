@@ -9,15 +9,15 @@ import { APP_CONFIG } from "@/lib/app-config";
 export const AuthLayout: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-app-mesh flex flex-col justify-between p-4 sm:p-6 lg:p-8 font-sans relative overflow-x-hidden">
-      <div className="dark:hidden fixed -top-40 -left-40 w-[500px] h-[500px] bg-blue-400/25 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
-      <div className="dark:hidden fixed -bottom-40 -right-40 w-[500px] h-[500px] bg-indigo-500/25 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+      <div className="dark:hidden fixed -top-40 -left-40 w-[500px] h-[500px] bg-brand-400/25 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
+      <div className="dark:hidden fixed -bottom-40 -right-40 w-[500px] h-[500px] bg-brand-500/25 rounded-full blur-3xl pointer-events-none animate-pulse-subtle" />
 
       <main className="flex-1 w-full max-w-5xl mx-auto flex items-center justify-center relative z-10 my-auto">
-        <div className="hidden lg:grid w-full rounded-[36px] p-8 xl:p-10 shadow-[0_30px_70px_-15px_rgba(15,37,85,0.22)] grid-cols-12 gap-8 items-center border-2 border-white/90 dark:border-line relative overflow-hidden bg-white/70 dark:bg-surface backdrop-blur-xl">
+        <div className="hidden lg:grid w-full rounded-[36px] p-8 xl:p-10 shadow-[0_30px_70px_-15px_rgba(15, 85, 50,0.22)] grid-cols-12 gap-8 items-center border-2 border-white/90 dark:border-line relative overflow-hidden bg-white/70 dark:bg-surface backdrop-blur-xl">
           <div className="col-span-7 flex flex-col justify-between h-full pr-4 space-y-6 relative z-10 min-h-[480px]">
             <div className="space-y-4">
               <AppLogo size="lg" layout="horizontal" showTagline />
-              <div className="w-16 h-1 bg-blue-700 rounded-full my-2 shadow-sm" />
+              <div className="w-16 h-1 bg-brand-700 rounded-full my-2 shadow-sm" />
               <p className="text-slate-700 dark:text-fg-secondary font-semibold text-base leading-relaxed max-w-lg">
                 {APP_CONFIG.authDescription}
               </p>
@@ -28,7 +28,7 @@ export const AuthLayout: React.FC = () => {
             <div className="grid grid-cols-3 gap-3.5 pt-2">
               {APP_CONFIG.authFeatures.map(({ icon: Icon, title, desc }) => (
                 <div key={title} className="glass-mockup-feature-card p-3.5 sm:p-4 rounded-2xl flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/90 dark:bg-elevated border border-blue-100/90 dark:border-line text-[#0544cc] dark:text-[var(--accent-primary)] shadow-sm flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-white/90 dark:bg-elevated border border-brand-100/90 dark:border-line text-[var(--brand-700)] dark:text-[var(--accent-primary)] shadow-sm flex items-center justify-center flex-shrink-0">
                     <Icon className="w-5 h-5 stroke-[2.2]" />
                   </div>
                   <div>

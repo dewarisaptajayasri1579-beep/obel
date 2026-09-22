@@ -48,7 +48,13 @@ export class WarehouseStockService {
             productId: dto.productId,
             qty: Math.abs(delta),
             toBoothId: null,
-            referenceType: 'warehouse_stock_adjustment',
+            // Arah dikodekan di referenceType karena mutasi Gudang tidak punya
+            // from/to booth yang bisa menandainya, sementara `qty` selalu positif.
+            // Tanpa penanda ini, baris penambahan dan pengurangan stok Gudang
+            // tidak bisa dibedakan saat riwayat dibaca ulang — satu-satunya
+            // petunjuk tinggal `note`, dan note bisa ditimpa `dto.reason`.
+            // Lihat arah.util.ts di modul stock-movements.
+            referenceType: delta > 0 ? 'warehouse_stock_adjustment_in' : 'warehouse_stock_adjustment_out',
             referenceId: dto.productId,
             businessDate,
             createdBy: actorId,

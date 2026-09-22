@@ -52,7 +52,7 @@ export const TableRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> = ({
   className = "",
   ...props
 }) => (
-  <tr className={`hover:bg-blue-50/40 dark:hover:bg-[rgba(59,130,246,0.05)] transition-colors ${className}`} {...props}>
+  <tr className={`hover:bg-brand-50/40 dark:hover:bg-[rgba(79, 169, 125,0.05)] transition-colors ${className}`} {...props}>
     {children}
   </tr>
 );
@@ -105,7 +105,7 @@ export const TableFilterInput: React.FC<React.InputHTMLAttributes<HTMLInputEleme
     <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-2.5 pointer-events-none" />
     <input
       type="text"
-      className={`w-full h-8 pl-8 pr-2.5 text-xs font-medium rounded-lg bg-white/70 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-700 dark:text-fg-secondary placeholder:text-slate-400 dark:placeholder:text-fg-muted placeholder:font-normal focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-blue-500 dark:focus:border-[#3B82F6] focus:ring-2 focus:ring-blue-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12)] transition-colors ${className}`}
+      className={`w-full h-8 pl-8 pr-2.5 text-xs font-medium rounded-lg bg-white/70 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-700 dark:text-fg-secondary placeholder:text-slate-400 dark:placeholder:text-fg-muted placeholder:font-normal focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-brand-500 dark:focus:border-[var(--brand-500)] focus:ring-2 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12)] transition-colors ${className}`}
       {...props}
     />
   </div>
@@ -117,7 +117,7 @@ export const TableFilterSelect: React.FC<React.SelectHTMLAttributes<HTMLSelectEl
   ...props
 }) => (
   <select
-    className={`w-full h-8 px-2 text-xs font-medium rounded-lg bg-white/70 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-700 dark:text-fg-secondary focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-blue-500 dark:focus:border-[#3B82F6] focus:ring-2 focus:ring-blue-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12)] transition-colors cursor-pointer ${className}`}
+    className={`w-full h-8 px-2 text-xs font-medium rounded-lg bg-white/70 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-700 dark:text-fg-secondary focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-brand-500 dark:focus:border-[var(--brand-500)] focus:ring-2 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12)] transition-colors cursor-pointer ${className}`}
     {...props}
   >
     {children}

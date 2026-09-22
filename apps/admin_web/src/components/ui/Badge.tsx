@@ -17,25 +17,25 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const variantClasses = {
-    primary: "bg-blue-500/15 dark:bg-[rgba(59,130,246,0.10)] text-blue-700 dark:text-[#60A5FA] border-blue-500/30 dark:border-[rgba(59,130,246,0.22)]",
+    primary: "bg-emerald-500/15 dark:bg-[rgba(79, 169, 125,0.10)] text-emerald-700 dark:text-[var(--brand-400)] border-emerald-500/30 dark:border-[rgba(79, 169, 125,0.22)]",
     secondary: "bg-slate-500/15 dark:bg-[rgba(148,163,184,0.10)] text-slate-700 dark:text-fg-secondary border-slate-500/30 dark:border-[rgba(148,163,184,0.22)]",
-    success: "bg-emerald-500/15 dark:bg-[rgba(16,185,129,0.10)] text-emerald-700 dark:text-[#34D399] border-emerald-500/30 dark:border-[rgba(16,185,129,0.22)]",
+    success: "bg-emerald-500/15 dark:bg-[rgba(46,140,99,0.10)] text-emerald-700 dark:text-[#34D399] border-emerald-500/30 dark:border-[rgba(46,140,99,0.22)]",
     warning: "bg-amber-500/15 dark:bg-[rgba(245,158,11,0.10)] text-amber-700 dark:text-[#FBBF24] border-amber-500/30 dark:border-[rgba(245,158,11,0.22)]",
     danger: "bg-rose-500/15 dark:bg-[rgba(239,68,68,0.10)] text-rose-700 dark:text-[#F87171] border-rose-500/30 dark:border-[rgba(239,68,68,0.22)]",
-    info: "bg-sky-500/15 dark:bg-[rgba(56,189,248,0.10)] text-sky-700 dark:text-[#38BDF8] border-sky-500/30 dark:border-[rgba(56,189,248,0.22)]",
+    info: "bg-teal-500/15 dark:bg-[rgba(38, 132, 124,0.10)] text-teal-700 dark:text-[var(--brand-500)] border-teal-500/30 dark:border-[rgba(38, 132, 124,0.22)]",
     outline: "bg-transparent text-slate-700 dark:text-fg-secondary border-slate-300 dark:border-line-strong",
     ghost: "bg-white/60 dark:bg-surface backdrop-blur-md dark:backdrop-blur-none text-slate-700 dark:text-fg-secondary border-white/80 dark:border-line shadow-sm dark:shadow-none",
   };
 
   const dotClasses = {
-    primary: "bg-blue-500",
+    primary: "bg-emerald-500",
     secondary: "bg-slate-500",
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     danger: "bg-rose-500",
-    info: "bg-sky-500",
+    info: "bg-teal-500",
     outline: "bg-slate-400",
-    ghost: "bg-blue-600",
+    ghost: "bg-emerald-600",
   };
 
   const sizeClasses = {

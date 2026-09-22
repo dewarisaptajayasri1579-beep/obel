@@ -264,8 +264,8 @@ export function FilterableTable<T>({
       <div className="no-print flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         {/* Bulk Action Panel */}
         {selectable && bulkActions && selected.size > 0 ? (
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-blue-50/80 dark:bg-blue-500/10 border border-blue-200/80 dark:border-blue-500/30 flex-1">
-            <span className="text-xs sm:text-sm font-bold text-blue-800 dark:text-[var(--accent-highlight)]">
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-brand-50/80 dark:bg-brand-500/10 border border-brand-200/80 dark:border-brand-500/30 flex-1">
+            <span className="text-xs sm:text-sm font-bold text-brand-800 dark:text-[var(--accent-highlight)]">
               {selected.size} dipilih
             </span>
             <div className="flex items-center gap-2">{bulkActions(selected)}</div>
@@ -308,12 +308,12 @@ export function FilterableTable<T>({
                   <button
                     key={col.key}
                     onClick={() => toggleColumn(col.key)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-fg-secondary hover:bg-blue-50/80 dark:hover:bg-blue-500/10 hover:text-blue-700 dark:hover:text-[var(--accent-highlight)] rounded-xl transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-fg-secondary hover:bg-brand-50/80 dark:hover:bg-brand-500/10 hover:text-brand-700 dark:hover:text-[var(--accent-highlight)] rounded-xl transition-colors text-left cursor-pointer"
                   >
                     <span
                       className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${
                         visibleColumns.has(col.key)
-                          ? "bg-blue-600 border-blue-600"
+                          ? "bg-brand-600 border-brand-600"
                           : "border-slate-300 dark:border-line-strong"
                       }`}
                     >
@@ -364,7 +364,7 @@ export function FilterableTable<T>({
                   serverMode?.onSearchChange?.(e.target.value);
                   pagination.setPage(1);
                 }}
-                className="w-full h-9 pl-9 pr-3 text-sm font-medium rounded-lg bg-white/70 dark:bg-surface border border-slate-200/80 dark:border-line text-slate-700 dark:text-fg-secondary placeholder:text-slate-400 dark:placeholder:text-fg-muted placeholder:font-normal focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-colors"
+                className="w-full h-9 pl-9 pr-3 text-sm font-medium rounded-lg bg-white/70 dark:bg-surface border border-slate-200/80 dark:border-line text-slate-700 dark:text-fg-secondary placeholder:text-slate-400 dark:placeholder:text-fg-muted placeholder:font-normal focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-colors"
               />
             </div>
           </div>
@@ -504,7 +504,7 @@ export function FilterableTable<T>({
                     </TableRow>
                     {isExpanded && renderExpandableRow && (
                       <TableRow className="bg-slate-50/40 dark:bg-black/5">
-                        <TableCell colSpan={activeColumns.length + (selectable ? 1 : 0) + (hasExpandable ? 1 : 0)} className="p-4 border-l-2 border-l-blue-500">
+                        <TableCell colSpan={activeColumns.length + (selectable ? 1 : 0) + (hasExpandable ? 1 : 0)} className="p-4 border-l-2 border-l-brand-500">
                           {renderExpandableRow(row)}
                         </TableCell>
                       </TableRow>
