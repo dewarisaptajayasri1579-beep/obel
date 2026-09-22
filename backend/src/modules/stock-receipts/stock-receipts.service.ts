@@ -57,6 +57,13 @@ export class StockReceiptsService {
       items: { include: { product: { select: { id: true, sku: true, name: true } } }, orderBy: { product: { name: 'asc' as const } } },
       createdBy: { select: { id: true, username: true, fullName: true } },
       postedBy: { select: { id: true, username: true, fullName: true } },
+      // Dua arah rantai revisi: dari dokumen REVISI, `revisionOf` menunjuk ke
+      // dokumen ASAL ("revisi dari TRM-000001"); dari dokumen ASAL, `revisedBy`
+      // menunjuk ke revisi terbarunya ("sudah digantikan oleh TRM-000002").
+      // Sebelum ini keduanya cuma ID mentah (`revisionOfId`), UI tidak bisa
+      // menampilkan nomor buktinya tanpa fetch terpisah.
+      revisionOf: { select: { id: true, receiptNo: true, versionNo: true } },
+      revisedBy: { select: { id: true, receiptNo: true, versionNo: true } },
     };
   }
 
@@ -172,6 +179,33 @@ export class StockReceiptsService {
     });
 
     return this.findOne(id);
+  }
+
+  /// Hanya dokumen DRAFT yang boleh dihapus — belum pernah menyentuh stok
+  /// sama sekali (lihat postDalamTransaksi: efek stok baru terjadi saat
+  /// Posting), jadi hard-delete di sini tidak melanggar "Posted transactions
+  /// are never hard-deleted" di AGENTS.md. `StockReceiptItem` ikut terhapus
+  /// lewat `onDelete: Cascade` di schema.
+  async remove(id: string, actorId: string, actorName: string) {
+    const receipt = await this.prisma.stockReceipt.findUnique({ where: { id } });
+    if (!receipt) throw new DomainError('NOT_FOUND', 'Dokumen Tambah Stok Gudang tidak ditemukan.');
+    if (receipt.status !== StockReceiptStatus.DRAFT) {
+      throw new DomainError('RECEIPT_NOT_DRAFT', 'Hanya dokumen berstatus Draft yang bisa dihapus. Dokumen Posted memakai jalur Revisi.', {
+        status: receipt.status,
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.activityLog.record(tx, {
+        entityType: 'stock_receipt',
+        entityId: id,
+        action: 'DELETE',
+        actorId,
+        actorName,
+        note: `Draft ${receipt.receiptNo} dihapus.`,
+      });
+      await tx.stockReceipt.delete({ where: { id } });
+    });
   }
 
   /// Tombol Posting. DRAFT biasa: cukup terapkan qty-nya. DRAFT hasil Revisi

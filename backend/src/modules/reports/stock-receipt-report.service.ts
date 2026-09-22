@@ -340,31 +340,69 @@ export class StockReceiptReportService {
       const KIRI = 40;
       const KANAN = 555;
 
-      const teksKiri = profil.logoPath ? KIRI + 46 : KIRI;
-      if (profil.logoPath) doc.image(profil.logoPath, KIRI, 36, { fit: [40, 40] });
-      doc.font('Helvetica-Bold').fontSize(15).fillColor('#0F172A').text(profil.name, teksKiri, 40);
-      doc.font('Helvetica').fontSize(9).fillColor('#64748B').text(profil.address ?? '', teksKiri, 60);
+      // --- KEPALA: logo + perusahaan SENDIRIAN di barisnya (bukan berbagi baris
+      // dengan judul dokumen) — pola nota transaksi jsBerkah (STB/Opname), bukan
+      // gaya letterhead surat formal yang dipakai sebelumnya di sini. ---
+      const teksKiri = profil.logoPath ? KIRI + 38 : KIRI;
+      if (profil.logoPath) {
+        doc.roundedRect(KIRI, 38, 30, 30, 6).lineWidth(1).strokeColor('#E2E8F0').stroke();
+        doc.image(profil.logoPath, KIRI + 3, 41, { fit: [24, 24] });
+      }
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#0F172A').text(profil.name, teksKiri, 41);
+      doc.font('Helvetica').fontSize(8.5).fillColor('#64748B').text(profil.address ?? '', teksKiri, 57);
 
-      doc.font('Helvetica-Bold').fontSize(13).fillColor(HIJAU_HEX)
-        .text('BUKTI TAMBAH STOK GUDANG', KIRI, 40, { width: KANAN - KIRI, align: 'right' });
-      doc.font('Courier-Bold').fontSize(11).fillColor('#0F172A')
-        .text(r.versionNo > 1 ? `${r.receiptNo} (v${r.versionNo})` : r.receiptNo, KIRI, 58, { width: KANAN - KIRI, align: 'right' });
-
-      doc.moveTo(KIRI, 82).lineTo(KANAN, 82).lineWidth(1.5).strokeColor('#1E293B').stroke();
+      // --- JUDUL (kiri) & KARTU METADATA (kanan) — baris kedua, sejajar satu sama
+      // lain seperti "PURCHASE ORDER" + kartu No. Dokumen/Tanggal/Status jsBerkah. ---
+      const judulY = 86;
+      const renggang = (s: string) => s.split('').join(' ');
+      doc.font('Helvetica-Bold').fontSize(15).fillColor('#0F172A').text('BUKTI TAMBAH STOK GUDANG', KIRI, judulY, { width: 280 });
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#94A3B8').text(renggang('BARANG MASUK KE GUDANG'), KIRI, judulY + 20);
+      doc.font('Helvetica').fontSize(8.5).fillColor('#64748B')
+        .text('Stok Gudang bertambah otomatis setelah dokumen ini diposting.', KIRI, judulY + 32, { width: 280 });
 
       const STATUS_LABEL_NOTA: Record<StockReceiptStatus, string> = { DRAFT: 'Draft', POSTED: 'Posted', REVISED: 'Sudah Direvisi' };
-
-      const metaY = 92;
-      const tulisMeta = (label: string, nilai: string, x: number, y: number, w: number) => {
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#64748B').text(label.toUpperCase(), x, y);
-        doc.font('Helvetica').fontSize(10).fillColor('#0F172A').text(nilai, x, y + 12, { width: w });
+      const STATUS_WARNA_BADGE: Record<StockReceiptStatus, { bg: string; fg: string }> = {
+        DRAFT: { bg: '#F1F5F9', fg: '#64748B' },
+        POSTED: { bg: '#E6F4EC', fg: HIJAU_HEX },
+        REVISED: { bg: '#FEF3C7', fg: '#B45309' },
       };
-      tulisMeta('Tanggal', this.tanggalJakarta(r.receiptDate), KIRI, metaY, 150);
-      tulisMeta('Status', STATUS_LABEL_NOTA[r.status], KIRI + 150, metaY, 120);
-      tulisMeta('Dicetak pada', dicetakPada, KIRI + 300, metaY, 215);
-      tulisMeta('Keterangan', r.note || '-', KIRI, metaY + 38, KANAN - KIRI);
 
-      let y = metaY + 74;
+      const kartuX = 345;
+      const kartuW = KANAN - kartuX;
+      const kartuY = judulY - 2;
+      const kartuH = 74;
+      doc.roundedRect(kartuX, kartuY, kartuW, kartuH, 8).fillAndStroke('#EAF6EF', '#BFE3CE');
+
+      const tulisBarisKartu = (label: string, y: number) => {
+        doc.font('Helvetica').fontSize(7.5).fillColor('#64748B').text(label, kartuX + 10, y, { width: 70 });
+      };
+      tulisBarisKartu('No. Dokumen', kartuY + 10);
+      doc.font('Courier-Bold').fontSize(9).fillColor('#0F172A')
+        .text(r.versionNo > 1 ? `${r.receiptNo} (v${r.versionNo})` : r.receiptNo, kartuX + 10, kartuY + 20, { width: kartuW - 20, align: 'right' });
+
+      tulisBarisKartu('Tanggal', kartuY + 34);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0F172A')
+        .text(this.tanggalJakarta(r.receiptDate), kartuX + 10, kartuY + 34, { width: kartuW - 20, align: 'right' });
+
+      tulisBarisKartu('Status', kartuY + 50);
+      const badge = STATUS_WARNA_BADGE[r.status];
+      const badgeLabel = STATUS_LABEL_NOTA[r.status];
+      const badgeW = doc.font('Helvetica-Bold').fontSize(8).widthOfString(badgeLabel) + 14;
+      doc.roundedRect(kartuX + kartuW - 10 - badgeW, kartuY + 47, badgeW, 14, 7).fill(badge.bg);
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(badge.fg)
+        .text(badgeLabel, kartuX + kartuW - 10 - badgeW, kartuY + 51, { width: badgeW, align: 'center' });
+
+      // --- KETERANGAN — baris penuh di bawah kop, kalau diisi ---
+      let y = judulY + 54;
+      if (r.note) {
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#64748B').text('KETERANGAN', KIRI, y);
+        doc.font('Helvetica').fontSize(9).fillColor('#0F172A').text(r.note, KIRI, y + 11, { width: KANAN - KIRI });
+        y += 30;
+      } else {
+        y += 6;
+      }
+      doc.font('Helvetica').fontSize(7).fillColor('#94A3B8').text(`Dicetak pada ${dicetakPada}`, KIRI, y);
+      y += 14;
       const kolom = [
         { label: 'No.', x: KIRI, w: 28, align: 'center' as const },
         { label: 'Kode', x: KIRI + 28, w: 90, align: 'left' as const },
@@ -400,13 +438,22 @@ export class StockReceiptReportService {
       doc.text(totalQty.toLocaleString('id-ID'), kolom[3].x + 4, y + 5, { width: kolom[3].w - 8, align: 'right' });
       y += 40;
 
-      const tandaTangan = (label: string, nama: string, x: number) => {
-        doc.font('Helvetica').fontSize(8.5).fillColor('#64748B').text(label, x, y, { width: 160 });
-        doc.moveTo(x, y + 50).lineTo(x + 160, y + 50).lineWidth(0.75).strokeColor('#94A3B8').stroke();
-        doc.font('Helvetica-Bold').fontSize(9).fillColor('#0F172A').text(nama || '-', x, y + 55, { width: 160 });
+      // Blok tanda tangan gaya nota jsBerkah (OpnamePrintable "Dihitung Oleh"/
+      // "Diketahui Toko"): label tebal, garis kosong untuk tanda tangan, lalu
+      // baris "Nama :" / "Tanggal :" — bukan cuma nama polos di bawah garis.
+      const tandaTangan = (label: string, nama: string, tanggal: string, x: number) => {
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0F172A').text(label, x, y, { width: 180 });
+        doc.moveTo(x, y + 28).lineTo(x + 180, y + 28).lineWidth(0.75).strokeColor('#CBD5E1').stroke();
+        doc.font('Helvetica').fontSize(8).fillColor('#475569');
+        // SATU pemanggilan .text() per baris (bukan continued) — versi
+        // sebelumnya memakai `continued: true` lintas dua .text() dengan `width`
+        // per segmen, yang di pdfkit malah membungkus/menumpuk baris berikutnya.
+        doc.text(`Nama    : ${nama || '....................................'}`, x, y + 34, { width: 180 });
+        doc.text(`Tanggal : ${tanggal}`, x, y + 46, { width: 180 });
       };
-      tandaTangan('Dibuat oleh', r.createdBy.fullName, KIRI);
-      tandaTangan('Diposting oleh', r.postedBy?.fullName ?? '-', KIRI + 200);
+      const titik = '....................................';
+      tandaTangan('Dibuat Oleh', r.createdBy.fullName, this.tanggalJakarta(r.createdAt), KIRI);
+      tandaTangan('Diposting Oleh', r.postedBy?.fullName ?? '', r.postedAt ? this.tanggalJakarta(r.postedAt) : titik, KIRI + 220);
 
       doc.end();
     });

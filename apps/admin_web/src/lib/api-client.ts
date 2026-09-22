@@ -324,6 +324,22 @@ export interface StockReceipt {
   items: StockReceiptItem[]
   createdBy: { id: string; username: string; fullName: string }
   postedBy: { id: string; username: string; fullName: string } | null
+  /// Dokumen ASAL kalau ini adalah dokumen revisi ("revisi dari TRM-000001").
+  revisionOf: { id: string; receiptNo: string; versionNo: number } | null
+  /// Dokumen revisi terbaru kalau dokumen ini SUDAH direvisi ("digantikan
+  /// oleh TRM-000002").
+  revisedBy: { id: string; receiptNo: string; versionNo: number } | null
+}
+
+export interface ActivityLogEntry {
+  id: string
+  entityType: string
+  entityId: string
+  action: string
+  actorId: string
+  actorName: string
+  note: string | null
+  occurredAt: string
 }
 
 export interface RestockRequestItemView {
@@ -824,6 +840,11 @@ export const api = {
   ) => request<StockReceipt>(`/stock-receipts/${id}`, { method: "PATCH", body: input }),
   postStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}/post`, { method: "PATCH" }),
   reviseStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}/revise`, { method: "POST" }),
+  /// Cuma berhasil untuk dokumen berstatus Draft — backend menolak selain itu
+  /// (lihat StockReceiptsService.remove, AGENTS.md "Posted transactions are
+  /// never hard-deleted").
+  deleteStockReceipt: (id: string) => request<null>(`/stock-receipts/${id}`, { method: "DELETE" }),
+  getStockReceiptActivityLog: (id: string) => request<ActivityLogEntry[]>(`/stock-receipts/${id}/activity-log`),
 
   getStockReceiptReport: async (format: "pdf" | "excel", filter: FilterLaporanPenerimaan = {}) => {
     const params = new URLSearchParams()

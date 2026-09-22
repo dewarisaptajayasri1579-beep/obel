@@ -101,7 +101,7 @@ function DetailPenerimaanContent({ id }: { id: string }) {
             <Spinner />
           </div>
         ) : (
-          <PenerimaanForm products={products} initial={receipt} />
+          <PenerimaanForm products={products} initial={receipt} onChanged={setReceipt} />
         )}
       </Card>
     </div>
