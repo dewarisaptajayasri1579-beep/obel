@@ -8,6 +8,7 @@ import {
   Layers,
   ListTree,
   PackageCheck,
+  Search,
   Table2,
   Warehouse,
 } from "lucide-react";
@@ -112,6 +113,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
 
   const [rekap, setRekap] = useState<RekapStokResponse | null>(null);
   const [memuatRekap, setMemuatRekap] = useState(false);
+  const [cariRekap, setCariRekap] = useState("");
 
   const [productId, setProductId] = useState("");
   const [rinci, setRinci] = useState<RinciMutasiResponse | null>(null);
@@ -180,7 +182,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
   // supaya produk yang belum dikategorikan tidak menyelip di tengah daftar.
   const rekapTersusun = useMemo(() => {
     if (!rekap) return [];
-    const rows = [...rekap.rows];
+    const q = cariRekap.trim().toLowerCase();
+    const rows = q
+      ? rekap.rows.filter((r) => `${r.name} ${r.sku}`.toLowerCase().includes(q))
+      : [...rekap.rows];
     rows.sort((a, b) => {
       const ka = kategoriProduk.get(a.productId) ?? TANPA_KATEGORI;
       const kb = kategoriProduk.get(b.productId) ?? TANPA_KATEGORI;
@@ -192,7 +197,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
       return a.name.localeCompare(b.name, "id");
     });
     return rows;
-  }, [rekap, kategoriProduk]);
+  }, [rekap, kategoriProduk, cariRekap]);
 
   const SUB: { key: SubTab; label: string; icon: typeof Table2 }[] = [
     { key: "rekap", label: "Rekap", icon: Table2 },
@@ -225,7 +230,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
       {/* ── Rekap ───────────────────────────────────────────────────────── */}
       {sub === "rekap" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
+          <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4 space-y-3">
             <PeriodeFilter bulan={periode.bulan} tahun={periode.tahun} onChange={setPeriode}>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-fg-muted ml-1">
                 <Warehouse className="w-3.5 h-3.5" />
@@ -235,6 +240,17 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                 <Select options={opsiLokasi} value={lokasi} onChange={setLokasi} sizeVariant="sm" />
               </div>
             </PeriodeFilter>
+
+            <div className="relative w-full sm:max-w-[270px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cari nama atau kode produk..."
+                value={cariRekap}
+                onChange={(e) => setCariRekap(e.target.value)}
+                className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
+              />
+            </div>
           </div>
 
           {rekap?.total.perluVerifikasi && <PeringatanVerifikasi />}
@@ -491,14 +507,8 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
 
                     <tfoot className="bg-slate-50/80 dark:bg-surface-hover border-t-2 border-slate-200 dark:border-line">
                       <tr className="text-[11px] font-bold text-slate-700 dark:text-fg-secondary">
-                        <td colSpan={2} className="py-3 px-3 uppercase tracking-wide">
+                        <td colSpan={4} className="py-3 px-3 uppercase tracking-wide">
                           Saldo Akhir
-                        </td>
-                        <td className="py-3 px-3 text-center text-brand-600 dark:text-brand-400 tabular-nums">
-                          +{angka(rinci.ringkasan.masuk)}
-                        </td>
-                        <td className="py-3 px-3 text-center text-amber-600 dark:text-amber-400 tabular-nums">
-                          −{angka(rinci.ringkasan.keluar)}
                         </td>
                         <td className="py-3 px-3 text-center tabular-nums text-slate-900 dark:text-fg">
                           {angka(rinci.ringkasan.saldoAkhir)}
