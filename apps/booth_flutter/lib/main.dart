@@ -7,6 +7,7 @@ import 'screens/inbound_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/closing_count_screen.dart';
 import 'screens/printer_settings_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme.dart';
 
 void main() {
@@ -27,8 +28,9 @@ class ObbelBoothApp extends StatelessWidget {
       title: 'Obbel Petugas Booth',
       theme: ObbelTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      initialRoute: '/login',
+      initialRoute: '/splash',
       routes: {
+        '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const MainShell(),
         '/inbound': (context) => const InboundScreen(),

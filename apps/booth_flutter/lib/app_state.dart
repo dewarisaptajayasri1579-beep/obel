@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'api_client.dart';
 import 'models.dart';
 
 const _uuid = Uuid();
+const _tokenPrefsKey = 'auth_token';
 
 String _fmtTime(DateTime dt) =>
     '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')}';
@@ -86,6 +90,9 @@ class AppState extends ChangeNotifier {
 
       await _loadShiftAndCatalog();
       loggedIn = true;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenPrefsKey, _token!);
     } on ApiException {
       rethrow;
     } catch (_) {
@@ -99,11 +106,38 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Dipanggil sekali saat app baru dibuka (lihat splash_screen.dart).
+  /// Mencoba pulihkan sesi dari token yang tersimpan lokal, supaya Petugas
+  /// tidak perlu login ulang tiap kali app di-kill OS / device restart
+  /// (bukan cuma soal Hot Restart saat development).
+  Future<bool> restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString(_tokenPrefsKey);
+    if (savedToken == null) return false;
+
+    _token = savedToken;
+    try {
+      await _loadShiftAndCatalog();
+      loggedIn = true;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      // Token invalid/expired, atau network error saat startup — jangan
+      // paksa masuk, biarkan Petugas login manual lagi.
+      _token = null;
+      await prefs.remove(_tokenPrefsKey);
+      return false;
+    }
+  }
+
   void logout() {
     _token = null;
     loggedIn = false;
     cart.clear();
     sales.clear();
+    unawaited(
+      SharedPreferences.getInstance().then((p) => p.remove(_tokenPrefsKey)),
+    );
     notifyListeners();
   }
 
