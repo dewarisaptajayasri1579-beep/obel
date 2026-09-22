@@ -252,10 +252,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                       <th className="py-3.5 px-3 text-center w-10">No.</th>
                       <th className="py-3.5 px-3 text-left">Nama Stok</th>
                       <th className="py-3.5 px-3 text-left">Kategori</th>
-                      <th className="py-3.5 px-3 text-right">Saldo Awal</th>
-                      <th className="py-3.5 px-3 text-right">Masuk</th>
-                      <th className="py-3.5 px-3 text-right">Keluar</th>
-                      <th className="py-3.5 px-3 text-right">Saldo Akhir</th>
+                      <th className="py-3.5 px-3 text-center">Saldo Awal</th>
+                      <th className="py-3.5 px-3 text-center">Masuk</th>
+                      <th className="py-3.5 px-3 text-center">Keluar</th>
+                      <th className="py-3.5 px-3 text-center">Saldo Akhir</th>
                     </tr>
                   </thead>
 
@@ -294,16 +294,16 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                                 </span>
                               </td>
                               <td className="py-3 px-3 text-slate-600 dark:text-fg-muted">{kategori}</td>
-                              <td className="py-3 px-3 text-right tabular-nums text-slate-600 dark:text-fg-secondary">
+                              <td className="py-3 px-3 text-center tabular-nums text-slate-600 dark:text-fg-secondary">
                                 {angka(r.saldoAwal)}
                               </td>
-                              <td className="py-3 px-3 text-right tabular-nums font-semibold text-brand-600 dark:text-brand-400">
+                              <td className="py-3 px-3 text-center tabular-nums font-semibold text-brand-600 dark:text-brand-400">
                                 {r.masuk === 0 ? "—" : `+${angka(r.masuk)}`}
                               </td>
-                              <td className="py-3 px-3 text-right tabular-nums font-semibold text-amber-600 dark:text-amber-400">
+                              <td className="py-3 px-3 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">
                                 {r.keluar === 0 ? "—" : `−${angka(r.keluar)}`}
                               </td>
-                              <td className="py-3 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">
+                              <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 dark:text-fg">
                                 {angka(r.saldoAkhir)}
                               </td>
                             </tr>
@@ -327,14 +327,14 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                         <td colSpan={3} className="py-3 px-3 uppercase tracking-wide">
                           Total · {namaLokasi} · {BULAN[periode.bulan - 1]} {periode.tahun}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums">{angka(rekap.total.saldoAwal)}</td>
-                        <td className="py-3 px-3 text-right tabular-nums text-brand-600 dark:text-brand-400">
+                        <td className="py-3 px-3 text-center tabular-nums">{angka(rekap.total.saldoAwal)}</td>
+                        <td className="py-3 px-3 text-center tabular-nums text-brand-600 dark:text-brand-400">
                           +{angka(rekap.total.masuk)}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-amber-600 dark:text-amber-400">
+                        <td className="py-3 px-3 text-center tabular-nums text-amber-600 dark:text-amber-400">
                           −{angka(rekap.total.keluar)}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-slate-900 dark:text-fg">
+                        <td className="py-3 px-3 text-center tabular-nums text-slate-900 dark:text-fg">
                           {angka(rekap.total.saldoAkhir)}
                         </td>
                       </tr>
@@ -426,8 +426,8 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                         <th className="py-3.5 px-3 text-left w-28">Tanggal</th>
                         <th className="py-3.5 px-3 text-left">Keterangan</th>
                         <th className="py-3.5 px-3 text-center w-24">Masuk/Keluar</th>
-                        <th className="py-3.5 px-3 text-right w-20">Qty</th>
-                        <th className="py-3.5 px-3 text-right w-28">Saldo Akhir</th>
+                        <th className="py-3.5 px-3 text-center w-20">Qty</th>
+                        <th className="py-3.5 px-3 text-center w-28">Saldo Akhir</th>
                       </tr>
                     </thead>
 
@@ -436,7 +436,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                         <td colSpan={4} className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-fg-muted">
                           Saldo Awal
                         </td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-700 dark:text-fg-secondary">
+                        <td className="py-2.5 px-3 text-center tabular-nums font-bold text-slate-700 dark:text-fg-secondary">
                           {angka(rinci.ringkasan.saldoAwal)}
                         </td>
                       </tr>
@@ -471,10 +471,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                               {r.arah === "MASUK" ? "Masuk" : "Keluar"}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums font-semibold text-slate-800 dark:text-fg">
+                          <td className="py-3 px-3 text-center tabular-nums font-semibold text-slate-800 dark:text-fg">
                             {angka(r.qty)}
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">
+                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 dark:text-fg">
                             {angka(r.saldo)}
                           </td>
                         </tr>
@@ -497,10 +497,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                         <td className="py-3 px-3 text-center text-brand-600 dark:text-brand-400 tabular-nums">
                           +{angka(rinci.ringkasan.masuk)}
                         </td>
-                        <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 tabular-nums">
+                        <td className="py-3 px-3 text-center text-amber-600 dark:text-amber-400 tabular-nums">
                           −{angka(rinci.ringkasan.keluar)}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-slate-900 dark:text-fg">
+                        <td className="py-3 px-3 text-center tabular-nums text-slate-900 dark:text-fg">
                           {angka(rinci.ringkasan.saldoAkhir)}
                         </td>
                       </tr>

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CompanyProfileService } from '../company-profile/company-profile.service';
 
 export interface FilterLaporanProduk {
   q?: string;
@@ -19,14 +20,6 @@ interface BarisLaporan {
   totalStok: number;
   active: boolean;
 }
-
-/// Identitas yang dicetak di kop laporan. Bukan master data karena Obbel hanya
-/// punya satu badan usaha; kalau nanti perlu diubah dari UI, pindahkan ke tabel
-/// config, jangan sebar ke tiap laporan.
-const PERUSAHAAN = {
-  nama: 'Obbel Coffee & Milk',
-  alamat: 'Yogyakarta, Indonesia',
-};
 
 /// Hijau Obbel — sama dengan `AppTheme.primaryDark` di aplikasi Android
 /// (apps/booth_flutter/lib/theme.dart). Berkas cetak dan aplikasinya harus
@@ -59,11 +52,15 @@ const GARIS: Partial<ExcelJS.Borders> = {
 /// berisi persis apa yang sedang dilihat pemakai.
 @Injectable()
 export class ProductReportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly companyProfile: CompanyProfileService,
+  ) {}
 
   private async ambilBaris(filter: FilterLaporanProduk): Promise<BarisLaporan[]> {
     const products = await this.prisma.product.findMany({
       where: {
+        deletedAt: null,
         ...(filter.kategoriId ? { categoryId: filter.kategoriId } : {}),
         ...(filter.status ? { active: filter.status === 'active' } : {}),
         ...(filter.q
@@ -137,9 +134,10 @@ export class ProductReportService {
     const rows = await this.ambilBaris(filter);
     const penyaring = await this.labelPenyaring(filter);
     const jumlahAktif = rows.filter((r) => r.active).length;
+    const profil = await this.companyProfile.getForPrint();
 
     const buku = new ExcelJS.Workbook();
-    buku.creator = PERUSAHAAN.nama;
+    buku.creator = profil.name;
     buku.created = new Date();
 
     const lembar = buku.addWorksheet('Master Produk', {
@@ -164,12 +162,18 @@ export class ProductReportService {
     ];
 
     // --- KOP PERUSAHAAN ---
+    if (profil.logoPath && profil.logoExt) {
+      const imageId = buku.addImage({ filename: profil.logoPath, extension: profil.logoExt });
+      lembar.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 32, height: 32 } });
+      lembar.getRow(1).height = 26;
+    }
+
     lembar.mergeCells('A1:C1');
-    lembar.getCell('A1').value = PERUSAHAAN.nama;
+    lembar.getCell('A1').value = profil.logoPath ? `        ${profil.name}` : profil.name;
     lembar.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF0F172A' } };
 
     lembar.mergeCells('D1:G1');
-    lembar.getCell('D1').value = PERUSAHAAN.alamat;
+    lembar.getCell('D1').value = profil.address ?? '';
     lembar.getCell('D1').font = { size: 9, color: { argb: 'FF64748B' } };
     lembar.getCell('D1').alignment = { horizontal: 'right' };
 
@@ -268,6 +272,7 @@ export class ProductReportService {
     const penyaring = await this.labelPenyaring(filter);
     const jumlahAktif = rows.filter((r) => r.active).length;
     const dicetakPada = this.stempelJakarta();
+    const profil = await this.companyProfile.getForPrint();
 
     return new Promise((resolve, reject) => {
       // A4 landscape, sama dengan laporan produk jsBerkah.
@@ -280,9 +285,11 @@ export class ProductReportService {
       const KIRI = 28;
       const KANAN = 814; // 842pt lebar A4 landscape − margin kanan
 
-      // --- KOP: perusahaan di kiri, judul di kanan, garis tebal di bawahnya ---
-      doc.font('Helvetica-Bold').fontSize(13).fillColor('#0F172A').text(PERUSAHAAN.nama, KIRI, 28);
-      doc.font('Helvetica').fontSize(8).fillColor('#64748B').text(PERUSAHAAN.alamat, KIRI, 45);
+      // --- KOP: logo (kalau ada) + perusahaan di kiri, judul di kanan, garis tebal di bawahnya ---
+      const teksKiri = profil.logoPath ? KIRI + 42 : KIRI;
+      if (profil.logoPath) doc.image(profil.logoPath, KIRI, 24, { fit: [36, 36] });
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#0F172A').text(profil.name, teksKiri, 28);
+      doc.font('Helvetica').fontSize(8).fillColor('#64748B').text(profil.address ?? '', teksKiri, 45);
 
       doc.font('Helvetica-Bold').fontSize(12).fillColor('#0F172A')
         .text('Daftar Master Produk', KIRI, 28, { width: KANAN - KIRI, align: 'right' });

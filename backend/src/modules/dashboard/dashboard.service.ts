@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DistributionStatus, RestockRequestStatus, ReturnStatus, SaleStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
-import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
+import { resolveStockStatus } from '../../common/stock-status';
 import { effectiveByGroup } from '../../common/effective-version';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 
@@ -34,7 +34,7 @@ export class DashboardService {
         include: { items: true, refunds: true },
       }),
       this.prisma.shiftSession.count({ where: { status: ShiftStatus.OPEN } }),
-      this.prisma.boothStock.findMany(),
+      this.prisma.boothStock.findMany({ include: { product: true } }),
       this.prisma.boothStockThreshold.findMany(),
       this.prisma.stockDistribution.count({ where: { status: DistributionStatus.SENT } }),
       this.prisma.restockRequest.count({ where: { status: RestockRequestStatus.REQUESTED } }),
@@ -50,8 +50,8 @@ export class DashboardService {
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
     const lowStockCount = boothStocks.filter((s) => {
       const threshold = thresholdByKey.get(`${s.boothId}:${s.productId}`);
-      const minimumQty = threshold?.minimumQty ?? DEFAULT_MINIMUM_QTY;
-      const criticalQty = threshold?.criticalQty ?? DEFAULT_CRITICAL_QTY;
+      const minimumQty = threshold?.minimumQty ?? s.product.minimumQty;
+      const criticalQty = threshold?.criticalQty ?? s.product.criticalQty;
       return resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty) !== 'Aman';
     }).length;
 

@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -58,6 +59,8 @@ export class ReturnsService {
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
+      const shiftSessionId = await cariShiftTerbukaBoothStaff(tx, boothId, staffId);
+
       for (const item of items!) {
         const decremented = await tx.boothStock.updateMany({
           where: { boothId, productId: item.productId, qtyOnHand: { gte: item.qty } },
@@ -92,6 +95,7 @@ export class ReturnsService {
             businessDate: businessDateOf(now),
             occurredAt: now,
             createdBy: staffId,
+            shiftSessionId,
             note: 'Stok keluar dari Booth saat pengembalian diajukan.',
           },
         });

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Package } from "lucide-react";
+import { ArrowLeftRight, Package, Settings } from "lucide-react";
 
-export type ProdukTabKey = "main" | "mutasi";
+export type ProdukTabKey = "main" | "mutasi" | "pengaturan";
 
 const TAB: { key: ProdukTabKey; label: string; icon: typeof Package }[] = [
   { key: "main", label: "Main", icon: Package },
   { key: "mutasi", label: "Mutasi Stok", icon: ArrowLeftRight },
+  { key: "pengaturan", label: "Pengaturan", icon: Settings },
 ];
 
 /// Tab halaman Produk. Semua tab tetap ter-mount dan yang tidak aktif

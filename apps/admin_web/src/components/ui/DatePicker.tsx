@@ -5,6 +5,8 @@ import { Calendar } from "lucide-react";
 
 export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
   label?: string;
+  /** Kelas pengganti label bawaan — dipakai form padat (lihat ProdukForm). */
+  labelClassName?: string;
   helperText?: string;
   error?: string;
   sizeVariant?: "sm" | "md" | "lg";
@@ -14,7 +16,7 @@ export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInpu
  *  otomatis pakai locale + accessibility bawaan browser. Kalau nanti butuh popover
  *  kalender custom (mis. rentang tanggal), bikin komponen baru — jangan dipaksa di sini. */
 export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
-  ({ label, helperText, error, sizeVariant = "lg", className = "", disabled, id, ...props }, ref) => {
+  ({ label, labelClassName, helperText, error, sizeVariant = "lg", className = "", disabled, id, ...props }, ref) => {
     const generatedId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
     const sizeClasses = {
@@ -26,7 +28,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
     return (
       <div className="w-full flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={generatedId} className="text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none">
+          <label htmlFor={generatedId} className={labelClassName ?? "text-xs sm:text-sm font-bold text-slate-700 dark:text-fg-secondary select-none"}>
             {label}
           </label>
         )}

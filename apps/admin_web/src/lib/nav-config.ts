@@ -2,10 +2,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
-  BarChart3,
   ShoppingCart,
   TrendingUp,
   Truck,
+  PackagePlus,
   PackageSearch,
   Undo2,
   Receipt,
@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Users,
   BookOpen,
+  Building2,
 } from "lucide-react";
 
 export interface NavItem {
@@ -41,15 +42,12 @@ export const NAV_GROUPS: NavGroup[] = [
     // Group Tanpa Label (Top-Level)
     items: [
       {
+        // Dashboard & Laporan digabung jadi satu halaman ber-tab (lihat
+        // app/dashboard/page.tsx) — dulu dua entri menu terpisah yang saling
+        // tumpang tindih (sama-sama "ringkasan operasional").
         label: "Dashboard",
         href: "/dashboard",
         icon: LayoutGrid,
-        bottomBar: true,
-      },
-      {
-        label: "Laporan",
-        href: "/laporan",
-        icon: BarChart3,
         bottomBar: true,
       },
     ],
@@ -58,9 +56,15 @@ export const NAV_GROUPS: NavGroup[] = [
     group: "TRANSAKSI",
     items: [
       {
-        label: "Pembelian & Stok",
+        label: "Transaksi Kantor",
         icon: ShoppingCart,
         children: [
+          {
+            label: "Tambah Stok Gudang",
+            href: "/stok/penerimaan",
+            icon: PackagePlus,
+            bottomBar: true,
+          },
           {
             label: "Distribusi Stok",
             href: "/distribusi",
@@ -82,7 +86,7 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
-        label: "Aktivitas Sales",
+        label: "Transaksi Booth",
         icon: TrendingUp,
         children: [
           {
@@ -123,6 +127,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Tampilan",
         href: "/pengaturan/tampilan",
         icon: Palette,
+        bottomBar: false,
+      },
+      {
+        label: "Profil Perusahaan",
+        href: "/pengaturan/profil-perusahaan",
+        icon: Building2,
         bottomBar: false,
       },
       {

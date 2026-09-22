@@ -7,7 +7,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { startOfDayJakarta, startOfTodayJakarta } from '../../common/jakarta-date';
-import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
+import { resolveStockStatus } from '../../common/stock-status';
 import { effectiveByGroup } from '../../common/effective-version';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 
@@ -38,7 +38,7 @@ export class OwnerService {
         this.prisma.sale.findMany({ where: { status: SaleStatus.PAID, paidAt: { gte: todayStart } }, include: { items: true, booth: true } }),
         this.prisma.sale.findMany({ where: { status: SaleStatus.PAID, paidAt: { gte: yesterdayStart, lt: todayStart } }, include: { items: true } }),
         this.prisma.booth.count({ where: { status: BoothStatus.ACTIVE } }),
-        this.prisma.boothStock.findMany(),
+        this.prisma.boothStock.findMany({ include: { product: true } }),
         this.prisma.boothStockThreshold.findMany(),
         this.prisma.stockDistribution.count({ where: { status: DistributionStatus.SENT } }),
         this.prisma.restockRequest.count({ where: { status: 'REQUESTED' } }),
@@ -56,7 +56,7 @@ export class OwnerService {
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
     const lowStockCount = boothStocks.filter((s) => {
       const th = thresholdByKey.get(`${s.boothId}:${s.productId}`);
-      return resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? DEFAULT_MINIMUM_QTY, th?.criticalQty ?? DEFAULT_CRITICAL_QTY) !== 'Aman';
+      return resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty) !== 'Aman';
     }).length;
 
     const boothTotals = new Map<string, { boothName: string; omzet: number }>();
@@ -161,7 +161,7 @@ export class OwnerService {
 
     const rows = boothStocks.map((s) => {
       const th = thresholdByKey.get(`${s.boothId}:${s.productId}`);
-      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? DEFAULT_MINIMUM_QTY, th?.criticalQty ?? DEFAULT_CRITICAL_QTY);
+      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty);
       return { boothName: s.booth.name, productName: s.product.name, qtyOnHand: s.qtyOnHand, status };
     });
 

@@ -64,6 +64,7 @@ Semua client memakai **satu database/backend**.
 23. `23-open-decisions.md` — keputusan yang harus dikonfirmasi sebelum production.
 24. `24-data-consistency-correction-reversal.md` — aturan cancel/revisi, stock opname, correction, reversal, dan reconciliation seluruh transaksi.
 25. `25-transaction-impact-matrix.md` — quick reference dampak cancel/revisi per jenis transaksi.
+26. `26-monitoring-realtime.md` — halaman Monitoring Admin: peta lokasi Booth real-time + panel stok kritis/menipis.
 
 Folder `references/` berisi mockup dan referensi visual yang harus dipakai sebagai arah desain, bukan sebagai pixel-perfect requirement.
 

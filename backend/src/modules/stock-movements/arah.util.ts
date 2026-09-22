@@ -116,6 +116,8 @@ const KETERANGAN: Record<string, string> = {
   return_receipt_correction_out: 'Koreksi penerimaan pengembalian',
   opening_balance_backfill_in: 'Saldo awal (penyesuaian buku besar)',
   opening_balance_backfill_out: 'Saldo awal (penyesuaian buku besar)',
+  stock_receipt_in: 'Tambah Stok Gudang',
+  stock_receipt_reversal_out: 'Pembalikan Tambah Stok Gudang (revisi)',
   shift_closing: 'Selisih tutup shift',
   stock_opname: 'Stock opname',
   stock_adjustment: 'Adjustment stok',

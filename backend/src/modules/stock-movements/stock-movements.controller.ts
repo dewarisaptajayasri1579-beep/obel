@@ -3,7 +3,7 @@ import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { StockMovementsService } from './stock-movements.service';
+import { StockMovementsService, type JenisMutasi } from './stock-movements.service';
 import { WAREHOUSE, type LokasiStok } from './arah.util';
 
 /// Riwayat & rekap mutasi stok. READ-ONLY — tidak ada endpoint yang menulis.
@@ -30,14 +30,30 @@ export class StockMovementsController {
     };
   }
 
+  private resolveJenis(jenis?: string): JenisMutasi {
+    return jenis === 'PENJUALAN' ? 'PENJUALAN' : 'SEMUA';
+  }
+
   @Get('rekap')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   rekap(
     @Query('bulan') bulan?: string,
     @Query('tahun') tahun?: string,
     @Query('lokasi') lokasi?: string,
+    @Query('jenis') jenis?: string,
   ) {
-    return this.service.rekap(this.resolve(bulan, tahun, lokasi));
+    return this.service.rekap({ ...this.resolve(bulan, tahun, lokasi), jenis: this.resolveJenis(jenis) });
+  }
+
+  @Get('rekap-booth')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  rekapBooth(
+    @Query('bulan') bulan?: string,
+    @Query('tahun') tahun?: string,
+    @Query('jenis') jenis?: string,
+  ) {
+    const { lokasi: _abaikan, ...periode } = this.resolve(bulan, tahun);
+    return this.service.rekapPerBooth({ ...periode, jenis: this.resolveJenis(jenis) });
   }
 
   @Get('ringkas')
@@ -54,7 +70,8 @@ export class StockMovementsController {
     @Query('bulan') bulan?: string,
     @Query('tahun') tahun?: string,
     @Query('lokasi') lokasi?: string,
+    @Query('jenis') jenis?: string,
   ) {
-    return this.service.rinci({ productId, ...this.resolve(bulan, tahun, lokasi) });
+    return this.service.rinci({ productId, ...this.resolve(bulan, tahun, lokasi), jenis: this.resolveJenis(jenis) });
   }
 }

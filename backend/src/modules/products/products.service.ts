@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
+import { ActivityLogService } from '../../common/activity-log.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -12,12 +13,20 @@ const SKU_PREFIX = 'OBL';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLog: ActivityLogService,
+  ) {}
 
   async findAll() {
     const products = await this.prisma.product.findMany({
+      // Soft-deleted tidak pernah tampil di daftar biasa — lihat AGENTS.md
+      // "Aturan Soft Delete". Nonaktif TETAP tampil, hanya digeser ke bawah.
+      where: { deletedAt: null },
       include: { category: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      // active DESC dulu: nonaktif otomatis ke bawah pada urutan bawaan,
+      // tanpa pemakai perlu memilih sortir apa pun.
+      orderBy: [{ active: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
     return products.map((p) => ({
       id: p.id,
@@ -27,6 +36,8 @@ export class ProductsService {
       sellPrice: Number(p.sellPrice),
       imageUrl: p.imageUrl,
       active: p.active,
+      minimumQty: p.minimumQty,
+      criticalQty: p.criticalQty,
     }));
   }
 
@@ -103,7 +114,7 @@ export class ProductsService {
     return `${SKU_PREFIX}-${String(tertinggi + 1).padStart(4, '0')}`;
   }
 
-  async create(dto: CreateProductDto) {
+  async create(dto: CreateProductDto, actorId: string, actorName: string) {
     if (dto.sku) {
       const existing = await this.prisma.product.findUnique({ where: { sku: dto.sku } });
       if (existing) {
@@ -117,6 +128,15 @@ export class ProductsService {
     // di kolom `sku` adalah penjaga terakhir yang menangkapnya.
     const product = await this.buatDenganKodeUnik(dto);
 
+    await this.activityLog.record(this.prisma, {
+      entityType: 'product',
+      entityId: product.id,
+      action: 'CREATE',
+      actorId,
+      actorName,
+      note: `Produk ${product.sku} "${product.name}" dibuat.`,
+    });
+
     return {
       id: product.id,
       sku: product.sku,
@@ -125,6 +145,8 @@ export class ProductsService {
       sellPrice: Number(product.sellPrice),
       imageUrl: product.imageUrl,
       active: product.active,
+      minimumQty: product.minimumQty,
+      criticalQty: product.criticalQty,
     };
   }
 
@@ -157,7 +179,7 @@ export class ProductsService {
   /// BARU: SaleItem.unitPrice sudah snapshot harga saat transaksi dibuat
   /// (lihat sales.service.ts createPaidSale), jadi mengubah Product di
   /// sini tidak pernah merestate omzet histori.
-  async update(id: string, dto: UpdateProductDto) {
+  async update(id: string, dto: UpdateProductDto, actorId: string, actorName: string) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) {
       throw new DomainError('NOT_FOUND', 'Produk tidak ditemukan.');
@@ -171,9 +193,35 @@ export class ProductsService {
         sellPrice: dto.sellPrice !== undefined ? BigInt(dto.sellPrice) : undefined,
         active: dto.active,
         imageUrl: dto.imageUrl,
+        minimumQty: dto.minimumQty,
+        criticalQty: dto.criticalQty,
       },
       include: { category: true },
     });
+
+    // Diaktifkan/dinonaktifkan dicatat sebagai aksi TERSENDIRI ("ngapain"
+    // harus jelas dari satu baris log, bukan diselipkan di dalam "UPDATE"
+    // generik) — inilah kasus yang paling sering dilihat kembali saat
+    // menyelidiki kenapa satu produk tiba-tiba hilang dari layar Jual.
+    if (dto.active !== undefined && dto.active !== existing.active) {
+      await this.activityLog.record(this.prisma, {
+        entityType: 'product',
+        entityId: product.id,
+        action: dto.active ? 'ACTIVATE' : 'DEACTIVATE',
+        actorId,
+        actorName,
+        note: `Produk ${product.sku} ${dto.active ? 'diaktifkan' : 'dinonaktifkan'}.`,
+      });
+    } else {
+      await this.activityLog.record(this.prisma, {
+        entityType: 'product',
+        entityId: product.id,
+        action: 'UPDATE',
+        actorId,
+        actorName,
+        note: `Produk ${product.sku} diperbarui.`,
+      });
+    }
 
     return {
       id: product.id,
@@ -183,6 +231,75 @@ export class ProductsService {
       sellPrice: Number(product.sellPrice),
       imageUrl: product.imageUrl,
       active: product.active,
+      minimumQty: product.minimumQty,
+      criticalQty: product.criticalQty,
     };
+  }
+
+  /// Hapus (soft) — HANYA boleh kalau produk tidak pernah tersentuh transaksi
+  /// apa pun. Kalau sudah ada histori, tolak dan arahkan ke Nonaktifkan:
+  /// menghapus produk yang pernah terjual akan membuat baris StockMovement
+  /// dan SaleItem lama menunjuk ke produk yang "tidak ada", padahal ia harus
+  /// tetap bisa dibaca di laporan dan nota lama selamanya.
+  async remove(id: string, actorId: string, actorName: string) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product || product.deletedAt) {
+      throw new DomainError('NOT_FOUND', 'Produk tidak ditemukan.');
+    }
+
+    const [
+      movementCount,
+      saleItemCount,
+      distributionItemCount,
+      restockItemCount,
+      returnItemCount,
+      opnameItemCount,
+      warehouseStock,
+      boothStockAgg,
+    ] = await Promise.all([
+      this.prisma.stockMovement.count({ where: { productId: id } }),
+      this.prisma.saleItem.count({ where: { productId: id } }),
+      this.prisma.stockDistributionItem.count({ where: { productId: id } }),
+      this.prisma.restockRequestItem.count({ where: { productId: id } }),
+      this.prisma.stockReturnItem.count({ where: { productId: id } }),
+      this.prisma.stockOpnameItem.count({ where: { productId: id } }),
+      this.prisma.warehouseStock.findUnique({ where: { productId: id } }),
+      this.prisma.boothStock.aggregate({ where: { productId: id }, _sum: { qtyOnHand: true } }),
+    ]);
+
+    const totalHistori =
+      movementCount + saleItemCount + distributionItemCount + restockItemCount + returnItemCount + opnameItemCount;
+    const sisaStok = (warehouseStock?.qtyOnHand ?? 0) + (boothStockAgg._sum.qtyOnHand ?? 0);
+
+    if (totalHistori > 0) {
+      throw new DomainError(
+        'PRODUCT_HAS_HISTORY',
+        `Produk "${product.name}" tidak bisa dihapus karena sudah punya ${totalHistori} riwayat transaksi. Gunakan Nonaktifkan.`,
+        { movementCount, saleItemCount, distributionItemCount, restockItemCount, returnItemCount, opnameItemCount },
+      );
+    }
+    if (sisaStok > 0) {
+      throw new DomainError(
+        'PRODUCT_HAS_STOCK',
+        `Produk "${product.name}" masih punya sisa stok ${sisaStok} di gudang/booth. Habiskan atau adjustment ke 0 dulu.`,
+        { sisaStok },
+      );
+    }
+
+    await this.prisma.product.update({
+      where: { id },
+      data: { deletedAt: new Date(), active: false },
+    });
+
+    await this.activityLog.record(this.prisma, {
+      entityType: 'product',
+      entityId: id,
+      action: 'SOFT_DELETE',
+      actorId,
+      actorName,
+      note: `Produk ${product.sku} "${product.name}" dihapus (tidak ada riwayat transaksi).`,
+    });
+
+    return { id, deleted: true };
   }
 }

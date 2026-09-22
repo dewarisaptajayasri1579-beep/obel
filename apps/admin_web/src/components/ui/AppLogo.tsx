@@ -45,32 +45,9 @@ export const AppLogo: React.FC<AppLogoProps> = ({
         layout === "vertical" ? "flex-col items-center text-center" : "flex-row items-center gap-3"
       } ${className}`}
     >
-      <div className={`relative flex-shrink-0 ${iconSizes[size]}`}>
-        <svg
-          viewBox="0 0 200 200"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full drop-shadow-md select-none"
-        >
-          <ellipse cx="100" cy="186" rx="64" ry="10" fill="#1E8A54" fillOpacity="0.18" />
-          <circle cx="100" cy="104" r="80" fill="#1B7A4B" />
-          <path
-            d="M100 44L146 70V122L100 148L54 122V70L100 44Z"
-            fill="#FFFFFF"
-          />
-          <path d="M100 44L146 70L100 96L54 70L100 44Z" fill="#DCF7EA" />
-          <path d="M100 96V148L54 122V70L100 96Z" fill="#EEFCF5" />
-          <text
-            x="100"
-            y="103"
-            textAnchor="middle"
-            fontSize="34"
-            fontWeight="800"
-            fill="#1B7A4B"
-          >
-            7
-          </text>
-        </svg>
+      <div className={`relative flex-shrink-0 rounded-full overflow-hidden shadow-md ${iconSizes[size]}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Obbel" className="w-full h-full object-cover select-none" />
       </div>
 
       {!iconOnly && (

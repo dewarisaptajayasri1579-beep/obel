@@ -16,6 +16,7 @@ import {
 import { ProdukTabs } from "./ProdukTabs";
 import { TabMain } from "./TabMain";
 import { TabMutasiStok } from "./TabMutasiStok";
+import { TabPengaturan } from "./TabPengaturan";
 import { periodeBerjalanJakarta } from "./PeriodeFilter";
 
 /// Halaman Produk (Data Operasional). Dua tab: Main (daftar & CRUD) dan Mutasi
@@ -84,6 +85,7 @@ function ProdukContent() {
             />
           ),
           mutasi: <TabMutasiStok products={products} booths={booths} />,
+          pengaturan: <TabPengaturan products={products} onReload={load} />,
         }}
       />
     </div>

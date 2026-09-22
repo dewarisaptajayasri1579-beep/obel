@@ -189,6 +189,12 @@ model Booth {
   code         String      @unique
   name         String
   locationName String?     @map("location_name")
+  address      String?
+  // Titik tetap Booth untuk peta Monitoring (docs/obbel-coffee-ai-docs/26-monitoring-realtime.md
+  // §4.2) — dipakai sebagai fallback kalau belum ada transaksi hari ini yang membawa
+  // koordinat GPS-nya sendiri (lihat Sale.latitude/longitude di bawah).
+  latitude     Decimal?    @db.Decimal(9, 6)
+  longitude    Decimal?    @db.Decimal(9, 6)
   status       BoothStatus @default(ACTIVE)
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
@@ -231,6 +237,8 @@ model Profile {
   resolvedReconciliations ReconciliationCase[]
   stockOpnames            StockOpname[]
   saleRefunds             SaleRefund[]
+  createdStockReceipts    StockReceipt[]          @relation("StockReceiptCreatedBy")
+  postedStockReceipts     StockReceipt[]          @relation("StockReceiptPostedBy")
 
   @@index([role])
   @@index([defaultBoothId])
@@ -259,6 +267,18 @@ model Product {
   imageUrl   String?          @map("image_url")
   active     Boolean          @default(true)
   sortOrder  Int              @default(0) @map("sort_order")
+  /// Default stok Menipis/Kritis produk ini di SELURUH booth — dipakai
+  /// sebagai fallback saat booth tertentu belum punya BoothStockThreshold
+  /// sendiri (lihat resolveStockStatus & BR-007). Override per-booth via
+  /// BoothStockThreshold tetap menang kalau ada.
+  minimumQty Int              @default(25) @map("minimum_qty")
+  criticalQty Int             @default(10) @map("critical_qty")
+  /// Soft delete. TERPISAH dari `active`: nonaktif = disembunyikan dari
+  /// transaksi tapi tetap tampil (bisa diaktifkan lagi); dihapus = ditutup
+  /// permanen oleh Admin karena tidak pernah dipakai transaksi apa pun.
+  /// Baris TIDAK PERNAH benar-benar di-DELETE — lihat "Aturan Soft Delete &
+  /// Log Aktivitas" di AGENTS.md.
+  deletedAt  DateTime?        @map("deleted_at")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
@@ -273,10 +293,102 @@ model Product {
   stockThresholds     BoothStockThreshold[]
   StockOpnameItem     StockOpnameItem[]
   saleRefundItems     SaleRefundItem[]
+  stockReceiptItems   StockReceiptItem[]
 
   @@index([categoryId])
   @@index([active])
+  @@index([deletedAt])
   @@map("products")
+}
+
+/// Jejak audit generik: SATU baris per aksi bermakna pada SATU entitas —
+/// tanggal, siapa, ngapain. Bukan pengganti StockMovement/TransactionCorrection
+/// (yang mencatat DAMPAK stok/uang secara presisi); ini mencatat AKSI manusia
+/// pada dokumen apa pun (produk dihapus, distribusi dibatalkan, dst), termasuk
+/// aksi yang tidak mengubah stok sama sekali (mis. menonaktifkan user).
+///
+/// `actorName` di-snapshot saat penulisan (pola yang sama dengan
+/// SaleItem.productNameSnapshot) — supaya baris lama tetap terbaca kalau nama
+/// akun pelakunya berubah belakangan, tanpa join ke Profile.
+model ActivityLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type") // "product" | "distribution" | "sale" | dst
+  entityId   String   @map("entity_id")
+  action     String // "CREATE" | "UPDATE" | "SOFT_DELETE" | "APPROVE" | dst — bebas per modul, bukan enum tertutup
+  actorId    String   @map("actor_id")
+  actorName  String   @map("actor_name")
+  note       String?
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  @@index([entityType, entityId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("activity_logs")
+}
+
+enum StockReceiptStatus {
+  DRAFT
+  POSTED
+  /// Sudah digantikan oleh versi revisi yang lebih baru — dokumen tetap ada
+  /// (tidak pernah dihapus), tapi bukan lagi versi yang berlaku.
+  REVISED
+
+  @@map("stock_receipt_status")
+}
+
+/// Terima Stok Gudang — barang masuk ke Gudang Pusat dari luar sistem
+/// (pembelian/dropping supplier). DRAFT tidak menyentuh stok sama sekali;
+/// stok baru bergerak saat Posting (lihat StockReceiptsService.post()).
+///
+/// Lineage revisi mengikuti pola StockDistribution: `transactionGroupId`
+/// sama di seluruh rantai versi, `versionNo` naik tiap revisi,
+/// `revisionOfId` menunjuk versi sebelumnya persis. Dokumen POSTED tidak
+/// pernah diedit langsung — revisi selalu berupa dokumen BARU yang saat
+/// di-posting membalik efek versi lama lalu menerapkan angka baru, atomik
+/// dalam satu transaksi (lihat AGENTS.md "Aturan Soft Delete & Log
+/// Aktivitas" dan 24-data-consistency-correction-reversal.md).
+model StockReceipt {
+  id             String             @id @default(uuid())
+  receiptNo      String             @unique @map("receipt_no")
+  status         StockReceiptStatus @default(DRAFT)
+  /// Tanggal BISNIS — kapan barang benar-benar diterima, dipakai sebagai
+  /// businessDate StockMovement supaya rekap bulanan jatuh di periode yang
+  /// benar walau dokumennya baru diketik belakangan.
+  receiptDate    DateTime           @map("receipt_date") @db.Date
+  note           String?
+  idempotencyKey String             @unique @map("idempotency_key")
+  postedAt       DateTime?          @map("posted_at")
+  postedById     String?            @map("posted_by")
+  postedBy       Profile?           @relation("StockReceiptPostedBy", fields: [postedById], references: [id])
+  createdById    String             @map("created_by")
+  createdBy      Profile            @relation("StockReceiptCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  transactionGroupId String        @default(uuid()) @map("transaction_group_id")
+  versionNo          Int           @default(1) @map("version_no")
+  revisionOfId       String?       @unique @map("revision_of_id")
+  revisionOf         StockReceipt? @relation("StockReceiptRevision", fields: [revisionOfId], references: [id])
+  revisedBy          StockReceipt? @relation("StockReceiptRevision")
+
+  items StockReceiptItem[]
+
+  @@index([status])
+  @@index([receiptDate])
+  @@index([transactionGroupId])
+  @@map("stock_receipts")
+}
+
+model StockReceiptItem {
+  id          String       @id @default(uuid())
+  receiptId   String       @map("receipt_id")
+  receipt     StockReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productId   String       @map("product_id")
+  product     Product      @relation(fields: [productId], references: [id])
+  qtyReceived Int          @map("qty_received")
+
+  @@unique([receiptId, productId])
+  @@index([productId])
+  @@map("stock_receipt_items")
 }
 
 /// Ambang stok per Booth-produk — AGENTS.md eksplisit melarang hardcode
@@ -375,6 +487,11 @@ model Sale {
   revisionOfId       String?       @map("revision_of_id")
   reversalOfId       String?       @map("reversal_of_id")
   createdAt          DateTime      @default(now()) @map("created_at")
+  // Koordinat GPS petugas saat transaksi dibuat (docs/26-monitoring-realtime.md §5 & §7).
+  // Selalu nullable: sale tidak boleh gagal/tertunda gara-gara GPS tidak tersedia saat itu.
+  latitude           Decimal?      @db.Decimal(9, 6)
+  longitude          Decimal?      @db.Decimal(9, 6)
+  locationCapturedAt DateTime?     @map("location_captured_at")
 
   items    SaleItem[]
   payments Payment[]
@@ -741,4 +858,21 @@ model StockOpnameItem {
   @@unique([stockOpnameId, productId])
   @@index([productId])
   @@map("stock_opname_items")
+}
+
+/// Identitas perusahaan yang dipajang di kop semua dokumen cetak (PDF/Excel
+/// daftar produk, daftar & nota Tambah Stok Gudang, dst). SINGLETON — selalu
+/// satu baris berid tetap `'default'`, diubah lewat Pengaturan → Profil
+/// Perusahaan (Admin), dibaca oleh semua *-report.service.ts. Sebelum baris
+/// ini pernah dibuat, layanan laporan jatuh ke default hardcode di kode.
+model CompanyProfile {
+  id        String   @id @default("default")
+  name      String   @default("Obbel Coffee & Milk")
+  legalName String?  @map("legal_name")
+  address   String?
+  phone     String?
+  logoUrl   String?  @map("logo_url")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_profile")
 }

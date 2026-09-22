@@ -15,6 +15,7 @@ import { ReturnsModule } from './modules/returns/returns.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
 import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
+import { StockReceiptsModule } from './modules/stock-receipts/stock-receipts.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { BoothStockThresholdsModule } from './modules/booth-stock-thresholds/booth-stock-thresholds.module';
 import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.module';
@@ -23,6 +24,7 @@ import { StockAdjustmentsModule } from './modules/stock-adjustments/stock-adjust
 import { ReconciliationCasesModule } from './modules/reconciliation-cases/reconciliation-cases.module';
 import { OwnerModule } from './modules/owner/owner.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CompanyProfileModule } from './modules/company-profile/company-profile.module';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     DashboardModule,
     BoothStockModule,
     StockMovementsModule,
+    StockReceiptsModule,
     ReportsModule,
     BoothStockThresholdsModule,
     ShiftTemplatesModule,
@@ -50,6 +53,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ReconciliationCasesModule,
     OwnerModule,
     NotificationsModule,
+    CompanyProfileModule,
   ],
 })
 export class AppModule {}

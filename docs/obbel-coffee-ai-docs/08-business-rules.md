@@ -53,7 +53,7 @@ Per product per Booth:
 - `MENIPIS` jika critical_qty < qty <= minimum_qty.
 - `AMAN` jika qty > minimum_qty.
 
-Jika critical_qty tidak diisi, dapat default sama dengan floor(minimum_qty/2), tetapi lebih baik seed explicit.
+`minimum_qty`/`critical_qty` efektif diambil dari `BoothStockThreshold` (override booth tertentu) jika ada; kalau tidak, jatuh ke `minimum_qty`/`critical_qty` milik Product itu sendiri (diatur di menu Produk > Pengaturan, admin_web). Tidak ada lagi angka default hardcode di kode — setiap produk selalu punya nilainya sendiri (seed awal 25/10).
 
 ## BR-008 — Restock request
 Petugas dapat request produk walau belum menyentuh threshold, tetapi UI memprioritaskan low stock.

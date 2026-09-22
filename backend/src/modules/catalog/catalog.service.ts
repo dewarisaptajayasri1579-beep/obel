@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
+import { resolveStockStatus } from '../../common/stock-status';
 
 @Injectable()
 export class CatalogService {
@@ -25,8 +25,8 @@ export class CatalogService {
     return products.map((product) => {
       const qtyOnHand = stockByProduct.get(product.id) ?? 0;
       const threshold = thresholdByProduct.get(product.id);
-      const minimumQty = threshold?.minimumQty ?? DEFAULT_MINIMUM_QTY;
-      const criticalQty = threshold?.criticalQty ?? DEFAULT_CRITICAL_QTY;
+      const minimumQty = threshold?.minimumQty ?? product.minimumQty;
+      const criticalQty = threshold?.criticalQty ?? product.criticalQty;
       return {
         id: product.id,
         sku: product.sku,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DistributionStatus, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DEFAULT_CRITICAL_QTY, DEFAULT_MINIMUM_QTY, resolveStockStatus } from '../../common/stock-status';
+import { resolveStockStatus } from '../../common/stock-status';
 
 export interface NotificationItem {
   id: string;
@@ -37,7 +37,7 @@ export class NotificationsService {
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
     for (const s of boothStocks) {
       const th = thresholdByKey.get(`${s.boothId}:${s.productId}`);
-      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? DEFAULT_MINIMUM_QTY, th?.criticalQty ?? DEFAULT_CRITICAL_QTY);
+      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty);
       if (status === 'Kritis' || status === 'Habis') {
         items.push({
           id: `lowstock:${s.boothId}:${s.productId}`,
@@ -118,7 +118,7 @@ export class NotificationsService {
     const thresholdByProduct = new Map(thresholds.map((t) => [t.productId, t]));
     for (const s of boothStocks) {
       const th = thresholdByProduct.get(s.productId);
-      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? DEFAULT_MINIMUM_QTY, th?.criticalQty ?? DEFAULT_CRITICAL_QTY);
+      const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty);
       if (status === 'Kritis' || status === 'Habis') {
         items.push({
           id: `lowstock:${boothId}:${s.productId}`,

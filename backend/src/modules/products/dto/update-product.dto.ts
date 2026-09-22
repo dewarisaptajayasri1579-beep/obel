@@ -28,4 +28,17 @@ export class UpdateProductDto {
   @IsOptional()
   @IsUrl({ require_tld: false }, { message: 'imageUrl harus berupa URL yang valid.' })
   imageUrl?: string | null;
+
+  /// Default stok Menipis/Kritis produk ini di seluruh booth — lihat komentar
+  /// Product.minimumQty di schema.prisma. Override per-booth (BoothStockThreshold)
+  /// tetap menang kalau Admin sudah mengustomisasinya lewat halaman Threshold.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumQty?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  criticalQty?: number;
 }

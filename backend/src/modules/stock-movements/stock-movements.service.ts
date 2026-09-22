@@ -1,13 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, StockMovementType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { WAREHOUSE, dampakMutasi, keteranganMutasi, type LokasiStok } from './arah.util';
+
+/// Tab "Mutasi Stok" menghitung SEMUA jenis mutasi; tab "Mutasi Penjualan"
+/// (halaman Booth) memakai fungsi & bentuk response yang SAMA, cuma disaring
+/// ke movement tipe SALE saja lewat parameter ini — supaya tidak ada
+/// perhitungan saldo yang diduplikasi dengan rumus berbeda.
+export type JenisMutasi = 'SEMUA' | 'PENJUALAN';
+
+function filterJenis(jenis: JenisMutasi): Prisma.StockMovementWhereInput {
+  return jenis === 'PENJUALAN' ? { movementType: StockMovementType.SALE } : {};
+}
 
 export interface BarisRekapStok {
   productId: string;
   sku: string;
   name: string;
+  saldoAwal: number;
+  masuk: number;
+  keluar: number;
+  saldoAkhir: number;
+  perluVerifikasi: boolean;
+}
+
+export interface BarisRekapBooth {
+  boothId: string;
+  boothCode: string;
+  boothName: string;
   saldoAwal: number;
   masuk: number;
   keluar: number;
@@ -24,6 +45,15 @@ export interface BarisRinciMutasi {
   qty: number;
   saldo: number;
   perluVerifikasi: boolean;
+  /// Siapa yang menginput baris ini (Profile.fullName) — resolusi manual dari
+  /// StockMovement.createdBy, yang cuma menyimpan UUID mentah tanpa relasi
+  /// Prisma. Null kalau profile-nya sudah tidak ada (data lama/dihapus).
+  petugas: string | null;
+  /// Shift saat baris ini terjadi (mis. "Pagi", "Malam") — hanya terisi kalau
+  /// movement-nya sudah membawa shiftSessionId (lihat catatan di masing-masing
+  /// service penulis StockMovement). Null bukan berarti error, bisa juga
+  /// memang mutasi yang tidak terikat satu shift (mis. di Gudang).
+  shift: string | null;
 }
 
 /// Pembacaan riwayat & rekap stok dari `stock_movements`.
@@ -66,19 +96,19 @@ export class StockMovementsService {
   }
 
   /// Tab Rekap — satu baris per produk untuk satu bulan.
-  async rekap(params: { bulan: number; tahun: number; lokasi: LokasiStok }): Promise<{
+  async rekap(params: { bulan: number; tahun: number; lokasi: LokasiStok; jenis?: JenisMutasi }): Promise<{
     periode: { bulan: number; tahun: number };
     lokasi: LokasiStok;
     rows: BarisRekapStok[];
     total: Omit<BarisRekapStok, 'productId' | 'sku' | 'name'>;
   }> {
-    const { bulan, tahun, lokasi } = params;
+    const { bulan, tahun, lokasi, jenis = 'SEMUA' } = params;
     const { awal, akhir } = this.batasPeriode(bulan, tahun);
-    const filter = this.filterLokasi(lokasi);
+    const filter = { ...this.filterLokasi(lokasi), ...filterJenis(jenis) };
 
     const [products, sebelum, periode] = await Promise.all([
       this.prisma.product.findMany({
-        where: { active: true },
+        where: { active: true, deletedAt: null },
         select: { id: true, sku: true, name: true },
         orderBy: { name: 'asc' },
       }),
@@ -138,6 +168,81 @@ export class StockMovementsService {
     return { periode: { bulan, tahun }, lokasi, rows, total };
   }
 
+  /// Tab Rekap di halaman Booth — sumbunya dibalik dari `rekap()`: satu baris
+  /// per BOOTH (bukan per produk), digabung dari SEMUA produk. Dipakai tab
+  /// "Mutasi Stok" (jenis SEMUA) maupun "Mutasi Penjualan" (jenis PENJUALAN)
+  /// di halaman Booth — baris yang diklik lalu membuka Rinci lewat `rinci()`
+  /// dengan `lokasi` = boothId yang sama.
+  async rekapPerBooth(params: { bulan: number; tahun: number; jenis?: JenisMutasi }): Promise<{
+    periode: { bulan: number; tahun: number };
+    rows: BarisRekapBooth[];
+    total: Omit<BarisRekapBooth, 'boothId' | 'boothCode' | 'boothName'>;
+  }> {
+    const { bulan, tahun, jenis = 'SEMUA' } = params;
+    const { awal, akhir } = this.batasPeriode(bulan, tahun);
+    const filter = filterJenis(jenis);
+
+    const [booths, sebelum, periode] = await Promise.all([
+      this.prisma.booth.findMany({
+        where: { status: 'ACTIVE' },
+        select: { id: true, code: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.stockMovement.findMany({ where: { ...filter, businessDate: { lt: awal } } }),
+      this.prisma.stockMovement.findMany({ where: { ...filter, businessDate: { gte: awal, lt: akhir } } }),
+    ]);
+
+    const saldoAwal = new Map<string, number>();
+    const masuk = new Map<string, number>();
+    const keluar = new Map<string, number>();
+    const ragu = new Set<string>();
+
+    for (const b of booths) {
+      for (const m of sebelum) {
+        const { delta, perluVerifikasi } = dampakMutasi(m, b.id);
+        if (delta === 0) continue;
+        saldoAwal.set(b.id, (saldoAwal.get(b.id) ?? 0) + delta);
+        if (perluVerifikasi) ragu.add(b.id);
+      }
+      for (const m of periode) {
+        const { delta, perluVerifikasi } = dampakMutasi(m, b.id);
+        if (delta === 0) continue;
+        if (delta > 0) masuk.set(b.id, (masuk.get(b.id) ?? 0) + delta);
+        else keluar.set(b.id, (keluar.get(b.id) ?? 0) - delta);
+        if (perluVerifikasi) ragu.add(b.id);
+      }
+    }
+
+    const rows: BarisRekapBooth[] = booths.map((b) => {
+      const awalQty = saldoAwal.get(b.id) ?? 0;
+      const masukQty = masuk.get(b.id) ?? 0;
+      const keluarQty = keluar.get(b.id) ?? 0;
+      return {
+        boothId: b.id,
+        boothCode: b.code,
+        boothName: b.name,
+        saldoAwal: awalQty,
+        masuk: masukQty,
+        keluar: keluarQty,
+        saldoAkhir: awalQty + masukQty - keluarQty,
+        perluVerifikasi: ragu.has(b.id),
+      };
+    });
+
+    const total = rows.reduce(
+      (acc, r) => ({
+        saldoAwal: acc.saldoAwal + r.saldoAwal,
+        masuk: acc.masuk + r.masuk,
+        keluar: acc.keluar + r.keluar,
+        saldoAkhir: acc.saldoAkhir + r.saldoAkhir,
+        perluVerifikasi: acc.perluVerifikasi || r.perluVerifikasi,
+      }),
+      { saldoAwal: 0, masuk: 0, keluar: 0, saldoAkhir: 0, perluVerifikasi: false },
+    );
+
+    return { periode: { bulan, tahun }, rows, total };
+  }
+
   /// Ringkasan stok SELURUH produk dipecah per lokasi (Gudang Pusat + tiap Booth).
   /// Dipakai kolom "Total Stok" di daftar produk sekaligus tabel di baris yang
   /// dibuka — satu panggilan, bukan satu per baris tabel, karena daftar produk
@@ -149,6 +254,7 @@ export class StockMovementsService {
 
     const [products, booths, sebelum, periode] = await Promise.all([
       this.prisma.product.findMany({
+        where: { deletedAt: null },
         select: { id: true, sku: true, name: true },
         orderBy: { name: 'asc' },
       }),
@@ -228,12 +334,42 @@ export class StockMovementsService {
     return { periode: { bulan, tahun }, rows };
   }
 
+  /// `StockMovement.createdBy` cuma menyimpan UUID mentah (tidak ada relasi
+  /// Prisma ke Profile — lihat schema.prisma), dan `shiftSessionId` menunjuk
+  /// ke ShiftSession yang labelnya (Pagi/Malam) ada di ShiftTemplate. Dua-duanya
+  /// diresolusi di sini lewat batch query supaya baris Rinci sebanyak apa pun
+  /// tetap dua query tambahan, bukan N+1.
+  private async resolvePetugasDanShift(
+    movements: { createdBy: string; shiftSessionId: string | null }[],
+  ): Promise<{ namaPetugas: Map<string, string>; labelShift: Map<string, string> }> {
+    const profileIds = [...new Set(movements.map((m) => m.createdBy))];
+    const shiftIds = [...new Set(movements.map((m) => m.shiftSessionId).filter((id): id is string => !!id))];
+
+    const [profiles, shifts] = await Promise.all([
+      profileIds.length
+        ? this.prisma.profile.findMany({ where: { id: { in: profileIds } }, select: { id: true, fullName: true } })
+        : Promise.resolve([]),
+      shiftIds.length
+        ? this.prisma.shiftSession.findMany({
+            where: { id: { in: shiftIds } },
+            select: { id: true, shiftTemplate: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      namaPetugas: new Map(profiles.map((p) => [p.id, p.fullName])),
+      labelShift: new Map(shifts.map((s) => [s.id, s.shiftTemplate.name])),
+    };
+  }
+
   /// Tab Rinci — kartu stok satu produk: saldo awal, tiap mutasi, saldo berjalan.
   async rinci(params: {
     productId: string;
     bulan: number;
     tahun: number;
     lokasi: LokasiStok;
+    jenis?: JenisMutasi;
   }): Promise<{
     product: { id: string; sku: string; name: string };
     periode: { bulan: number; tahun: number };
@@ -242,9 +378,9 @@ export class StockMovementsService {
     rows: BarisRinciMutasi[];
     perluVerifikasi: boolean;
   }> {
-    const { productId, bulan, tahun, lokasi } = params;
+    const { productId, bulan, tahun, lokasi, jenis = 'SEMUA' } = params;
     const { awal, akhir } = this.batasPeriode(bulan, tahun);
-    const filter = this.filterLokasi(lokasi);
+    const filter = { ...this.filterLokasi(lokasi), ...filterJenis(jenis) };
 
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -275,6 +411,8 @@ export class StockMovementsService {
     let keluar = 0;
     const rows: BarisRinciMutasi[] = [];
 
+    const { namaPetugas, labelShift } = await this.resolvePetugasDanShift(periode);
+
     for (const m of periode) {
       const { delta, perluVerifikasi } = dampakMutasi(m, lokasi);
       if (delta === 0) continue;
@@ -288,6 +426,8 @@ export class StockMovementsService {
         tanggal: m.businessDate.toISOString(),
         movementNo: m.movementNo,
         keterangan: keteranganMutasi(m),
+        petugas: namaPetugas.get(m.createdBy) ?? null,
+        shift: m.shiftSessionId ? labelShift.get(m.shiftSessionId) ?? null : null,
         arah: delta > 0 ? 'MASUK' : 'KELUAR',
         qty: Math.abs(delta),
         saldo,

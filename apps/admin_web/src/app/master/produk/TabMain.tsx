@@ -7,7 +7,6 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
   FileText,
@@ -22,14 +21,15 @@ import {
   Power,
   Search,
   Boxes,
+  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ColumnVisibilityMenu } from "@/components/ui/ColumnVisibilityMenu";
+import { Modal } from "@/components/ui/Modal";
 import { PortalMenu } from "@/components/ui/PortalMenu";
 import { useToast } from "@/components/ui/Toast";
 import { useColumnVisibility, type ColumnDef } from "@/lib/use-column-visibility";
-import { getPageWindow } from "@/lib/pagination";
 import { useHotkey } from "@/hooks/useHotkey";
 import {
   api,
@@ -100,9 +100,6 @@ export function TabMain({
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
   const { isVisible: tampil, toggle: toggleColumn } = useColumnVisibility("master-produk", KOLOM_TERSEDIA);
 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -110,17 +107,36 @@ export function TabMain({
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [hapusTarget, setHapusTarget] = useState<Product | null>(null);
+  const [menghapus, setMenghapus] = useState(false);
   const router = useRouter();
+
+  /// Paginasi PER KELOMPOK, bukan paginasi baris global — daftar ini
+  /// dikelompokkan per kategori, dan paginasi global akan memotong header
+  /// kategori di tengah "halaman" (kategori A separuh di halaman 1, separuh
+  /// di halaman 2). `batasPerKelompok` membatasi berapa baris yang tampil di
+  /// TIAP kelompok sebelum diringkas jadi tombol "Lihat semua"; `null` berarti
+  /// tampilkan semua baris di semua kelompok sekaligus.
+  const [batasPerKelompok, setBatasPerKelompok] = useState<number | null>(10);
+  const [kelompokDiperluas, setKelompokDiperluas] = useState<Set<string>>(new Set());
+
+  function toggleKelompokDiperluas(nama: string) {
+    setKelompokDiperluas((prev) => {
+      const next = new Set(prev);
+      if (next.has(nama)) next.delete(nama);
+      else next.add(nama);
+      return next;
+    });
+  }
 
   // Keadaan daftar dibaca dari URL setelah mount, bukan saat inisialisasi state:
   // render pertama harus sama dengan hasil server, kalau tidak React protes
-  // hydration mismatch begitu URL sudah membawa ?q= atau ?page=.
+  // hydration mismatch begitu URL sudah membawa ?q=.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     setSearch(p.get("q") ?? "");
     setKategoriFilter(p.get("kategori") ?? "");
     setStatusFilter(p.get("status") ?? "");
-    setCurrentPage(Number(p.get("page") ?? "1") || 1);
     const expand = p.get("expand");
     if (expand) setExpandedRows(new Set([expand]));
   }, []);
@@ -192,10 +208,10 @@ export function TabMain({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, filteredRows, ringkas]);
 
-  const sortedRows = useMemo(() => {
-    const list = [...filteredRows];
-    list.sort((a, b) => {
-      if (!sortColumn) return a.sku.localeCompare(b.sku);
+  function urutkan(list: Product[]) {
+    const hasil = [...list];
+    hasil.sort((a, b) => {
+      if (!sortColumn) return a.name.localeCompare(b.name);
       let valA: string | number = "";
       let valB: string | number = "";
       if (sortColumn === "code") {
@@ -215,33 +231,55 @@ export function TabMain({
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-    return list;
+    return hasil;
+  }
+
+  const TANPA_KATEGORI = "Tanpa Kategori";
+
+  /// Dikelompokkan per kategori (pola yang sama dipakai tab Mutasi Stok →
+  /// Rekap) — kategori diurutkan alfabet, "Tanpa Kategori" selalu paling
+  /// akhir. Nonaktif TIDAK ikut dalam kelompok kategorinya masing-masing,
+  /// melainkan dikumpulkan jadi satu kelompok "Nonaktif" di paling bawah
+  /// daftar — supaya "digeser ke belakang" benar-benar berarti ke belakang
+  /// seluruh daftar, bukan cuma ke bawah dalam kategorinya sendiri.
+  const { kelompokKategori, kelompokNonaktif } = useMemo(() => {
+    const aktif = filteredRows.filter((p) => p.active);
+    const nonaktif = filteredRows.filter((p) => !p.active);
+
+    const perKategori = new Map<string, Product[]>();
+    for (const p of aktif) {
+      const kunci = p.category ?? TANPA_KATEGORI;
+      if (!perKategori.has(kunci)) perKategori.set(kunci, []);
+      perKategori.get(kunci)!.push(p);
+    }
+
+    const kelompok = Array.from(perKategori.entries())
+      .map(([nama, rows]) => ({ nama, rows: urutkan(rows) }))
+      .sort((a, b) => {
+        if (a.nama === TANPA_KATEGORI) return 1;
+        if (b.nama === TANPA_KATEGORI) return -1;
+        return a.nama.localeCompare(b.nama);
+      });
+
+    return { kelompokKategori: kelompok, kelompokNonaktif: urutkan(nonaktif) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredRows, sortColumn, sortDirection, ringkas]);
 
-  const totalItems = sortedRows.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  // Halaman dari URL bisa melebihi jumlah halaman yang tersisa; dijepit di sini
-  // supaya tabelnya tidak tampil kosong melompong.
-  const halamanAktif = Math.min(currentPage, totalPages);
-  const nomorHalaman = useMemo(() => getPageWindow(halamanAktif, totalPages), [halamanAktif, totalPages]);
-  const startIndex = (halamanAktif - 1) * pageSize;
-  const paginatedRows = sortedRows.slice(startIndex, startIndex + pageSize);
+  const totalItems = filteredRows.length;
 
-  /// Keadaan daftar saat ini (penyaring + halaman), dititipkan ke tautan
-  /// tambah/edit sebagai `back`. Tombol Back browser sebenarnya sudah cukup
-  /// (URL daftar di-replaceState tiap penyaring berubah), tapi ini menutup jalur
-  /// yang TIDAK lewat Back: setelah Simpan, form harus mengembalikan pemakai ke
-  /// halaman 4 yang tadi ditinggalkan, bukan ke halaman 1.
+  /// Keadaan daftar saat ini (penyaring), dititipkan ke tautan tambah/edit
+  /// sebagai `back`. Tombol Back browser sebenarnya sudah cukup (URL daftar
+  /// di-replaceState tiap penyaring berubah), tapi ini menutup jalur yang
+  /// TIDAK lewat Back: setelah Simpan, form harus mengembalikan pemakai ke
+  /// penyaring yang tadi ditinggalkan.
   const kembaliKe = useMemo(() => {
     const params = new URLSearchParams();
     if (search) params.set("q", search);
     if (kategoriFilter) params.set("kategori", kategoriFilter);
     if (statusFilter) params.set("status", statusFilter);
-    if (halamanAktif > 1) params.set("page", String(halamanAktif));
     const qs = params.toString();
     return qs ? `back=${encodeURIComponent(qs)}` : "";
-  }, [search, kategoriFilter, statusFilter, halamanAktif]);
+  }, [search, kategoriFilter, statusFilter]);
 
   const linkBaru = `/master/produk/baru${kembaliKe ? `?${kembaliKe}` : ""}`;
   const linkEdit = (id: string) => `/master/produk/${id}/edit${kembaliKe ? `?${kembaliKe}` : ""}`;
@@ -259,8 +297,6 @@ export function TabMain({
     const reset = (setter: (v: string) => void, key: string) => () => {
       setter("");
       updateUrlParam(key, "");
-      setCurrentPage(1);
-      updateUrlParam("page", "");
     };
     if (search.trim()) daftar.push({ key: "q", label: "Pencarian", nilai: `"${search.trim()}"`, hapus: reset(setSearch, "q") });
     if (kategoriFilter)
@@ -284,8 +320,7 @@ export function TabMain({
     setSearch("");
     setKategoriFilter("");
     setStatusFilter("");
-    setCurrentPage(1);
-    for (const key of ["q", "kategori", "status", "page"]) updateUrlParam(key, "");
+    for (const key of ["q", "kategori", "status"]) updateUrlParam(key, "");
   }
 
   const filterLaporan: FilterLaporanProduk = useMemo(
@@ -370,6 +405,327 @@ export function TabMain({
       skin: "bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-100 dark:border-violet-900/30",
     },
   ];
+
+  /// Satu baris produk + baris rincian (kalau dibuka) — dipakai berulang di
+  /// tiap kelompok kategori maupun kelompok Nonaktif, supaya markup-nya tidak
+  /// disalin tiga kali.
+  function renderBarisProduk(p: Product) {
+    const isExpanded = expandedRows.has(p.id);
+    const r = ringkas.get(p.id);
+    return (
+      <React.Fragment key={p.id}>
+        <tr className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors">
+          <td className="py-3 px-3 text-center">
+            <button
+              type="button"
+              onClick={() => toggleExpandRow(p.id)}
+              className="w-7 h-7 rounded-full bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border border-brand-200/80 dark:border-brand-800/40 flex items-center justify-center hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors cursor-pointer"
+              title={isExpanded ? "Tutup Rincian" : "Buka Rincian"}
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+            </button>
+          </td>
+
+          {tampil("photo") && (
+            <td className="py-3 px-3">
+              {/* Kotak 1:1 tetap digambar walau fotonya belum ada — kalau
+                  petaknya ikut hilang, tinggi baris jadi tidak seragam dan
+                  tabelnya terbaca bergoyang saat digulir. */}
+              <div className="relative w-20 aspect-square mx-auto rounded-lg overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center">
+                {p.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imageUrl} alt={`Foto ${p.name}`} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageOff className="w-6 h-6 text-slate-300 dark:text-fg-muted" />
+                )}
+              </div>
+            </td>
+          )}
+
+          {tampil("code") && (
+            <td className="py-3 px-3 font-mono font-bold">
+              <Link
+                href={linkEdit(p.id)}
+                className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                title="Ubah produk ini"
+              >
+                {p.sku}
+              </Link>
+            </td>
+          )}
+
+          {tampil("name") && (
+            <td className="py-3 px-3">
+              <Link
+                href={linkEdit(p.id)}
+                className="font-bold text-slate-800 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 hover:underline"
+                title="Ubah produk ini"
+              >
+                {p.name}
+              </Link>
+            </td>
+          )}
+
+          {tampil("kategori") && (
+            <td className="py-3 px-3 text-slate-600 dark:text-fg-muted">{p.category ?? "—"}</td>
+          )}
+
+          {tampil("hargaJual") && (
+            <td className="py-3 px-3 text-right font-semibold tabular-nums text-slate-800 dark:text-fg">
+              {formatRupiah(p.sellPrice)}
+            </td>
+          )}
+
+          {tampil("totalStok") && (
+            <td className="py-3 px-3 text-right">
+              <button
+                type="button"
+                onClick={() => toggleExpandRow(p.id)}
+                className="font-extrabold text-slate-900 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 cursor-pointer transition-colors tabular-nums"
+                title="Lihat rincian per lokasi"
+              >
+                {angka(stokTotal(p.id))}
+              </button>
+            </td>
+          )}
+
+          {tampil("status") && <td className="py-3 px-3 text-center">{renderStatusBadge(p.active)}</td>}
+
+          {tampil("action") && (
+            <td className="py-3 px-3 text-center">
+              <div className="flex items-center justify-center">
+                {/* `data-action-menu` WAJIB ada di pembungkus ini — penutup-saat-
+                    klik-di-luar memeriksanya, dan tanpa itu menunya tertutup
+                    sebelum isinya sempat diklik. */}
+                <div className="relative" data-action-menu>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const buka = actionMenuRowId !== p.id;
+                      setActionMenuAnchor(buka ? e.currentTarget : null);
+                      setActionMenuRowId(buka ? p.id : null);
+                    }}
+                    className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
+                      actionMenuRowId === p.id
+                        ? "bg-brand-50 text-[var(--brand-700)] border-brand-300"
+                        : "bg-white/80 dark:bg-surface hover:bg-slate-50"
+                    }`}
+                    title="Aksi Lainnya"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {/* Di-portal ke body: pembungkus tabel ber-`overflow-x-auto`
+                      memotong menu yang menempel di dalam baris. */}
+                  <PortalMenu
+                    open={actionMenuRowId === p.id}
+                    anchor={actionMenuAnchor}
+                    width={216}
+                    onClose={() => setActionMenuRowId(null)}
+                    className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
+                  >
+                    <Link
+                      href={linkEdit(p.id)}
+                      onClick={() => setActionMenuRowId(null)}
+                      className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[var(--brand-700)]" />
+                      <span>Edit Produk</span>
+                    </Link>
+
+                    <button
+                      type="button"
+                      disabled={togglingId === p.id}
+                      onClick={() => {
+                        setActionMenuRowId(null);
+                        toggleAktif(p);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
+                        p.active
+                          ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                          : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
+                      }`}
+                    >
+                      <Power className="w-3.5 h-3.5" />
+                      <span>{p.active ? "Nonaktifkan" : "Aktifkan"}</span>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-100 dark:border-line" />
+
+                    {/* Soft delete — lihat AGENTS.md "Aturan Soft Delete & Log
+                        Aktivitas". Backend menolak kalau produk sudah pernah
+                        dipakai transaksi apa pun; pesannya ditampilkan apa
+                        adanya lewat toast, bukan ditebak di sini. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionMenuRowId(null);
+                        setHapusTarget(p);
+                      }}
+                      className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors text-left cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Produk</span>
+                    </button>
+                  </PortalMenu>
+                </div>
+              </div>
+            </td>
+          )}
+        </tr>
+
+        {isExpanded && (
+          <tr className="bg-slate-50/60 dark:bg-surface-hover/30">
+            <td colSpan={jumlahKolomTampil} className="p-3 sm:p-4">
+              <div className="rounded-xl border border-slate-200/70 dark:border-line bg-white dark:bg-surface ml-4 sm:ml-8">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-brand-50/70 dark:bg-surface-hover text-[11px] font-bold text-slate-500 dark:text-fg-muted uppercase">
+                      <tr>
+                        <th className="text-center px-3.5 py-2 w-10">No.</th>
+                        <th className="text-left px-3.5 py-2">Lokasi</th>
+                        <th className="text-right px-3.5 py-2">Saldo Awal</th>
+                        <th className="text-right px-3.5 py-2">Masuk</th>
+                        <th className="text-right px-3.5 py-2">Keluar</th>
+                        <th className="text-right px-3.5 py-2">Akhir</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100 dark:divide-line">
+                      {(r?.lokasi ?? []).map((l, i) => (
+                        <tr
+                          key={`${l.tipe}-${l.lokasiId}`}
+                          className="hover:bg-brand-50/30 dark:hover:bg-surface-hover/40 transition-colors"
+                        >
+                          <td className="px-3.5 py-2 text-center text-slate-500 dark:text-fg-muted">{i + 1}</td>
+                          <td className="px-3.5 py-2 font-bold text-slate-700 dark:text-fg-secondary">
+                            {l.tipe === "WAREHOUSE" ? l.nama : `Booth ${l.nama}`}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums text-slate-600 dark:text-fg-muted">
+                            {angka(l.saldoAwal)}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums font-semibold text-brand-600 dark:text-brand-400">
+                            {l.masuk ? `+${angka(l.masuk)}` : "—"}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums font-semibold text-rose-600 dark:text-rose-400">
+                            {l.keluar ? `−${angka(l.keluar)}` : "—"}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums font-bold text-slate-900 dark:text-fg">
+                            {angka(l.saldoAkhir)}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {!r && (
+                        <tr>
+                          <td colSpan={6} className="px-3.5 py-6 text-center text-slate-400 dark:text-fg-muted">
+                            Data stok belum termuat.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+
+                    {r && (
+                      <tfoot className="bg-slate-50/80 dark:bg-surface-hover border-t-2 border-slate-200 dark:border-line text-[11px] font-bold text-slate-700 dark:text-fg-secondary">
+                        <tr>
+                          <td className="px-3.5 py-2" colSpan={2}>
+                            Total (cup)
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums">{angka(r.total.saldoAwal)}</td>
+                          <td className="px-3.5 py-2 text-right tabular-nums text-brand-700 dark:text-brand-400">
+                            +{angka(r.total.masuk)}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums text-rose-700 dark:text-rose-400">
+                            −{angka(r.total.keluar)}
+                          </td>
+                          <td className="px-3.5 py-2 text-right tabular-nums font-black text-slate-900 dark:text-fg">
+                            {angka(r.total.saldoAkhir)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+
+                <p className="px-3.5 py-2 text-[10px] text-slate-400 dark:text-fg-muted">
+                  Masuk &amp; Keluar periode {String(periode.bulan).padStart(2, "0")}/{periode.tahun} · Saldo Akhir
+                  = stok yang ada sekarang
+                  {r?.total.perluVerifikasi ? " · sebagian arah mutasi lama perlu diverifikasi" : ""}
+                </p>
+              </div>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    );
+  }
+
+  /// Header kelompok + barisnya, dipotong sampai `batasPerKelompok` kecuali
+  /// kelompok itu sudah "Lihat semua". Dipakai untuk tiap kategori maupun
+  /// kelompok Nonaktif — satu fungsi, bukan disalin dua kali.
+  function renderKelompok(nama: string, rows: Product[], warnaHeader: string, keterangan?: string) {
+    const diperluas = batasPerKelompok === null || kelompokDiperluas.has(nama);
+    const rowsTampil = diperluas ? rows : rows.slice(0, batasPerKelompok ?? rows.length);
+    const sisa = rows.length - rowsTampil.length;
+
+    return (
+      <React.Fragment key={nama}>
+        <tr className={warnaHeader}>
+          <td colSpan={jumlahKolomTampil} className="py-2 px-3">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-fg-muted">
+              {nama}
+            </span>
+            <span className="ml-2 text-[11px] font-normal text-slate-400 dark:text-fg-muted">
+              · {rows.length} produk{keterangan ? `, ${keterangan}` : ""}
+            </span>
+          </td>
+        </tr>
+        {rowsTampil.map((p) => renderBarisProduk(p))}
+        {sisa > 0 && (
+          <tr>
+            <td colSpan={jumlahKolomTampil} className="py-2 px-3 text-center bg-white dark:bg-surface">
+              <button
+                type="button"
+                onClick={() => toggleKelompokDiperluas(nama)}
+                className="text-[11px] font-bold text-[var(--brand-700)] dark:text-brand-400 hover:underline cursor-pointer"
+              >
+                Lihat {sisa} produk lainnya di {nama}
+              </button>
+            </td>
+          </tr>
+        )}
+        {diperluas && batasPerKelompok !== null && rows.length > batasPerKelompok && (
+          <tr>
+            <td colSpan={jumlahKolomTampil} className="py-2 px-3 text-center bg-white dark:bg-surface">
+              <button
+                type="button"
+                onClick={() => toggleKelompokDiperluas(nama)}
+                className="text-[11px] font-bold text-slate-500 dark:text-fg-muted hover:underline cursor-pointer"
+              >
+                Ciutkan {nama}
+              </button>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    );
+  }
+
+  async function hapusProduk() {
+    if (!hapusTarget) return;
+    setMenghapus(true);
+    try {
+      await api.deleteProduct(hapusTarget.id);
+      toast.success(`Produk "${hapusTarget.name}" dihapus.`);
+      setHapusTarget(null);
+      await onReload();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal menghapus produk.");
+    } finally {
+      setMenghapus(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -461,8 +817,6 @@ export function TabMain({
               onChange={(e) => {
                 setSearch(e.target.value);
                 updateUrlParam("q", e.target.value);
-                setCurrentPage(1);
-                updateUrlParam("page", "");
               }}
               className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
             />
@@ -500,8 +854,6 @@ export function TabMain({
                       onClick={() => {
                         setKategoriFilter(c.id);
                         updateUrlParam("kategori", c.id);
-                        setCurrentPage(1);
-                        updateUrlParam("page", "");
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold rounded-lg text-left cursor-pointer transition-colors ${
                         kategoriFilter === c.id
@@ -523,8 +875,6 @@ export function TabMain({
                       onClick={() => {
                         setStatusFilter(opt.value);
                         updateUrlParam("status", opt.value);
-                        setCurrentPage(1);
-                        updateUrlParam("page", "");
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold rounded-lg text-left cursor-pointer transition-colors ${
                         statusFilter === opt.value
@@ -538,6 +888,32 @@ export function TabMain({
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-fg-muted hidden sm:inline">
+                Tampilkan
+              </span>
+              <div className="relative">
+                <select
+                  value={batasPerKelompok ?? "semua"}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setBatasPerKelompok(v === "semua" ? null : Number(v));
+                    setKelompokDiperluas(new Set());
+                  }}
+                  title="Jumlah baris yang tampil per kategori sebelum diringkas jadi 'Lihat semua'"
+                  className="h-9 pl-2.5 pr-7 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none appearance-none shadow-2xs"
+                >
+                  {[5, 10, 25, 50].map((n) => (
+                    <option key={n} value={n}>
+                      {n} / kategori
+                    </option>
+                  ))}
+                  <option value="semua">Semua</option>
+                </select>
+                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+              </div>
             </div>
 
             <ColumnVisibilityMenu columns={KOLOM_TERSEDIA} isVisible={tampil} onToggle={toggleColumn} />
@@ -626,329 +1002,55 @@ export function TabMain({
             </thead>
 
             <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
-              {paginatedRows.length > 0 ? (
-                paginatedRows.map((p) => {
-                  const isExpanded = expandedRows.has(p.id);
-                  const r = ringkas.get(p.id);
-                  return (
-                    <React.Fragment key={p.id}>
-                      <tr className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors">
-                        <td className="py-3 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleExpandRow(p.id)}
-                            className="w-7 h-7 rounded-full bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border border-brand-200/80 dark:border-brand-800/40 flex items-center justify-center hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors cursor-pointer"
-                            title={isExpanded ? "Tutup Rincian" : "Buka Rincian"}
-                          >
-                            <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
-                          </button>
-                        </td>
-
-                        {tampil("photo") && (
-                          <td className="py-3 px-3">
-                            {/* Kotak 1:1 tetap digambar walau fotonya belum ada — kalau
-                                petaknya ikut hilang, tinggi baris jadi tidak seragam dan
-                                tabelnya terbaca bergoyang saat digulir. */}
-                            <div className="relative w-20 aspect-square mx-auto rounded-lg overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center">
-                              {p.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={p.imageUrl} alt={`Foto ${p.name}`} className="w-full h-full object-cover" />
-                              ) : (
-                                <ImageOff className="w-6 h-6 text-slate-300 dark:text-fg-muted" />
-                              )}
-                            </div>
-                          </td>
-                        )}
-
-                        {tampil("code") && (
-                          <td className="py-3 px-3 font-mono font-bold">
-                            <Link
-                              href={linkEdit(p.id)}
-                              className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
-                              title="Ubah produk ini"
-                            >
-                              {p.sku}
-                            </Link>
-                          </td>
-                        )}
-
-                        {tampil("name") && (
-                          <td className="py-3 px-3">
-                            <Link
-                              href={linkEdit(p.id)}
-                              className="font-bold text-slate-800 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 hover:underline"
-                              title="Ubah produk ini"
-                            >
-                              {p.name}
-                            </Link>
-                          </td>
-                        )}
-
-                        {tampil("kategori") && (
-                          <td className="py-3 px-3 text-slate-600 dark:text-fg-muted">{p.category ?? "—"}</td>
-                        )}
-
-                        {tampil("hargaJual") && (
-                          <td className="py-3 px-3 text-right font-semibold tabular-nums text-slate-800 dark:text-fg">
-                            {formatRupiah(p.sellPrice)}
-                          </td>
-                        )}
-
-                        {tampil("totalStok") && (
-                          <td className="py-3 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => toggleExpandRow(p.id)}
-                              className="font-extrabold text-slate-900 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 cursor-pointer transition-colors tabular-nums"
-                              title="Lihat rincian per lokasi"
-                            >
-                              {angka(stokTotal(p.id))}
-                            </button>
-                          </td>
-                        )}
-
-                        {tampil("status") && <td className="py-3 px-3 text-center">{renderStatusBadge(p.active)}</td>}
-
-                        {tampil("action") && (
-                          <td className="py-3 px-3 text-center">
-                            <div className="flex items-center justify-center">
-                              {/* `data-action-menu` WAJIB ada di pembungkus ini — penutup-saat-
-                                  klik-di-luar memeriksanya, dan tanpa itu menunya tertutup
-                                  sebelum isinya sempat diklik. */}
-                              <div className="relative" data-action-menu>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const buka = actionMenuRowId !== p.id;
-                                    setActionMenuAnchor(buka ? e.currentTarget : null);
-                                    setActionMenuRowId(buka ? p.id : null);
-                                  }}
-                                  className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
-                                    actionMenuRowId === p.id
-                                      ? "bg-brand-50 text-[var(--brand-700)] border-brand-300"
-                                      : "bg-white/80 dark:bg-surface hover:bg-slate-50"
-                                  }`}
-                                  title="Aksi Lainnya"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
-
-                                {/* Di-portal ke body: pembungkus tabel ber-`overflow-x-auto`
-                                    memotong menu yang menempel di dalam baris. */}
-                                <PortalMenu
-                                  open={actionMenuRowId === p.id}
-                                  anchor={actionMenuAnchor}
-                                  width={216}
-                                  onClose={() => setActionMenuRowId(null)}
-                                  className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
-                                >
-                                  <Link
-                                    href={linkEdit(p.id)}
-                                    onClick={() => setActionMenuRowId(null)}
-                                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
-                                  >
-                                    <Pencil className="w-3.5 h-3.5 text-[var(--brand-700)]" />
-                                    <span>Edit Produk</span>
-                                  </Link>
-
-                                  <div className="my-1 border-t border-slate-100 dark:border-line" />
-
-                                  {/* Menggantikan "Hapus Produk" di jsBerkah: produk Obbel tidak
-                                      pernah dihapus karena SaleItem lama menunjuk ke sini, dan
-                                      backend memang tidak menyediakan endpoint hapus. */}
-                                  <button
-                                    type="button"
-                                    disabled={togglingId === p.id}
-                                    onClick={() => {
-                                      setActionMenuRowId(null);
-                                      toggleAktif(p);
-                                    }}
-                                    className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
-                                      p.active
-                                        ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                                        : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
-                                    }`}
-                                  >
-                                    <Power className="w-3.5 h-3.5" />
-                                    <span>{p.active ? "Nonaktifkan" : "Aktifkan"}</span>
-                                  </button>
-                                </PortalMenu>
-                              </div>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-
-                      {isExpanded && (
-                        <tr className="bg-slate-50/60 dark:bg-surface-hover/30">
-                          <td colSpan={jumlahKolomTampil} className="p-3 sm:p-4">
-                            <div className="rounded-xl border border-slate-200/70 dark:border-line bg-white dark:bg-surface ml-4 sm:ml-8">
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
-                                  <thead className="bg-brand-50/70 dark:bg-surface-hover text-[11px] font-bold text-slate-500 dark:text-fg-muted uppercase">
-                                    <tr>
-                                      <th className="text-center px-3.5 py-2 w-10">No.</th>
-                                      <th className="text-left px-3.5 py-2">Lokasi</th>
-                                      <th className="text-right px-3.5 py-2">Saldo Awal</th>
-                                      <th className="text-right px-3.5 py-2">Masuk</th>
-                                      <th className="text-right px-3.5 py-2">Keluar</th>
-                                      <th className="text-right px-3.5 py-2">Akhir</th>
-                                    </tr>
-                                  </thead>
-
-                                  <tbody className="divide-y divide-slate-100 dark:divide-line">
-                                    {(r?.lokasi ?? []).map((l, i) => (
-                                      <tr
-                                        key={`${l.tipe}-${l.lokasiId}`}
-                                        className="hover:bg-brand-50/30 dark:hover:bg-surface-hover/40 transition-colors"
-                                      >
-                                        <td className="px-3.5 py-2 text-center text-slate-500 dark:text-fg-muted">{i + 1}</td>
-                                        <td className="px-3.5 py-2 font-bold text-slate-700 dark:text-fg-secondary">
-                                          {l.tipe === "WAREHOUSE" ? l.nama : `Booth ${l.nama}`}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums text-slate-600 dark:text-fg-muted">
-                                          {angka(l.saldoAwal)}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums font-semibold text-brand-600 dark:text-brand-400">
-                                          {l.masuk ? `+${angka(l.masuk)}` : "—"}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums font-semibold text-rose-600 dark:text-rose-400">
-                                          {l.keluar ? `−${angka(l.keluar)}` : "—"}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums font-bold text-slate-900 dark:text-fg">
-                                          {angka(l.saldoAkhir)}
-                                        </td>
-                                      </tr>
-                                    ))}
-
-                                    {!r && (
-                                      <tr>
-                                        <td colSpan={6} className="px-3.5 py-6 text-center text-slate-400 dark:text-fg-muted">
-                                          Data stok belum termuat.
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-
-                                  {r && (
-                                    <tfoot className="bg-slate-50/80 dark:bg-surface-hover border-t-2 border-slate-200 dark:border-line text-[11px] font-bold text-slate-700 dark:text-fg-secondary">
-                                      <tr>
-                                        <td className="px-3.5 py-2" colSpan={2}>
-                                          Total (cup)
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums">{angka(r.total.saldoAwal)}</td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums text-brand-700 dark:text-brand-400">
-                                          +{angka(r.total.masuk)}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums text-rose-700 dark:text-rose-400">
-                                          −{angka(r.total.keluar)}
-                                        </td>
-                                        <td className="px-3.5 py-2 text-right tabular-nums font-black text-slate-900 dark:text-fg">
-                                          {angka(r.total.saldoAkhir)}
-                                        </td>
-                                      </tr>
-                                    </tfoot>
-                                  )}
-                                </table>
-                              </div>
-
-                              <p className="px-3.5 py-2 text-[10px] text-slate-400 dark:text-fg-muted">
-                                Masuk &amp; Keluar periode {String(periode.bulan).padStart(2, "0")}/{periode.tahun} · Saldo Akhir
-                                = stok yang ada sekarang
-                                {r?.total.perluVerifikasi ? " · sebagian arah mutasi lama perlu diverifikasi" : ""}
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              ) : (
+              {totalItems === 0 ? (
                 <tr>
                   <td colSpan={jumlahKolomTampil} className="text-center py-10 text-slate-500 dark:text-fg-muted">
                     {products.length === 0 ? "Belum ada Produk." : "Tidak ada produk yang cocok dengan filter."}
                   </td>
                 </tr>
+              ) : (
+                <>
+                  {kelompokKategori.map((grup) =>
+                    renderKelompok(grup.nama, grup.rows, "bg-slate-50 dark:bg-surface-hover/60"),
+                  )}
+
+                  {kelompokNonaktif.length > 0 &&
+                    renderKelompok(
+                      "Nonaktif",
+                      kelompokNonaktif,
+                      "bg-slate-100 dark:bg-surface-hover",
+                      "disembunyikan dari transaksi",
+                    )}
+                </>
               )}
             </tbody>
           </table>
         </div>
+      </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-100 dark:border-line text-xs font-semibold text-slate-600 dark:text-fg-muted">
-          <div className="flex items-center gap-2">
-            <span>Tampilkan</span>
-            <div className="relative">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                  updateUrlParam("page", "");
-                }}
-                className="h-8 pl-2.5 pr-7 rounded-lg bg-white dark:bg-surface border border-slate-200/90 dark:border-line text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none appearance-none font-bold"
-              >
-                {[5, 10, 25, 50].map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-            </div>
-            <span>dari {totalItems} data</span>
-          </div>
-
-          <div className="flex items-center gap-1 self-end sm:self-auto">
-            <button
-              type="button"
-              disabled={halamanAktif <= 1}
-              onClick={() => {
-                const next = Math.max(1, halamanAktif - 1);
-                setCurrentPage(next);
-                updateUrlParam("page", next === 1 ? "" : String(next));
-              }}
-              className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:bg-slate-50 dark:hover:bg-surface-hover disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-              title="Halaman Sebelumnya"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {nomorHalaman.map((pg) => (
-              <button
-                key={pg}
-                type="button"
-                onClick={() => {
-                  setCurrentPage(pg);
-                  updateUrlParam("page", pg === 1 ? "" : String(pg));
-                }}
-                className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                  halamanAktif === pg
-                    ? "bg-[var(--brand-700)] text-white shadow-xs"
-                    : "border border-slate-200/90 dark:border-line text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover"
-                }`}
-              >
-                {pg}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              disabled={halamanAktif >= totalPages}
-              onClick={() => {
-                const next = Math.min(totalPages, halamanAktif + 1);
-                setCurrentPage(next);
-                updateUrlParam("page", next === 1 ? "" : String(next));
-              }}
-              className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:bg-slate-50 dark:hover:bg-surface-hover disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-              title="Halaman Berikutnya"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+      <Modal
+        isOpen={!!hapusTarget}
+        onClose={() => setHapusTarget(null)}
+        title="Hapus Produk"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-fg-muted">
+            Hapus produk <strong className="text-slate-800 dark:text-fg">{hapusTarget?.name}</strong> (
+            <span className="font-mono">{hapusTarget?.sku}</span>)? Hanya berhasil kalau produk ini belum pernah
+            dipakai transaksi apa pun (penjualan, distribusi, restock, return, opname) dan tidak ada sisa stok.
+            Kalau sudah pernah dipakai, gunakan Nonaktifkan.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setHapusTarget(null)}>
+              Batal
+            </Button>
+            <Button variant="danger" size="sm" isLoading={menghapus} onClick={hapusProduk}>
+              Hapus
+            </Button>
           </div>
         </div>
-      </div>
+      </Modal>
 
       <ProdukReportPreviewModal
         isOpen={showReportPreview}
