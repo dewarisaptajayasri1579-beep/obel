@@ -17,6 +17,11 @@ import { DomainExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Without this, Nest never listens for SIGTERM, so onModuleDestroy
+  // (PrismaService's $disconnect) never runs on redeploy/restart — the old
+  // process gets SIGKILL'd with its DB connections still open, leaking them
+  // until Postgres reaps them itself.
+  app.enableShutdownHooks();
   // Coolify's Traefik proxy terminates TLS and forwards over plain HTTP,
   // so without this req.protocol always reads "http" behind the proxy.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
