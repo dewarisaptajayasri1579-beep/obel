@@ -17,7 +17,7 @@ export class ShiftsController {
 
   @Get('active')
   getActive(@CurrentUser() user: JwtPayload) {
-    return this.shiftsService.getMyActiveShift(user.sub);
+    return this.shiftsService.getMyActiveShift(user);
   }
 
   @Post('check-in')

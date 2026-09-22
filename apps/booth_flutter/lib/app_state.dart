@@ -127,6 +127,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadShiftAndCatalog() async {
     final shift = await _api.getActiveShift(_token!);
+    final newToken = shift['accessToken'] as String?;
+    if (newToken != null) _token = newToken;
     _applyActiveShift(shift);
 
     await refreshCatalog();

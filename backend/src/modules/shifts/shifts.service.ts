@@ -35,10 +35,10 @@ export class ShiftsService {
 
   /// Mirrors get_my_active_shift() from
   /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md.
-  async getMyActiveShift(staffId: string) {
+  async getMyActiveShift(user: JwtPayload) {
     const shift = await this.prisma.shiftSession.findFirst({
       where: {
-        staffId,
+        staffId: user.sub,
         status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] },
       },
       include: { booth: true, shiftTemplate: true },
@@ -49,7 +49,11 @@ export class ShiftsService {
       throw new NotFoundException('Belum ada shift aktif untuk user ini.');
     }
 
-    return this.toActiveShiftResponse(shift);
+    // Token yang sedang dipakai bisa saja masih dari login SEBELUM Check-In
+    // (boothId null, lihat `checkIn()` di atas) — reissue supaya endpoint
+    // booth-scoped lain langsung jalan tanpa staff harus login ulang.
+    const accessToken = user.boothId !== shift.boothId ? await this.reissueToken(user, shift.boothId) : undefined;
+    return this.toActiveShiftResponse(shift, accessToken);
   }
 
   /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
