@@ -55,16 +55,26 @@ class ApiClient {
     return result as Map<String, dynamic>;
   }
 
-  /// Self-service buka shift — booth & shift template di-resolve server-side.
-  Future<Map<String, dynamic>> checkIn(
-    String token, {
-    required String idempotencyKey,
-  }) {
+  /// Absen Berangkat. `boothId` opsional — kosong berarti server pakai Booth
+  /// default dari BoothShiftAssignment staff ybs.
+  Future<Map<String, dynamic>> checkIn(String token, {String? boothId}) {
     return _post(
       '/shifts/check-in',
       token: token,
-      body: {'idempotencyKey': idempotencyKey},
+      body: {'boothId': ?boothId},
     );
+  }
+
+  /// Preview Booth/Shift yang bakal otomatis terpilih di layar Check-In.
+  /// Null berarti staff belum ditugaskan ke Booth manapun.
+  Future<Map<String, dynamic>?> getMyAssignment(String token) async {
+    final result = await _get('/booth-shift-assignments/mine', token: token);
+    return result as Map<String, dynamic>?;
+  }
+
+  Future<List<dynamic>> getBooths(String token) async {
+    final result = await _get('/booths', token: token);
+    return result as List<dynamic>;
   }
 
   Future<List<dynamic>> getSales(String token) async {

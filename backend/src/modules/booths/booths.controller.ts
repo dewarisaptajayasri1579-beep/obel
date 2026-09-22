@@ -13,7 +13,7 @@ export class BoothsController {
   constructor(private readonly boothsService: BoothsService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll() {
     return this.boothsService.findAll();
   }

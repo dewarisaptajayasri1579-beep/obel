@@ -17,13 +17,6 @@ export function startOfDayJakarta(date: Date): Date {
   return new Date(startOfDayWallClock - JAKARTA_OFFSET_MS);
 }
 
-/// Menit sejak tengah malam Asia/Jakarta (0-1439) — dipakai untuk mencocokkan
-/// jam sekarang ke jendela ShiftTemplate.startTime/endTime ("08:00" dst).
-export function minutesSinceMidnightJakarta(date: Date): number {
-  const jakartaTime = new Date(date.getTime() + JAKARTA_OFFSET_MS);
-  return jakartaTime.getUTCHours() * 60 + jakartaTime.getUTCMinutes();
-}
-
 /// Gabungkan tanggal bisnis Asia/Jakarta (dari startOfDayJakarta) dengan jam
 /// "HH:mm" jadi satu instant UTC, mis. untuk ShiftSession.scheduledStartAt.
 export function combineJakartaDateAndTime(businessDate: Date, hhmm: string): Date {

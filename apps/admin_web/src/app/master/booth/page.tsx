@@ -10,6 +10,7 @@ import { BoothTabs } from "./BoothTabs";
 import { TabMain } from "./TabMain";
 import { TabMutasiBooth } from "./TabMutasiBooth";
 import { TabRiwayatPenjualan } from "./TabRiwayatPenjualan";
+import { TabSettingPetugas } from "./TabSettingPetugas";
 
 /// Halaman Booth (Data Operasional). Empat tab — lihat BoothTabs.tsx untuk
 /// alasan pola tab-nya. `products` ikut dimuat di sini (bukan di dalam
@@ -71,6 +72,7 @@ function BoothContent() {
             />
           ),
           "riwayat-penjualan": <TabRiwayatPenjualan booths={booths} />,
+          "setting-petugas": <TabSettingPetugas booths={booths} />,
         }}
       />
     </div>

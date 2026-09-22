@@ -1,17 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Prisma, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { combineJakartaDateAndTime, startOfDayJakarta } from '../../common/jakarta-date';
+import { combineJakartaDateAndTime, startOfTodayJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CheckInDto } from './dto/check-in.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
-import { resolveActiveShiftTemplate } from './shift-template-matcher';
 
 const UNIQUE_VIOLATION = 'P2002';
 
@@ -24,14 +24,15 @@ export class ShiftsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
+    private readonly jwtService: JwtService,
   ) {}
 
   /// Mirrors get_my_active_shift() from
   /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md.
-  async getMyActiveShift(staffId: string) {
+  async getMyActiveShift(user: JwtPayload) {
     const shift = await this.prisma.shiftSession.findFirst({
       where: {
-        staffId,
+        staffId: user.sub,
         status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] },
       },
       include: { booth: true, shiftTemplate: true },
@@ -39,85 +40,119 @@ export class ShiftsService {
     });
 
     if (!shift) {
-      throw new DomainError('NO_ACTIVE_SHIFT', 'Belum ada shift aktif untuk user ini.', undefined, 404);
+      throw new NotFoundException('Belum ada shift aktif untuk user ini.');
     }
 
-    return this.toActiveShiftResponse(shift);
+    // Token yang sedang dipakai bisa saja masih dari login SEBELUM Check-In
+    // (boothId null, lihat `checkIn()` di atas) — reissue supaya endpoint
+    // booth-scoped lain langsung jalan tanpa staff harus login ulang.
+    const accessToken = user.boothId !== shift.boothId ? await this.reissueToken(user, shift.boothId) : undefined;
+    return this.toActiveShiftResponse(shift, accessToken);
   }
 
-  /// Self-service "check-in" — satu-satunya jalan membuat ShiftSession baru
-  /// selain seed script. Booth & ShiftTemplate di-resolve server-side (Booth
-  /// Staff tidak boleh mengirim boothId/staffId sendiri, dan lagipula tidak
-  /// punya akses baca ke /shift-templates atau /booth-shift-assignments).
-  async checkIn(staffId: string, dto: CheckInDto) {
-    const existing = await this.prisma.shiftSession.findUnique({
-      where: { idempotencyKey: dto.idempotencyKey },
+  /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
+  /// duluan, jadi langsung create berstatus OPEN). Booth default diambil dari
+  /// BoothShiftAssignment staff ybs (roster tetap Booth+Shift per staff),
+  /// `dto.boothId` boleh override manual. Idempotent terhadap double-tap:
+  /// kalau staff SUDAH aktif di Booth yang sama, kembalikan session yang
+  /// sudah ada apa adanya alih-alih membuat baris baru. Guard ini sudah
+  /// dijamin race-safe di level DB juga lewat partial unique index
+  /// (shift_sessions_one_active_per_staff, migration
+  /// 20260922165212_shift_session_checkin) — kalau dua request check-in
+  /// beneran race lolos dari cek `existing` di atas, insert-nya sendiri yang
+  /// bakal gagal kena constraint itu, ditangkap di bawah.
+  async checkIn(user: JwtPayload, dto: CheckInDto) {
+    const existing = await this.prisma.shiftSession.findFirst({
+      where: { staffId: user.sub, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
       include: { booth: true, shiftTemplate: true },
     });
     if (existing) {
-      return this.toActiveShiftResponse(existing);
+      if (dto.boothId && dto.boothId !== existing.boothId) {
+        throw new DomainError(
+          'ALREADY_CHECKED_IN_ELSEWHERE',
+          `Anda masih aktif di Booth "${existing.booth.name}". Checkout dulu sebelum check-in ke Booth lain.`,
+        );
+      }
+      return this.toActiveShiftResponse(existing, await this.reissueToken(user, existing.boothId));
     }
 
-    const active = await this.prisma.shiftSession.findFirst({
-      where: { staffId, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+    const assignment = await this.prisma.boothShiftAssignment.findUnique({
+      where: { staffId: user.sub },
+      include: { shiftTemplate: true },
     });
-    if (active) {
-      throw new DomainError('SHIFT_ALREADY_ACTIVE', 'Anda sudah memiliki shift aktif.', { shiftSessionId: active.id }, 409);
+    if (!assignment) {
+      throw new DomainError(
+        'NO_BOOTH_ASSIGNMENT',
+        'Anda belum ditugaskan ke Booth manapun. Hubungi Admin untuk mengatur penugasan Booth/Shift.',
+      );
     }
 
-    const now = new Date();
-    const templates = await this.prisma.shiftTemplate.findMany({ where: { active: true } });
-    const template = resolveActiveShiftTemplate(now, templates);
-    if (!template) {
-      throw new DomainError('NO_SHIFT_TEMPLATE_ACTIVE_NOW', 'Belum ada jadwal shift untuk jam ini.', undefined, 409);
+    const boothId = dto.boothId ?? assignment.boothId;
+    const booth = await this.prisma.booth.findUnique({ where: { id: boothId } });
+    if (!booth || booth.status !== 'ACTIVE') {
+      throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
     }
 
-    const assignment = await this.prisma.boothShiftAssignment.findFirst({
-      where: { staffId, shiftTemplateId: template.id },
-    });
-    const staff = await this.prisma.profile.findUnique({ where: { id: staffId } });
-    const boothId = assignment?.boothId ?? staff?.defaultBoothId ?? null;
-    if (!boothId) {
-      throw new DomainError('NO_BOOTH_ASSIGNED', 'Anda belum ditugaskan ke booth manapun. Hubungi Admin.', undefined, 409);
-    }
+    const businessDate = startOfTodayJakarta();
+    const openedAt = new Date();
+    const scheduledStartAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.startTime);
+    const scheduledEndAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.endTime);
 
-    const businessDate = startOfDayJakarta(now);
-    const scheduledStartAt = combineJakartaDateAndTime(businessDate, template.startTime);
-    const scheduledEndAt = combineJakartaDateAndTime(businessDate, template.endTime);
-
+    let created;
     try {
-      const created = await this.prisma.shiftSession.create({
+      created = await this.prisma.shiftSession.create({
         data: {
           businessDate,
           boothId,
-          shiftTemplateId: template.id,
-          staffId,
+          shiftTemplateId: assignment.shiftTemplateId,
+          staffId: user.sub,
           status: ShiftStatus.OPEN,
           scheduledStartAt,
           scheduledEndAt,
-          openedAt: now,
-          idempotencyKey: dto.idempotencyKey,
+          openedAt,
         },
         include: { booth: true, shiftTemplate: true },
       });
-      return this.toActiveShiftResponse(created);
     } catch (err) {
       const raced = err instanceof Prisma.PrismaClientKnownRequestError && err.code === UNIQUE_VIOLATION;
-      if (raced) {
-        throw new DomainError('SHIFT_ALREADY_ACTIVE', 'Anda sudah memiliki shift aktif.', undefined, 409);
-      }
-      throw err;
+      if (!raced) throw err;
+      const winner = await this.prisma.shiftSession.findFirstOrThrow({
+        where: { staffId: user.sub, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+        include: { booth: true, shiftTemplate: true },
+      });
+      return this.toActiveShiftResponse(winner, await this.reissueToken(user, winner.boothId));
     }
+
+    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
   }
 
-  private toActiveShiftResponse(shift: {
-    id: string;
-    status: ShiftStatus;
-    scheduledStartAt: Date;
-    scheduledEndAt: Date;
-    booth: { id: string; code: string; name: string };
-    shiftTemplate: { name: string };
-  }) {
+  /// JWT `boothId` dipakai banyak endpoint booth-scoped (catalog,
+  /// distributions/pending, restock-requests — lihat masing-masing
+  /// controller) tapi cuma diisi dari `Profile.defaultBoothId` saat login.
+  /// Staff yang boothnya ditentukan lewat BoothShiftAssignment (bukan
+  /// defaultBoothId) akan punya boothId null di token lamanya — reissue di
+  /// sini supaya endpoint-endpoint itu langsung berfungsi begitu Check-In
+  /// selesai, tanpa harus login ulang.
+  private reissueToken(user: JwtPayload, boothId: string) {
+    return this.jwtService.signAsync({
+      sub: user.sub,
+      username: user.username,
+      role: user.role,
+      boothId,
+    });
+  }
+
+  private toActiveShiftResponse(
+    shift: {
+      id: string;
+      booth: { id: string; code: string; name: string };
+      shiftTemplate: { name: string };
+      status: ShiftStatus;
+      scheduledStartAt: Date;
+      scheduledEndAt: Date;
+    },
+    accessToken?: string,
+  ) {
     return {
       shiftSessionId: shift.id,
       booth: { id: shift.booth.id, code: shift.booth.code, name: shift.booth.name },
@@ -125,6 +160,7 @@ export class ShiftsService {
       status: shift.status,
       scheduledStartAt: shift.scheduledStartAt,
       scheduledEndAt: shift.scheduledEndAt,
+      ...(accessToken ? { accessToken } : {}),
     };
   }
 
@@ -142,8 +178,6 @@ export class ShiftsService {
   /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
   /// "expected", lalu ubah shift ke CLOSING. Idempotent — kalau closing
   /// draft sudah ada, kembalikan yang itu (bukan bikin snapshot baru).
-  /// Ini + confirmClosing() di bawah adalah "check-out" — tidak ada endpoint
-  /// terpisah untuk itu, checkIn() di atas cuma menambahkan sisi bukanya.
   async startClosing(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
 

@@ -18,7 +18,6 @@ import {
   BookOpen,
   Building2,
   UserRound,
-  CalendarClock,
 } from "lucide-react";
 
 export interface NavItem {
@@ -121,12 +120,6 @@ export const MAIN_NAV: NavGroup[] = [
             label: "Petugas",
             href: "/master/petugas",
             icon: UserRound,
-            bottomBar: false,
-          },
-          {
-            label: "Setting Booth-Petugas",
-            href: "/master/booth-petugas",
-            icon: CalendarClock,
             bottomBar: false,
           },
         ],

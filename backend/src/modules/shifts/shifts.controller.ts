@@ -17,13 +17,13 @@ export class ShiftsController {
 
   @Get('active')
   getActive(@CurrentUser() user: JwtPayload) {
-    return this.shiftsService.getMyActiveShift(user.sub);
+    return this.shiftsService.getMyActiveShift(user);
   }
 
   @Post('check-in')
   @Roles(UserRole.BOOTH_STAFF)
-  checkIn(@Body() dto: CheckInDto, @CurrentUser() user: JwtPayload) {
-    return this.shiftsService.checkIn(user.sub, dto);
+  checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {
+    return this.shiftsService.checkIn(user, dto);
   }
 
   @Post(':id/closing/start')

@@ -1,7 +1,6 @@
 import {
   businessDateKeyJakarta,
   combineJakartaDateAndTime,
-  minutesSinceMidnightJakarta,
   startOfDayJakarta,
 } from './jakarta-date';
 
@@ -32,12 +31,6 @@ describe('jakarta-date', () => {
     const night = new Date('2026-03-05T16:00:00.000Z'); // 23:00 Jakarta
     expect(startOfDayJakarta(morning).toISOString()).toBe('2026-03-04T17:00:00.000Z');
     expect(startOfDayJakarta(night).toISOString()).toBe('2026-03-04T17:00:00.000Z');
-  });
-
-  it('minutesSinceMidnightJakarta converts UTC instants to Jakarta wall-clock minutes', () => {
-    expect(minutesSinceMidnightJakarta(new Date('2026-03-05T01:00:00.000Z'))).toBe(8 * 60); // 08:00 Jakarta
-    expect(minutesSinceMidnightJakarta(new Date('2026-03-05T00:30:00.000Z'))).toBe(7 * 60 + 30); // 07:30 Jakarta
-    expect(minutesSinceMidnightJakarta(new Date('2026-03-04T17:00:00.000Z'))).toBe(0); // 00:00 Jakarta
   });
 
   it('combineJakartaDateAndTime combines a Jakarta business date with an "HH:mm" time', () => {
