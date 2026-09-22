@@ -1,18 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../app_state.dart';
 import '../theme.dart';
-import '../dummy_stock_history.dart'; // TODO: hapus import ini setelah selesai
-// testing, lalu sambungkan ke data riwayat asli (lihat catatan TODO di bawah).
 
 const Color _kGreen = ObbelTheme.primaryDark;
+
+enum HistoryType { receipt, submission }
+
+enum HistoryStatus { pending, approved, rejected }
+
+class NotificationHistoryEntry {
+  final String id;
+  final HistoryType type;
+  final HistoryStatus status;
+  final DateTime time;
+  final String title;
+  final String message;
+  final int? requestedQty;
+  final String? badgeLabel;
+  final Color badgeColor;
+
+  const NotificationHistoryEntry({
+    required this.id,
+    required this.type,
+    required this.status,
+    required this.time,
+    required this.title,
+    required this.message,
+    this.requestedQty,
+    this.badgeLabel,
+    this.badgeColor = Colors.grey,
+  });
+}
 
 String _two(int v) => v.toString().padLeft(2, '0');
 
 String _timeLabel(DateTime d) => '${_two(d.hour)}:${_two(d.minute)} WIB';
 
 const _bulan = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 String _dateLabel(DateTime d) => '${d.day} ${_bulan[d.month - 1]} ${d.year}';
@@ -37,13 +75,153 @@ IconData _typeIcon(HistoryType type) {
   }
 }
 
-String _typeFilterLabel(HistoryType type) {
-  switch (type) {
-    case HistoryType.receipt:
-      return 'Penerimaan Stok';
-    case HistoryType.submission:
-      return 'Pengajuan Restock';
+DateTime _notificationDate(Map<String, dynamic> notification) {
+  final raw = notification['createdAt'];
+  if (raw is String) {
+    return DateTime.tryParse(raw)?.toLocal() ?? DateTime.now();
   }
+  return DateTime.now();
+}
+
+HistoryType? _notificationType(Map<String, dynamic> notification) {
+  final id = (notification['id'] ?? '').toString();
+  if (id.startsWith('distribution:')) return HistoryType.receipt;
+  if (id.startsWith('restock:')) return HistoryType.submission;
+  return null;
+}
+
+HistoryStatus _requestStatus(Map<String, dynamic> request) {
+  switch ((request['status'] ?? '').toString().toUpperCase()) {
+    case 'APPROVED':
+      return HistoryStatus.approved;
+    case 'REJECTED':
+      return HistoryStatus.rejected;
+    default:
+      return HistoryStatus.pending;
+  }
+}
+
+String _statusLabel(HistoryStatus status) {
+  switch (status) {
+    case HistoryStatus.approved:
+      return 'Disetujui';
+    case HistoryStatus.rejected:
+      return 'Ditolak';
+    case HistoryStatus.pending:
+      return 'Menunggu Persetujuan';
+  }
+}
+
+Color _statusColor(HistoryStatus status) {
+  switch (status) {
+    case HistoryStatus.approved:
+      return Colors.green.shade700;
+    case HistoryStatus.rejected:
+      return Colors.redAccent;
+    case HistoryStatus.pending:
+      return Colors.amber.shade800;
+  }
+}
+
+Color _notificationBadgeColor(Map<String, dynamic> notification) {
+  switch ((notification['type'] ?? '').toString()) {
+    case 'success':
+      return Colors.green.shade700;
+    case 'error':
+      return Colors.redAccent;
+    case 'warning':
+      return Colors.amber.shade800;
+    default:
+      return Colors.blueGrey;
+  }
+}
+
+String _notificationBadgeLabel(Map<String, dynamic> notification) {
+  switch ((notification['type'] ?? '').toString()) {
+    case 'success':
+      return 'Disetujui';
+    case 'error':
+      return 'Perlu Perhatian';
+    case 'warning':
+      return 'Kritis';
+    default:
+      return 'Aktif';
+  }
+}
+
+NotificationHistoryEntry _mapNotification(
+  Map<String, dynamic> notification,
+  HistoryType type,
+  List<Map<String, dynamic>> restockRequests,
+) {
+  int? requestedQty;
+  if (type == HistoryType.submission) {
+    final notificationId = (notification['id'] ?? '').toString();
+    final requestId = notificationId.startsWith('restock:')
+        ? notificationId.substring('restock:'.length)
+        : '';
+    for (final request in restockRequests) {
+      if ((request['id'] ?? '').toString() == requestId) {
+        final items = request['items'];
+        if (items is List) {
+          requestedQty = items.fold<int>(0, (total, rawItem) {
+            if (rawItem is! Map) return total;
+            final quantity = rawItem['qtyRequested'];
+            return total + (quantity is num ? quantity.toInt() : 0);
+          });
+        }
+        break;
+      }
+    }
+  }
+
+  return NotificationHistoryEntry(
+    id: (notification['id'] ?? 'notification').toString(),
+    type: type,
+    status: HistoryStatus.approved,
+    time: _notificationDate(notification),
+    title: type == HistoryType.receipt
+        ? 'Penerimaan Stok'
+        : (notification['title'] ?? 'Pengajuan Restock').toString(),
+    message: (notification['message'] ?? '').toString(),
+    requestedQty: requestedQty,
+    badgeLabel: _notificationBadgeLabel(notification),
+    badgeColor: _notificationBadgeColor(notification),
+  );
+}
+
+NotificationHistoryEntry _mapRestockRequest(Map<String, dynamic> request) {
+  final status = _requestStatus(request);
+  final items = request['items'];
+  final requestedQty = items is List
+      ? items.fold<int>(0, (total, rawItem) {
+          if (rawItem is! Map) return total;
+          final quantity = rawItem['qtyRequested'];
+          return total + (quantity is num ? quantity.toInt() : 0);
+        })
+      : null;
+  final requestNo = (request['requestNo'] ?? '').toString();
+  final reason = (request['rejectReason'] ?? '').toString();
+
+  return NotificationHistoryEntry(
+    id: (request['id'] ?? requestNo).toString(),
+    type: HistoryType.submission,
+    status: status,
+    time: _notificationDate({'createdAt': request['createdAt']}),
+    title: status == HistoryStatus.rejected
+        ? 'Pengajuan Restock Ditolak'
+        : status == HistoryStatus.approved
+        ? 'Restock Disetujui'
+        : 'Pengajuan Restock',
+    message: status == HistoryStatus.rejected && reason.isNotEmpty
+        ? 'Alasan: $reason'
+        : requestNo.isEmpty
+        ? 'Pengajuan restock sedang diproses.'
+        : 'Pengajuan $requestNo ${_statusLabel(status).toLowerCase()}.',
+    requestedQty: requestedQty,
+    badgeLabel: _statusLabel(status),
+    badgeColor: _statusColor(status),
+  );
 }
 
 // =====================================================================
@@ -58,36 +236,68 @@ class StockHistoryScreen extends StatefulWidget {
 }
 
 class _StockHistoryScreenState extends State<StockHistoryScreen> {
-  // TODO: setelah testing selesai, ganti `_allHistory` dengan data riwayat
-  // asli (mis. dari AppState/ApiClient), dan sesuaikan field
-  // DummyHistoryEntry -> model riwayat yang sebenarnya.
-  final List<DummyHistoryEntry> _allHistory = buildDummyStockHistory();
+  HistoryStatus? _statusFilter; // null = Semua
 
-  HistoryType? _typeFilter; // null = Semua
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final appState = context.read<AppState>();
+        appState.refreshRestockRequests();
+        appState.refreshNotifications();
+      }
+    });
+  }
 
-  List<DummyHistoryEntry> get _filtered {
-    final list = _typeFilter == null
-        ? _allHistory
-        : _allHistory.where((e) => e.type == _typeFilter).toList();
+  List<NotificationHistoryEntry> _historyFromNotifications(
+    List<Map<String, dynamic>> notifications,
+    List<Map<String, dynamic>> restockRequests,
+  ) {
+    final entries = <NotificationHistoryEntry>[];
+    for (final notification in notifications) {
+      final type = _notificationType(notification);
+      if (type != null) {
+        entries.add(_mapNotification(notification, type, restockRequests));
+      }
+    }
+    final notificationRestockIds = notifications
+        .where(
+          (notification) =>
+              (notification['id'] ?? '').toString().startsWith('restock:'),
+        )
+        .map(
+          (notification) => (notification['id'] ?? '').toString().substring(
+            'restock:'.length,
+          ),
+        )
+        .toSet();
+    for (final request in restockRequests) {
+      if (!notificationRestockIds.contains((request['id'] ?? '').toString())) {
+        entries.add(_mapRestockRequest(request));
+      }
+    }
+    entries.sort((a, b) => b.time.compareTo(a.time));
+    return entries;
+  }
+
+  List<NotificationHistoryEntry> _filtered(
+    List<NotificationHistoryEntry> allHistory,
+  ) {
+    final list = _statusFilter == null
+        ? allHistory
+        : allHistory.where((e) => e.status == _statusFilter).toList();
     final sorted = [...list]..sort((a, b) => b.time.compareTo(a.time));
     return sorted;
   }
 
-  int get _totalDiajukan => _allHistory
-      .where((e) => e.type == HistoryType.submission)
-      .fold(0, (total, e) => total + e.totalQty);
-
-  int get _totalDiterima => _allHistory
-      .where((e) => e.type == HistoryType.receipt)
-      .fold(0, (total, e) => total + e.totalQty);
-
   /// Kelompokkan entri (yang sudah difilter & diurutkan) ke dalam
   /// grup per-hari, sambil menjaga urutan grup dari yang terbaru.
-  List<MapEntry<String, List<DummyHistoryEntry>>> _groupByDay(
-    List<DummyHistoryEntry> entries,
+  List<MapEntry<String, List<NotificationHistoryEntry>>> _groupByDay(
+    List<NotificationHistoryEntry> entries,
   ) {
     final now = DateTime.now();
-    final groups = <String, List<DummyHistoryEntry>>{};
+    final groups = <String, List<NotificationHistoryEntry>>{};
     for (final entry in entries) {
       final label = _dayGroupLabel(entry.time, now);
       groups.putIfAbsent(label, () => []).add(entry);
@@ -97,7 +307,13 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
+    final notifications = context.watch<AppState>().notifications;
+    final restockRequests = context.watch<AppState>().restockRequests;
+    final allHistory = _historyFromNotifications(
+      notifications,
+      restockRequests,
+    );
+    final filtered = _filtered(allHistory);
     final groups = _groupByDay(filtered);
 
     return Scaffold(
@@ -120,7 +336,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          _buildSummaryRow(),
+          _buildSummaryRow(allHistory),
           const SizedBox(height: 16),
           _buildFilterChips(),
           const SizedBox(height: 16),
@@ -144,13 +360,19 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
   // SUMMARY
   // ===================================================================
 
-  Widget _buildSummaryRow() {
+  Widget _buildSummaryRow(List<NotificationHistoryEntry> allHistory) {
+    final totalDiajukan = allHistory
+        .where((e) => e.type == HistoryType.submission)
+        .length;
+    final totalDiterima = allHistory
+        .where((e) => e.type == HistoryType.receipt)
+        .length;
     return Row(
       children: [
         Expanded(
           child: _buildSummaryTile(
-            label: 'TOTAL DIAJUKAN',
-            value: '+$_totalDiajukan unit',
+            label: 'NOTIF. RESTOCK',
+            value: '$totalDiajukan notif',
             valueColor: const Color(0xFF2E5AAC),
             borderColor: const Color(0xFFD8E1F0),
             iconBg: const Color(0xFFEAF0FB),
@@ -161,8 +383,8 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildSummaryTile(
-            label: 'TOTAL DITERIMA',
-            value: '+$_totalDiterima unit',
+            label: 'NOTIF. STOK MASUK',
+            value: '$totalDiterima notif',
             valueColor: _kGreen,
             borderColor: const Color(0xFFB7E1C1),
             iconBg: const Color(0xFFE8F5E9),
@@ -244,14 +466,14 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
         children: [
           _buildChip(
             label: 'Semua',
-            selected: _typeFilter == null,
-            onTap: () => setState(() => _typeFilter = null),
+            selected: _statusFilter == null,
+            onTap: () => setState(() => _statusFilter = null),
           ),
-          for (final type in HistoryType.values)
+          for (final status in [HistoryStatus.approved, HistoryStatus.rejected])
             _buildChip(
-              label: _typeFilterLabel(type),
-              selected: _typeFilter == type,
-              onTap: () => setState(() => _typeFilter = type),
+              label: _statusLabel(status),
+              selected: _statusFilter == status,
+              onTap: () => setState(() => _statusFilter = status),
             ),
         ],
       ),
@@ -346,149 +568,125 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
   // KARTU RIWAYAT
   // ===================================================================
 
-  Widget _buildHistoryCard(DummyHistoryEntry entry) {
+  Widget _buildHistoryCard(NotificationHistoryEntry entry) {
     final now = DateTime.now();
     final isToday = _dayGroupLabel(entry.time, now) == 'Hari Ini';
 
     final content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: ikon, judul, subjudul, badge status.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header: ikon, judul, subjudul, badge status.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? _kGreen.withValues(alpha: 0.12)
+                    : Colors.grey.shade200,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isToday ? _typeIcon(entry.type) : Icons.check_circle_outline,
+                size: 18,
+                color: isToday ? _kGreen : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.title,
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: ObbelTheme.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_dayGroupLabel(entry.time, now)}, '
+                    '${_timeLabel(entry.time)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: ObbelTheme.textLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (entry.badgeLabel != null)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isToday
-                      ? _kGreen.withValues(alpha: 0.12)
-                      : Colors.grey.shade200,
-                  shape: BoxShape.circle,
+                  color: entry.badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(
-                  isToday ? _typeIcon(entry.type) : Icons.check_circle_outline,
-                  size: 18,
-                  color: isToday ? _kGreen : Colors.grey.shade600,
+                child: Text(
+                  entry.badgeLabel!,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: entry.badgeColor,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Detail yang ditampilkan langsung dari pesan notifikasi server.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: ObbelTheme.backgroundLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (entry.requestedQty != null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      entry.title,
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
+                    const Text(
+                      'Jumlah diajukan',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: ObbelTheme.textDark,
                       ),
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      '#${entry.id} • ${_dayGroupLabel(entry.time, now)}, '
-                      '${_timeLabel(entry.time)}',
+                      '+${entry.requestedQty} unit',
                       style: const TextStyle(
-                        fontSize: 11,
-                        color: ObbelTheme.textLight,
+                        fontFamily: 'Outfit',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: _kGreen,
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                entry.message,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  height: 1.35,
                 ),
               ),
-              if (entry.badgeLabel != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: entry.badgeColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    entry.badgeLabel!,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      color: entry.badgeColor,
-                    ),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Kotak info produk.
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: ObbelTheme.backgroundLight,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.topInfoLabel,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: ObbelTheme.textDark,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        entry.products.map((p) => p.label).join(', '),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '+${entry.totalQty}',
-                          style: const TextStyle(
-                            fontFamily: 'Outfit',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: _kGreen,
-                          ),
-                        ),
-                        Text(
-                          'unit',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-          Divider(height: 1, color: Colors.grey.shade100),
-          const SizedBox(height: 8),
-          Text(
-            entry.footerLabel,
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-          ),
-        ],
+        ),
+      ],
     );
 
     return Container(
@@ -526,10 +724,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                 ],
               ),
             )
-          : Padding(
-              padding: const EdgeInsets.all(14),
-              child: content,
-            ),
+          : Padding(padding: const EdgeInsets.all(14), child: content),
     );
   }
 }

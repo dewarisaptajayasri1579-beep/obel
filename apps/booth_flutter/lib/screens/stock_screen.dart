@@ -1082,6 +1082,14 @@ class _StockScreenState extends State<StockScreen> {
 
     final isSelected = _selectedIds.contains(item.id);
 
+    // Mode seleksi aktif ketika lebih dari 1 produk sudah dipilih —
+    // pada saat itu, pojok kiri atas SEMUA kartu berubah jadi checkbox
+    // (bukan hanya kartu yang sedang dipilih) supaya mudah memilih lebih
+    // banyak produk sekaligus.
+    final isSelectionMode = _selectedIds.length > 1;
+
+    final showCheckbox = isSelected || isSelectionMode;
+
     final quickAdd = _quickAddFor(item);
 
     return GestureDetector(
@@ -1125,22 +1133,67 @@ class _StockScreenState extends State<StockScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
+                // =====================================================
+                // POJOK KIRI ATAS — ICON KATEGORI, DENGAN CHECKBOX BULAT
+                // KECIL YANG NEMPEL DI POJOKNYA SAAT MODE SELEKSI AKTIF
+                // =====================================================
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
 
-                  decoration: BoxDecoration(
-                    color: _statusBg(item.status),
+                      decoration: BoxDecoration(
+                        color: _statusBg(item.status),
 
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
 
-                  child: Icon(
-                    _categoryIcon(item.category),
+                      child: Icon(
+                        _categoryIcon(item.category),
 
-                    color: color,
+                        color: color,
 
-                    size: 18,
-                  ),
+                        size: 18,
+                      ),
+                    ),
+
+                    if (showCheckbox)
+                      Positioned(
+                        top: -6,
+                        left: -6,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+
+                          decoration: BoxDecoration(
+                            color: isSelected ? _kGreen : Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? _kGreen
+                                  : Colors.grey.shade400,
+                              width: 1.4,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 12,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                      ),
+                  ],
                 ),
 
                 const SizedBox(width: 10),

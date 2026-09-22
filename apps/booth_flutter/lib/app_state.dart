@@ -39,12 +39,18 @@ class AppState extends ChangeNotifier {
   int transactionCount = 0;
 
   List<Map<String, dynamic>> notifications = [];
+  List<Map<String, dynamic>> restockRequests = [];
   List<SaleHistoryRecord> sales = [];
   bool get hasUnreadNotifications => notifications.isNotEmpty;
 
   int get cartCount => cart.fold(0, (sum, item) => sum + item.quantity);
   int get cartTotal => cart.fold(0, (sum, item) => sum + item.totalPrice);
   int get lowStockCount => stock.where((s) => s.status != 'Aman').length;
+  int stockStatusCount(String status) =>
+      stock.where((s) => s.status.toLowerCase() == status.toLowerCase()).length;
+  int stockQuantityForStatus(String status) => stock
+      .where((s) => s.status.toLowerCase() == status.toLowerCase())
+      .fold(0, (total, item) => total + item.currentQty);
   int get averagePerTransaction =>
       transactionCount == 0 ? 0 : (omzetToday / transactionCount).round();
 
@@ -106,15 +112,15 @@ class AppState extends ChangeNotifier {
     boothName = (shift['booth'] as Map)['name'] as String;
     shiftSessionId = shift['shiftSessionId'] as String;
     shiftLabel = '${shift['shiftName']} AKTIF'.toUpperCase();
-    final startAt = DateTime.parse(
-      shift['scheduledStartAt'] as String,
-    ).toLocal();
+    final startAt = DateTime.parse(shift['scheduledStartAt'] as String)
+        .toLocal();
     final endAt = DateTime.parse(shift['scheduledEndAt'] as String).toLocal();
     shiftTime = '${_fmtTime(startAt)} - ${_fmtTime(endAt)}';
 
     await refreshCatalog();
     await refreshSales();
     await refreshPendingDistribution();
+    await refreshRestockRequests();
     await refreshNotifications();
   }
 
@@ -125,6 +131,19 @@ class AppState extends ChangeNotifier {
     final items = await _api.getNotifications(_token!);
     notifications = items.cast<Map<String, dynamic>>();
     notifyListeners();
+  }
+
+  /// Mengambil pengajuan restock milik booth agar detail jumlah yang diajukan
+  /// tetap mengikuti data transaksi server, bukan hanya teks notifikasi.
+  Future<void> refreshRestockRequests() async {
+    if (_token == null) return;
+    try {
+      final items = await _api.getMyRestockRequests(_token!);
+      restockRequests = items.cast<Map<String, dynamic>>();
+      notifyListeners();
+    } on ApiException {
+      // Riwayat notifikasi tetap dapat ditampilkan bila endpoint detail gagal.
+    }
   }
 
   /// Mengambil distribusi SENT pertama yang menunggu diterima booth ini
@@ -349,10 +368,7 @@ class AppState extends ChangeNotifier {
         paidAt: DateTime.now(),
         items: itemSnapshot
             .map(
-              (item) => SaleHistoryItem(
-                productName: item.name,
-                qty: item.qty,
-              ),
+              (item) => SaleHistoryItem(productName: item.name, qty: item.qty),
             )
             .toList(),
       ),

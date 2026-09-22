@@ -65,6 +65,16 @@ class ApiClient {
     return result as List<dynamic>;
   }
 
+  Future<List<dynamic>> getMyDistributions(String token) async {
+    final result = await _get('/distributions/mine', token: token);
+    return result as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getMyRestockRequests(String token) async {
+    final result = await _get('/restock-requests/mine', token: token);
+    return result as List<dynamic>;
+  }
+
   Future<Map<String, dynamic>> receiveDistribution(
     String token,
     String distributionId,
