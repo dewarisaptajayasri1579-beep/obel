@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -26,6 +26,24 @@ export class SalesController {
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateSaleDto) {
     return this.salesService.createPaidSale(user, dto);
+  }
+
+  /// Tab "Riwayat Penjualan" halaman Booth — lihat SalesService.riwayatBooth.
+  /// Bulan & tahun default ke periode berjalan Asia/Jakarta, sama seperti
+  /// StockMovementsController, supaya kedua tab di halaman Booth konsisten.
+  @Get('riwayat-booth')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  riwayatBooth(
+    @Query('boothId') boothId?: string,
+    @Query('bulan') bulan?: string,
+    @Query('tahun') tahun?: string,
+  ) {
+    const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    return this.salesService.riwayatBooth({
+      boothId: boothId || undefined,
+      bulan: bulan ? Number(bulan) : jakarta.getUTCMonth() + 1,
+      tahun: tahun ? Number(tahun) : jakarta.getUTCFullYear(),
+    });
   }
 
   @Get(':id')

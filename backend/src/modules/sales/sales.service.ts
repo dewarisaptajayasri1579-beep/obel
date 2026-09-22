@@ -13,6 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { effectiveByGroup } from '../../common/effective-version';
+import { batasBulanJakarta, businessDateKeyJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -217,6 +218,85 @@ export class SalesService {
         versionNo: s.versionNo,
         isRevised: s.versionNo > 1,
       }));
+  }
+
+  /// Tab "Riwayat Penjualan" di halaman Booth — daftar transaksi sebulan
+  /// (opsional disaring ke satu Booth) plus Rekap Harian per shift. Berbeda
+  /// dari `findAll()` (list global, dibatasi 200 baris terbaru tanpa filter
+  /// periode): endpoint ini justru dibangun untuk analisa "shift Pagi vs
+  /// Malam" (lihat docs/obbel-coffee-ai-docs/26-monitoring-realtime.md),
+  /// jadi filternya per bulan dan tiap baris membawa nama shift-nya.
+  async riwayatBooth(params: { boothId?: string; bulan: number; tahun: number }) {
+    const { boothId, bulan, tahun } = params;
+    const { awal, akhir } = batasBulanJakarta(bulan, tahun);
+
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] },
+        paidAt: { gte: awal, lt: akhir },
+        ...(boothId ? { boothId } : {}),
+      },
+      include: {
+        booth: true,
+        staff: true,
+        items: true,
+        shiftSession: { include: { shiftTemplate: true } },
+      },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    const effective = effectiveByGroup(sales).sort(
+      (a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0),
+    );
+
+    const rows = effective.map((s) => ({
+      id: s.id,
+      saleNo: s.saleNo,
+      boothId: s.boothId,
+      boothName: s.booth.name,
+      staffName: s.staff.fullName,
+      shift: s.shiftSession.shiftTemplate.name,
+      status: s.status,
+      total: Number(s.total),
+      cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
+      paymentMethod: s.paymentMethod,
+      paidAt: s.paidAt,
+    }));
+
+    // Rekap Harian dikelompokkan per tanggal bisnis Jakarta, lalu per shift di
+    // dalamnya — hanya sale PAID yang menyumbang omzet/cup (VOIDED tetap
+    // tampil di `rows` sebagai riwayat, tapi tidak pernah terjadi secara
+    // bisnis, konsisten dengan `DashboardService.getAdminDashboard`).
+    const harian = new Map<string, Map<string, { cup: number; omzet: number }>>();
+    for (const s of effective) {
+      if (s.status !== SaleStatus.PAID || !s.paidAt) continue;
+      const tanggal = businessDateKeyJakarta(s.paidAt);
+      const shiftName = s.shiftSession.shiftTemplate.name;
+      if (!harian.has(tanggal)) harian.set(tanggal, new Map());
+      const perShift = harian.get(tanggal)!;
+      const cur = perShift.get(shiftName) ?? { cup: 0, omzet: 0 };
+      cur.cup += s.items.reduce((sum, i) => sum + i.qty, 0);
+      cur.omzet += Number(s.total);
+      perShift.set(shiftName, cur);
+    }
+
+    const rekapHarian = [...harian.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([tanggal, perShiftMap]) => {
+        const perShift = [...perShiftMap.entries()].map(([shift, v]) => ({
+          shift,
+          cup: v.cup,
+          omzet: v.omzet,
+        }));
+        return {
+          tanggal,
+          cup: perShift.reduce((sum, x) => sum + x.cup, 0),
+          omzet: perShift.reduce((sum, x) => sum + x.omzet, 0),
+          perShift,
+        };
+      });
+
+    return { periode: { bulan, tahun }, rows, rekapHarian };
   }
 
   /// Detail satu sale untuk modal koreksi Admin Web.

@@ -116,6 +116,12 @@ export const NAV_GROUPS: NavGroup[] = [
             icon: Package,
             bottomBar: false,
           },
+          {
+            label: "Booth",
+            href: "/master/booth",
+            icon: Store,
+            bottomBar: false,
+          },
         ],
       },
     ],
@@ -139,10 +145,10 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Master Data",
         icon: Settings,
         children: [
-          // Produk dipindah ke grup DATA → Data Operasional: dia pintu masuk ke
-          // riwayat & rekap stok, jadi lebih sering dibuka dari sana. Sengaja
-          // TIDAK diduplikasi di sini supaya tidak ada dua tautan ke halaman sama.
-          { label: "Booth", href: "/master/booth", icon: Store },
+          // Produk & Booth dipindah ke grup DATA → Data Operasional: keduanya
+          // pintu masuk ke riwayat & rekap (stok, mutasi, penjualan), jadi lebih
+          // sering dibuka dari sana. Sengaja TIDAK diduplikasi di sini supaya
+          // tidak ada dua tautan ke halaman yang sama.
           { label: "Shift", href: "/master/shift", icon: Clock },
           { label: "Threshold Stok Booth", href: "/master/threshold", icon: SlidersHorizontal },
           { label: "User", href: "/master/user", icon: Users },

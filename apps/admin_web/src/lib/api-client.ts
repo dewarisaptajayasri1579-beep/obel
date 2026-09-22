@@ -89,6 +89,9 @@ export interface Booth {
   code: string
   name: string
   locationName: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
   status: "ACTIVE" | "INACTIVE"
 }
 
@@ -142,6 +145,13 @@ export interface BarisRinciMutasi {
   qty: number
   saldo: number
   perluVerifikasi: boolean
+  /// Nama Petugas yang menginput baris ini. Null kalau profile-nya sudah
+  /// tidak ada.
+  petugas: string | null
+  /// Label shift (mis. "Pagi"/"Malam") saat baris ini terjadi. Null kalau
+  /// movement-nya tidak terikat satu shift (mis. mutasi di Gudang, atau
+  /// movement lama sebelum shift ikut dicatat).
+  shift: string | null
 }
 
 export interface RinciMutasiResponse {
@@ -151,6 +161,61 @@ export interface RinciMutasiResponse {
   ringkasan: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number }
   rows: BarisRinciMutasi[]
   perluVerifikasi: boolean
+}
+
+/// Tab "Mutasi Stok"/"Mutasi Penjualan" di halaman Booth — rekap per Booth
+/// (bukan per produk seperti `BarisRekapStok`), dipakai bersama parameter
+/// `jenis` ("SEMUA" | "PENJUALAN").
+export interface BarisRekapBooth {
+  boothId: string
+  boothCode: string
+  boothName: string
+  saldoAwal: number
+  masuk: number
+  keluar: number
+  saldoAkhir: number
+  perluVerifikasi: boolean
+}
+
+export interface RekapBoothResponse {
+  periode: { bulan: number; tahun: number }
+  rows: BarisRekapBooth[]
+  total: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number; perluVerifikasi: boolean }
+}
+
+export type JenisMutasi = "SEMUA" | "PENJUALAN"
+
+export interface BarisRiwayatPenjualanBooth {
+  id: string
+  saleNo: string
+  boothId: string
+  boothName: string
+  staffName: string
+  shift: string
+  status: "PAID" | "VOIDED"
+  total: number
+  cupCount: number
+  paymentMethod: "CASH" | "QRIS"
+  paidAt: string | null
+}
+
+export interface RekapHarianShift {
+  shift: string
+  cup: number
+  omzet: number
+}
+
+export interface RekapHarianBooth {
+  tanggal: string
+  cup: number
+  omzet: number
+  perShift: RekapHarianShift[]
+}
+
+export interface RiwayatPenjualanBoothResponse {
+  periode: { bulan: number; tahun: number }
+  rows: BarisRiwayatPenjualanBooth[]
+  rekapHarian: RekapHarianBooth[]
 }
 
 export interface SaldoLokasi {
@@ -521,8 +586,25 @@ export const api = {
     request<LoginResponse>("/auth/login", { method: "POST", body: { username, password } }),
 
   getBooths: () => request<Booth[]>("/booths"),
-  createBooth: (input: { code: string; name: string; locationName?: string }) =>
-    request<Booth>("/booths", { method: "POST", body: input }),
+  createBooth: (input: {
+    code: string
+    name: string
+    locationName?: string
+    address?: string
+    latitude?: number
+    longitude?: number
+  }) => request<Booth>("/booths", { method: "POST", body: input }),
+  updateBooth: (
+    id: string,
+    input: {
+      name?: string
+      locationName?: string
+      address?: string
+      latitude?: number
+      longitude?: number
+      status?: "ACTIVE" | "INACTIVE"
+    },
+  ) => request<Booth>(`/booths/${id}`, { method: "PATCH", body: input }),
 
   getProducts: () => request<Product[]>("/products"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
@@ -787,13 +869,25 @@ export const api = {
     return res.blob()
   },
 
-  getStockRekap: (params: { bulan: number; tahun: number; lokasi?: string }) =>
+  getStockRekap: (params: { bulan: number; tahun: number; lokasi?: string; jenis?: JenisMutasi }) =>
     request<RekapStokResponse>(
-      `/stock-movements/rekap?bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
+      `/stock-movements/rekap?bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}&jenis=${params.jenis ?? "SEMUA"}`,
     ),
-  getStockRinci: (params: { productId: string; bulan: number; tahun: number; lokasi?: string }) =>
+  getStockRinci: (params: { productId: string; bulan: number; tahun: number; lokasi?: string; jenis?: JenisMutasi }) =>
     request<RinciMutasiResponse>(
-      `/stock-movements/rinci?productId=${params.productId}&bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
+      `/stock-movements/rinci?productId=${params.productId}&bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}&jenis=${params.jenis ?? "SEMUA"}`,
+    ),
+  /// Tab Mutasi Stok/Mutasi Penjualan di halaman Booth — satu baris per
+  /// Booth (bukan per produk), lihat StockMovementsService.rekapPerBooth.
+  getStockRekapBooth: (params: { bulan: number; tahun: number; jenis?: JenisMutasi }) =>
+    request<RekapBoothResponse>(
+      `/stock-movements/rekap-booth?bulan=${params.bulan}&tahun=${params.tahun}&jenis=${params.jenis ?? "SEMUA"}`,
+    ),
+  /// Tab Riwayat Penjualan di halaman Booth — daftar transaksi sebulan +
+  /// Rekap Harian per shift. `boothId` opsional: kosong berarti semua Booth.
+  getRiwayatPenjualanBooth: (params: { boothId?: string; bulan: number; tahun: number }) =>
+    request<RiwayatPenjualanBoothResponse>(
+      `/sales/riwayat-booth?bulan=${params.bulan}&tahun=${params.tahun}${params.boothId ? `&boothId=${params.boothId}` : ""}`,
     ),
 
   getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),
