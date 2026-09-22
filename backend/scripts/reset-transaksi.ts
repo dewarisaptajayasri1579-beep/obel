@@ -10,7 +10,38 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
+function redactedDbTarget(): string {
+  const raw = process.env.DATABASE_URL ?? '';
+  try {
+    const url = new URL(raw);
+    return `${url.hostname}:${url.port || '5432'}${url.pathname}`;
+  } catch {
+    return '(tidak bisa membaca DATABASE_URL)';
+  }
+}
+
+async function confirmOrAbort() {
+  const target = redactedDbTarget();
+  console.log(`Target database: ${target}`);
+  console.log('Script ini MENGHAPUS PERMANEN seluruh sales, stock movement,');
+  console.log('shift, distribusi, retur, opname, dan koreksi transaksi.');
+
+  if (process.env.CONFIRM_RESET !== 'YES_I_UNDERSTAND') {
+    console.error(
+      '\nAborted. Set env var CONFIRM_RESET=YES_I_UNDERSTAND untuk melanjutkan, ' +
+        'dan pastikan DATABASE_URL di atas benar-benar target yang kamu maksud ' +
+        '(database ini kemungkinan dipakai bersama oleh backend production).',
+    );
+    process.exit(1);
+  }
+
+  console.log('\nKonfirmasi diterima. Menjalankan dalam 5 detik — Ctrl+C untuk batal...');
+  await new Promise((resolve) => setTimeout(resolve, 5_000));
+}
+
 async function main() {
+  await confirmOrAbort();
+
   await prisma.$transaction(
     async (tx) => {
       await tx.saleRefundItem.deleteMany();

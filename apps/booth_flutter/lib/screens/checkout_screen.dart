@@ -9,7 +9,6 @@ import 'receipt_screen.dart';
 
 class _CheckoutAccent {
   static const mintBg = Color(0xFFEEF8F4);
-  static const mintBorder = Color(0xFFCFEADD);
   static const surfaceMuted = Color(0xFFF6F9F8);
   static const border = Color(0xFFE2E9ED);
   static const textMuted = Color(0xFF667991);
@@ -84,52 +83,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Future<void> _printWithFeedback(
-    ScaffoldMessengerState messenger,
-    Receipt receipt,
-  ) async {
-    final printer = BluetoothReceiptPrinter();
-    final preferred =
-        await BluetoothReceiptPrinter.loadPreferred();
-
-    if (preferred == null) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Pembayaran sukses. Printer belum diatur — struk tidak dicetak.',
-          ),
-          backgroundColor: ObbelTheme.primaryDark,
-          action: SnackBarAction(
-            label: 'Print Ulang',
-            onPressed: () =>
-                _printWithFeedback(messenger, receipt),
-          ),
-        ),
-      );
-      return;
-    }
-
-    final ok = await printer.printReceipt(receipt);
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Pembayaran sukses! Nota tercetak.'
-              : 'Pembayaran sukses. Gagal mencetak nota.',
-        ),
-        backgroundColor: ok
-            ? ObbelTheme.primaryDark
-            : ObbelTheme.accentRed,
-        action: SnackBarAction(
-          label: 'Print Ulang',
-          onPressed: () =>
-              _printWithFeedback(messenger, receipt),
-        ),
-      ),
-    );
-  }
-
   Future<String?> _loadPrinterLabel() async {
     try {
       final preferred =
@@ -177,7 +130,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final itemCount = cartItems.fold<int>(
       0,
-      (sum, i) => sum + (i.quantity as int),
+      (sum, i) => sum + i.quantity,
     );
 
     final canPay = cartItems.isNotEmpty && !_paying;
@@ -454,7 +407,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.quantity}x @ ${_formatRupiah((item.product.price as num).round())}',
+                  '${item.quantity}x @ ${_formatRupiah(item.product.price.round())}',
                   style: TextStyle(
                     color: ObbelTheme.textLight,
                     fontSize: 12.5,
@@ -730,7 +683,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               Switch(
                 value: _autoPrint,
-                activeColor:
+                activeThumbColor:
                     ObbelTheme.primaryDark,
                 onChanged: (value) {
                   setState(() {
