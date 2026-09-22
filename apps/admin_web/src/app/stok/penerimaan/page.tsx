@@ -15,10 +15,12 @@ import {
   Plus,
   Printer,
   Search,
+  Trash2,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { PortalMenu } from "@/components/ui/PortalMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
@@ -45,6 +47,8 @@ function PenerimaanContent() {
   const [unduhExcel, setUnduhExcel] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notaTarget, setNotaTarget] = useState<StockReceipt | null>(null);
+  const [hapusTarget, setHapusTarget] = useState<StockReceipt | null>(null);
+  const [menghapus, setMenghapus] = useState(false);
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -106,9 +110,24 @@ function PenerimaanContent() {
     }
   }
 
+  async function hapusDraft() {
+    if (!hapusTarget) return;
+    setMenghapus(true);
+    try {
+      await api.deleteStockReceipt(hapusTarget.id);
+      toast.success(`Draft ${hapusTarget.receiptNo} dihapus.`);
+      setReceipts((semua) => semua?.filter((r) => r.id !== hapusTarget.id) ?? semua);
+      setHapusTarget(null);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal menghapus draft.");
+    } finally {
+      setMenghapus(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi Kantor" }, { label: "Tambah Stok Gudang" }]} />
+      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi" }, { label: "Tambah Stok Gudang" }]} />
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
@@ -330,6 +349,23 @@ function PenerimaanContent() {
                                 <Printer className="w-3.5 h-3.5 text-[var(--brand-700)]" />
                                 <span>Cetak Nota</span>
                               </button>
+
+                              {r.status === "DRAFT" && (
+                                <>
+                                  <div className="my-1 border-t border-slate-100 dark:border-line" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuRowId(null);
+                                      setHapusTarget(r);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors text-left cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Hapus Draft</span>
+                                  </button>
+                                </>
+                              )}
                             </PortalMenu>
                           </div>
                         </div>
@@ -361,6 +397,24 @@ function PenerimaanContent() {
           receiptNo={notaTarget.receiptNo}
         />
       )}
+
+      <Modal isOpen={!!hapusTarget} onClose={() => setHapusTarget(null)} title="Hapus Draft Tambah Stok Gudang" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-fg-muted">
+            Hapus draft <strong className="text-slate-800 dark:text-fg font-mono">{hapusTarget?.receiptNo}</strong>? Dokumen ini
+            belum pernah diposting dan belum menyentuh stok Gudang sama sekali, jadi aman dihapus. Tindakan ini tidak bisa
+            dibatalkan.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setHapusTarget(null)}>
+              Batal
+            </Button>
+            <Button variant="danger" size="sm" isLoading={menghapus} onClick={hapusDraft}>
+              Hapus
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

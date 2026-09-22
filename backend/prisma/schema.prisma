@@ -199,15 +199,16 @@ model Booth {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  profiles        Profile[]
-  shiftSessions   ShiftSession[]
-  boothStocks     BoothStock[]
-  sales           Sale[]
-  distributions   StockDistribution[]
-  restockRequests RestockRequest[]
-  stockReturns    StockReturn[]
-  stockThresholds BoothStockThreshold[]
-  stockOpnames    StockOpname[]
+  profiles         Profile[]
+  shiftSessions    ShiftSession[]
+  boothStocks      BoothStock[]
+  sales            Sale[]
+  distributions    StockDistribution[]
+  restockRequests  RestockRequest[]
+  stockReturns     StockReturn[]
+  stockThresholds  BoothStockThreshold[]
+  stockOpnames     StockOpname[]
+  shiftAssignments BoothShiftAssignment[]
 
   @@map("booths")
 }
@@ -239,6 +240,7 @@ model Profile {
   saleRefunds             SaleRefund[]
   createdStockReceipts    StockReceipt[]          @relation("StockReceiptCreatedBy")
   postedStockReceipts     StockReceipt[]          @relation("StockReceiptPostedBy")
+  shiftAssignments        BoothShiftAssignment[]
 
   @@index([role])
   @@index([defaultBoothId])
@@ -258,29 +260,29 @@ model ProductCategory {
 }
 
 model Product {
-  id         String           @id @default(uuid())
-  sku        String           @unique
-  name       String
-  categoryId String?          @map("category_id")
-  category   ProductCategory? @relation(fields: [categoryId], references: [id])
-  sellPrice  BigInt           @map("sell_price")
-  imageUrl   String?          @map("image_url")
-  active     Boolean          @default(true)
-  sortOrder  Int              @default(0) @map("sort_order")
+  id          String           @id @default(uuid())
+  sku         String           @unique
+  name        String
+  categoryId  String?          @map("category_id")
+  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  sellPrice   BigInt           @map("sell_price")
+  imageUrl    String?          @map("image_url")
+  active      Boolean          @default(true)
+  sortOrder   Int              @default(0) @map("sort_order")
   /// Default stok Menipis/Kritis produk ini di SELURUH booth — dipakai
   /// sebagai fallback saat booth tertentu belum punya BoothStockThreshold
   /// sendiri (lihat resolveStockStatus & BR-007). Override per-booth via
   /// BoothStockThreshold tetap menang kalau ada.
-  minimumQty Int              @default(25) @map("minimum_qty")
-  criticalQty Int             @default(10) @map("critical_qty")
+  minimumQty  Int              @default(25) @map("minimum_qty")
+  criticalQty Int              @default(10) @map("critical_qty")
   /// Soft delete. TERPISAH dari `active`: nonaktif = disembunyikan dari
   /// transaksi tapi tetap tampil (bisa diaktifkan lagi); dihapus = ditutup
   /// permanen oleh Admin karena tidak pernah dipakai transaksi apa pun.
   /// Baris TIDAK PERNAH benar-benar di-DELETE — lihat "Aturan Soft Delete &
   /// Log Aktivitas" di AGENTS.md.
-  deletedAt  DateTime?        @map("deleted_at")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  deletedAt   DateTime?        @map("deleted_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   boothStocks         BoothStock[]
   saleItems           SaleItem[]
@@ -416,8 +418,29 @@ model ShiftTemplate {
   active    Boolean @default(true)
 
   shiftSessions ShiftSession[]
+  assignments   BoothShiftAssignment[]
 
   @@map("shift_templates")
+}
+
+/// Setting Booth-Petugas (Data Operasional) — Petugas DEFAULT yang bertugas di
+/// satu Booth untuk satu template shift (mis. "Booth 1 / Shift 1" -> Rina).
+/// Ini bukan jadwal harian (itu `ShiftSession`, dibuat per business date) —
+/// ini cuma pasangan default yang dipakai Admin sebagai acuan, dan calon
+/// sumber saat penjadwalan harian dibangun nanti. `staffId` boleh kosong
+/// (belum ditugaskan).
+model BoothShiftAssignment {
+  id              String        @id @default(uuid())
+  boothId         String        @map("booth_id")
+  booth           Booth         @relation(fields: [boothId], references: [id])
+  shiftTemplateId String        @map("shift_template_id")
+  shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
+  staffId         String?       @map("staff_id")
+  staff           Profile?      @relation(fields: [staffId], references: [id])
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@unique([boothId, shiftTemplateId])
+  @@map("booth_shift_assignments")
 }
 
 model ShiftSession {

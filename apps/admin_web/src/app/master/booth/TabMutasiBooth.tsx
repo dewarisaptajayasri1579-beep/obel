@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -9,8 +9,9 @@ import {
   ListTree,
   PackageCheck,
   Search,
+  Store,
   Table2,
-  Warehouse,
+  User,
 } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
@@ -19,22 +20,17 @@ import {
   api,
   ApiError,
   type Booth,
+  type JenisMutasi,
   type Product,
-  type RekapStokResponse,
+  type RekapBoothResponse,
   type RinciMutasiResponse,
 } from "@/lib/api-client";
-import { BULAN, PeriodeFilter, periodeBerjalanJakarta } from "./PeriodeFilter";
+import { BULAN, PeriodeFilter, periodeBerjalanJakarta } from "../produk/PeriodeFilter";
 
 type SubTab = "rekap" | "rinci";
 
-/// Nama kategori dipakai sebagai kunci pengelompokan baris Rekap — produk yang
-/// belum dikategorikan sengaja diberi label eksplisit, bukan dibiarkan kosong,
-/// supaya tetap kebagian header kelompoknya sendiri (selalu di paling akhir).
-const TANPA_KATEGORI = "Tanpa Kategori";
-
-// Header tabel & pembungkusnya disamakan dengan tab Main (lihat TabMain.tsx)
-// supaya kedua tab dalam satu halaman Produk terasa satu sistem, bukan dua
-// gaya berbeda yang ditempel.
+// Header tabel & pembungkusnya disamakan dengan TabMutasiStok.tsx di Produk
+// supaya kedua halaman terasa satu sistem visual, bukan dua gaya berbeda.
 const KELAS_WRAPPER_TABEL = "overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line";
 const KELAS_HEADER_TABEL =
   "bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line";
@@ -44,15 +40,10 @@ function angka(n: number) {
 }
 
 function tanggalJakarta(iso: string) {
-  // businessDate dikirim sebagai tanggal polos UTC; dibaca dengan getter UTC
-  // supaya tidak bergeser sehari oleh zona waktu perangkat.
   const d = new Date(iso);
   return `${d.getUTCDate()} ${BULAN[d.getUTCMonth()].slice(0, 3)} ${d.getUTCFullYear()}`;
 }
 
-/// Peringatan untuk baris yang arah mutasinya tidak bisa dipastikan dari ledger
-/// lama. Ditampilkan apa adanya, bukan disembunyikan — angka yang mungkin
-/// terbalik lebih berbahaya kalau disajikan seolah pasti.
 function PeringatanVerifikasi() {
   return (
     <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/15 p-3.5 flex items-start gap-2.5">
@@ -60,9 +51,8 @@ function PeringatanVerifikasi() {
       <div className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
         <p className="font-bold">Sebagian angka perlu diverifikasi</p>
         <p className="mt-0.5">
-          Ada mutasi lama yang arahnya tidak tercatat, sehingga ditebak sebagai
-          penambahan. Mutasi baru sudah mencatat arahnya sendiri, jadi ini hanya
-          menyangkut data sebelum perbaikan.
+          Ada mutasi lama yang arahnya tidak tercatat, sehingga ditebak sebagai penambahan. Mutasi baru sudah
+          mencatat arahnya sendiri, jadi ini hanya menyangkut data sebelum perbaikan.
         </p>
       </div>
     </div>
@@ -82,10 +72,8 @@ function KartuAngka({
 }) {
   const skin = {
     brand: "bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
-    hijau:
-      "bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
-    jingga:
-      "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
+    hijau: "bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
+    jingga: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
     abu: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line",
   }[warna];
 
@@ -105,51 +93,69 @@ function KartuAngka({
   );
 }
 
-export function TabMutasiStok({ products, booths }: { products: Product[]; booths: Booth[] }) {
+/// Tab Mutasi Stok & Mutasi Penjualan di halaman Booth — SATU komponen, beda
+/// cuma parameter `jenis` ("SEMUA" vs "PENJUALAN" yang menyaring StockMovement
+/// tipe SALE saja). Sumbunya kebalik dari TabMutasiStok.tsx milik Produk:
+/// Rekap di sini satu baris per BOOTH (gabungan semua produk), bukan satu
+/// baris per produk untuk satu lokasi — karena di sinilah yang mau
+/// dibandingkan justru Booth mana yang paling bergerak.
+export function TabMutasiBooth({
+  booths,
+  products,
+  jenis,
+  judul,
+  deskripsi,
+}: {
+  booths: Booth[];
+  products: Product[];
+  jenis: JenisMutasi;
+  judul: string;
+  deskripsi: string;
+}) {
   const toast = useToast();
   const [sub, setSub] = useState<SubTab>("rekap");
   const [periode, setPeriode] = useState(periodeBerjalanJakarta());
-  const [lokasi, setLokasi] = useState("WAREHOUSE");
 
-  const [rekap, setRekap] = useState<RekapStokResponse | null>(null);
+  const [rekap, setRekap] = useState<RekapBoothResponse | null>(null);
   const [memuatRekap, setMemuatRekap] = useState(false);
   const [cariRekap, setCariRekap] = useState("");
 
+  const [boothId, setBoothId] = useState("");
   const [productId, setProductId] = useState("");
   const [rinci, setRinci] = useState<RinciMutasiResponse | null>(null);
   const [memuatRinci, setMemuatRinci] = useState(false);
 
-  const opsiLokasi = useMemo(
-    () => [
-      { value: "WAREHOUSE", label: "Gudang Pusat" },
-      ...booths.map((b) => ({ value: b.id, label: `Booth ${b.name}` })),
-    ],
-    [booths],
-  );
+  const opsiBooth = useMemo(() => booths.map((b) => ({ value: b.id, label: `Booth ${b.name}` })), [booths]);
+  const opsiProduk = useMemo(() => products.map((p) => ({ value: p.id, label: p.name })), [products]);
+
+  const rekapTersaring = useMemo(() => {
+    if (!rekap) return [];
+    const q = cariRekap.trim().toLowerCase();
+    if (!q) return rekap.rows;
+    return rekap.rows.filter((r) => `${r.boothName} ${r.boothCode}`.toLowerCase().includes(q));
+  }, [rekap, cariRekap]);
 
   const muatRekap = useCallback(async () => {
     setMemuatRekap(true);
     try {
-      setRekap(await api.getStockRekap({ ...periode, lokasi }));
+      setRekap(await api.getStockRekapBooth({ ...periode, jenis }));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memuat rekap stok.");
+      toast.error(err instanceof ApiError ? err.message : "Gagal memuat rekap.");
       setRekap(null);
     } finally {
       setMemuatRekap(false);
     }
-    // toast identitasnya berubah tiap render provider; sengaja tidak dijadikan
-    // dependensi supaya tidak memicu pemuatan ulang tanpa henti.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periode, lokasi]);
+  }, [periode, jenis]);
 
   const muatRinci = useCallback(async () => {
-    if (!productId) {
+    if (!boothId || !productId) {
       setRinci(null);
       return;
     }
     setMemuatRinci(true);
     try {
-      setRinci(await api.getStockRinci({ productId, ...periode, lokasi }));
+      setRinci(await api.getStockRinci({ productId, lokasi: boothId, ...periode, jenis }));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat rincian mutasi.");
       setRinci(null);
@@ -157,7 +163,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
       setMemuatRinci(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, periode, lokasi]);
+  }, [boothId, productId, periode, jenis]);
 
   useEffect(() => {
     if (sub === "rekap") muatRekap();
@@ -167,37 +173,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
     if (sub === "rinci") muatRinci();
   }, [sub, muatRinci]);
 
-  const namaLokasi = opsiLokasi.find((o) => o.value === lokasi)?.label ?? lokasi;
-
-  const opsiProduk = useMemo(() => products.map((p) => ({ value: p.id, label: p.name })), [products]);
-
-  const kategoriProduk = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of products) map.set(p.id, p.category ?? TANPA_KATEGORI);
-    return map;
-  }, [products]);
-
-  // Rekap dikelompokkan per kategori (abjad), lalu per nama produk (abjad) di
-  // dalam tiap kelompok — "Tanpa Kategori" selalu diletakkan paling akhir
-  // supaya produk yang belum dikategorikan tidak menyelip di tengah daftar.
-  const rekapTersusun = useMemo(() => {
-    if (!rekap) return [];
-    const q = cariRekap.trim().toLowerCase();
-    const rows = q
-      ? rekap.rows.filter((r) => `${r.name} ${r.sku}`.toLowerCase().includes(q))
-      : [...rekap.rows];
-    rows.sort((a, b) => {
-      const ka = kategoriProduk.get(a.productId) ?? TANPA_KATEGORI;
-      const kb = kategoriProduk.get(b.productId) ?? TANPA_KATEGORI;
-      if (ka !== kb) {
-        if (ka === TANPA_KATEGORI) return 1;
-        if (kb === TANPA_KATEGORI) return -1;
-        return ka.localeCompare(kb, "id");
-      }
-      return a.name.localeCompare(b.name, "id");
-    });
-    return rows;
-  }, [rekap, kategoriProduk, cariRekap]);
+  const namaBooth = opsiBooth.find((o) => o.value === boothId)?.label ?? "";
 
   const SUB: { key: SubTab; label: string; icon: typeof Table2 }[] = [
     { key: "rekap", label: "Rekap", icon: Table2 },
@@ -206,6 +182,11 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
 
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className="text-sm font-bold text-slate-800 dark:text-fg">{judul}</h2>
+        <p className="text-xs text-slate-500 dark:text-fg-muted mt-0.5">{deskripsi}</p>
+      </div>
+
       <div className="flex items-center gap-2 flex-wrap">
         {SUB.map(({ key, label, icon: Icon }) => {
           const aktif = sub === key;
@@ -227,25 +208,17 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
         })}
       </div>
 
-      {/* ── Rekap ───────────────────────────────────────────────────────── */}
+      {/* ── Rekap (per Booth) ──────────────────────────────────────────── */}
       {sub === "rekap" && (
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4 space-y-3">
-            <PeriodeFilter bulan={periode.bulan} tahun={periode.tahun} onChange={setPeriode}>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-fg-muted ml-1">
-                <Warehouse className="w-3.5 h-3.5" />
-                Lokasi
-              </span>
-              <div className="w-44">
-                <Select options={opsiLokasi} value={lokasi} onChange={setLokasi} sizeVariant="sm" />
-              </div>
-            </PeriodeFilter>
+            <PeriodeFilter bulan={periode.bulan} tahun={periode.tahun} onChange={setPeriode} />
 
             <div className="relative w-full sm:max-w-[270px]">
               <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Cari nama atau kode produk..."
+                placeholder="Cari nama atau kode Booth..."
                 value={cariRekap}
                 onChange={(e) => setCariRekap(e.target.value)}
                 className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
@@ -266,8 +239,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                   <thead className={KELAS_HEADER_TABEL}>
                     <tr>
                       <th className="py-3.5 px-3 text-center w-10">No.</th>
-                      <th className="py-3.5 px-3 text-left">Nama Stok</th>
-                      <th className="py-3.5 px-3 text-left">Kategori</th>
+                      <th className="py-3.5 px-3 text-left">Booth</th>
                       <th className="py-3.5 px-3 text-center">Saldo Awal</th>
                       <th className="py-3.5 px-3 text-center">Masuk</th>
                       <th className="py-3.5 px-3 text-center">Keluar</th>
@@ -276,62 +248,42 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
-                    {(() => {
-                      let kategoriSebelumnya: string | null = null;
-                      return rekapTersusun.map((r, i) => {
-                        const kategori = kategoriProduk.get(r.productId) ?? TANPA_KATEGORI;
-                        const kelompokBaru = kategori !== kategoriSebelumnya;
-                        kategoriSebelumnya = kategori;
-                        return (
-                          <Fragment key={r.productId}>
-                            {kelompokBaru && (
-                              <tr className="bg-slate-50/70 dark:bg-surface-hover/40">
-                                <td
-                                  colSpan={7}
-                                  className="py-2 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-fg-muted"
-                                >
-                                  {kategori}
-                                </td>
-                              </tr>
-                            )}
-                            <tr
-                              className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors cursor-pointer"
-                              onClick={() => {
-                                setProductId(r.productId);
-                                setSub("rinci");
-                              }}
-                              title="Lihat rinciannya"
-                            >
-                              <td className="py-3 px-3 text-center text-slate-500 dark:text-fg-muted">{i + 1}</td>
-                              <td className="py-3 px-3">
-                                <span className="font-semibold text-slate-800 dark:text-fg">{r.name}</span>
-                                <span className="ml-2 font-mono text-[10px] text-slate-400 dark:text-fg-muted">
-                                  {r.sku}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-600 dark:text-fg-muted">{kategori}</td>
-                              <td className="py-3 px-3 text-center tabular-nums text-slate-600 dark:text-fg-secondary">
-                                {angka(r.saldoAwal)}
-                              </td>
-                              <td className="py-3 px-3 text-center tabular-nums font-semibold text-brand-600 dark:text-brand-400">
-                                {r.masuk === 0 ? "—" : `+${angka(r.masuk)}`}
-                              </td>
-                              <td className="py-3 px-3 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">
-                                {r.keluar === 0 ? "—" : `−${angka(r.keluar)}`}
-                              </td>
-                              <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 dark:text-fg">
-                                {angka(r.saldoAkhir)}
-                              </td>
-                            </tr>
-                          </Fragment>
-                        );
-                      });
-                    })()}
+                    {rekapTersaring.map((r, i) => (
+                      <tr
+                        key={r.boothId}
+                        className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setBoothId(r.boothId);
+                          setSub("rinci");
+                        }}
+                        title="Lihat rincian Booth ini"
+                      >
+                        <td className="py-3 px-3 text-center text-slate-500 dark:text-fg-muted">{i + 1}</td>
+                        <td className="py-3 px-3">
+                          <span className="font-semibold text-slate-800 dark:text-fg">{r.boothName}</span>
+                          <span className="ml-2 font-mono text-[10px] text-slate-400 dark:text-fg-muted">
+                            {r.boothCode}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center tabular-nums text-slate-600 dark:text-fg-secondary">
+                          {angka(r.saldoAwal)}
+                        </td>
+                        <td className="py-3 px-3 text-center tabular-nums font-semibold text-brand-600 dark:text-brand-400">
+                          {r.masuk === 0 ? "—" : `+${angka(r.masuk)}`}
+                        </td>
+                        <td className="py-3 px-3 text-center tabular-nums font-semibold text-amber-600 dark:text-amber-400">
+                          {r.keluar === 0 ? "—" : `−${angka(r.keluar)}`}
+                        </td>
+                        <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 dark:text-fg">
+                          {angka(r.saldoAkhir)}
+                        </td>
+                      </tr>
+                    ))}
 
-                    {rekap && rekap.rows.length === 0 && (
+                    {rekap && rekapTersaring.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
-                          Belum ada produk aktif.
+                        <td colSpan={6} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
+                          {rekap.rows.length === 0 ? "Belum ada Booth aktif." : "Tidak ada Booth yang cocok dengan pencarian."}
                         </td>
                       </tr>
                     )}
@@ -340,8 +292,8 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                   {rekap && rekap.rows.length > 0 && (
                     <tfoot className="bg-slate-50/80 dark:bg-surface-hover border-t-2 border-slate-200 dark:border-line">
                       <tr className="text-[11px] font-bold text-slate-700 dark:text-fg-secondary">
-                        <td colSpan={3} className="py-3 px-3 uppercase tracking-wide">
-                          Total · {namaLokasi} · {BULAN[periode.bulan - 1]} {periode.tahun}
+                        <td colSpan={2} className="py-3 px-3 uppercase tracking-wide">
+                          Total · {BULAN[periode.bulan - 1]} {periode.tahun}
                         </td>
                         <td className="py-3 px-3 text-center tabular-nums">{angka(rekap.total.saldoAwal)}</td>
                         <td className="py-3 px-3 text-center tabular-nums text-brand-600 dark:text-brand-400">
@@ -363,17 +315,17 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
         </div>
       )}
 
-      {/* ── Rinci ───────────────────────────────────────────────────────── */}
+      {/* ── Rinci (Booth + Produk) ─────────────────────────────────────── */}
       {sub === "rinci" && (
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
             <PeriodeFilter bulan={periode.bulan} tahun={periode.tahun} onChange={setPeriode}>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-fg-muted ml-1">
-                <Warehouse className="w-3.5 h-3.5" />
-                Lokasi
+                <Store className="w-3.5 h-3.5" />
+                Booth
               </span>
-              <div className="w-44">
-                <Select options={opsiLokasi} value={lokasi} onChange={setLokasi} sizeVariant="sm" />
+              <div className="w-48">
+                <Select options={opsiBooth} value={boothId} onChange={setBoothId} placeholder="Pilih Booth…" sizeVariant="sm" />
               </div>
 
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-fg-muted ml-1">
@@ -392,11 +344,11 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
             </PeriodeFilter>
           </div>
 
-          {!productId ? (
+          {!boothId || !productId ? (
             <div className="rounded-xl border border-dashed border-slate-300 dark:border-line bg-white/60 dark:bg-surface p-12 text-center">
               <ListTree className="w-7 h-7 text-slate-300 dark:text-fg-muted mx-auto" />
               <p className="mt-2.5 text-xs font-semibold text-slate-500 dark:text-fg-muted">
-                Pilih produk untuk melihat rincian mutasinya
+                Pilih Booth dan produk untuk melihat rincian mutasinya
               </p>
               <p className="mt-1 text-[11px] text-slate-400 dark:text-fg-muted">
                 Bisa juga dengan mengklik salah satu baris di tab Rekap.
@@ -427,7 +379,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                       </span>
                     </p>
                     <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">
-                      {namaLokasi} · {BULAN[periode.bulan - 1]} {periode.tahun}
+                      {namaBooth} · {BULAN[periode.bulan - 1]} {periode.tahun}
                     </p>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-500 dark:text-fg-muted tabular-nums">
@@ -441,27 +393,26 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                       <tr>
                         <th className="py-3.5 px-3 text-left w-28">Tanggal</th>
                         <th className="py-3.5 px-3 text-left">Keterangan</th>
+                        <th className="py-3.5 px-3 text-left w-36">Petugas</th>
+                        <th className="py-3.5 px-3 text-left w-20">Shift</th>
                         <th className="py-3.5 px-3 text-center w-24">Masuk/Keluar</th>
-                        <th className="py-3.5 px-3 text-center w-20">Qty</th>
-                        <th className="py-3.5 px-3 text-center w-28">Saldo Akhir</th>
+                        <th className="py-3.5 px-3 text-right w-20">Qty</th>
+                        <th className="py-3.5 px-3 text-right w-28">Saldo Akhir</th>
                       </tr>
                     </thead>
 
                     <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
                       <tr className="bg-slate-50/50 dark:bg-surface-hover/40">
-                        <td colSpan={4} className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-fg-muted">
+                        <td colSpan={6} className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-fg-muted">
                           Saldo Awal
                         </td>
-                        <td className="py-2.5 px-3 text-center tabular-nums font-bold text-slate-700 dark:text-fg-secondary">
+                        <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-700 dark:text-fg-secondary">
                           {angka(rinci.ringkasan.saldoAwal)}
                         </td>
                       </tr>
 
                       {rinci.rows.map((r) => (
-                        <tr
-                          key={r.id}
-                          className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors"
-                        >
+                        <tr key={r.id} className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors">
                           <td className="py-3 px-3 text-slate-600 dark:text-fg-secondary whitespace-nowrap">
                             {tanggalJakarta(r.tanggal)}
                           </td>
@@ -470,6 +421,25 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                             <span className="ml-2 font-mono text-[10px] text-slate-400 dark:text-fg-muted">
                               {r.movementNo}
                             </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-700 dark:text-fg-secondary">
+                            {r.petugas ? (
+                              <span className="inline-flex items-center gap-1">
+                                <User className="w-3 h-3 text-slate-400" />
+                                {r.petugas}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 dark:text-fg-muted">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            {r.shift ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-secondary border border-slate-200 dark:border-line">
+                                {r.shift}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 dark:text-fg-muted text-[10px]">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-center">
                             <span
@@ -487,10 +457,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
                               {r.arah === "MASUK" ? "Masuk" : "Keluar"}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-center tabular-nums font-semibold text-slate-800 dark:text-fg">
+                          <td className="py-3 px-3 text-right tabular-nums font-semibold text-slate-800 dark:text-fg">
                             {angka(r.qty)}
                           </td>
-                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 dark:text-fg">
+                          <td className="py-3 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">
                             {angka(r.saldo)}
                           </td>
                         </tr>
@@ -498,7 +468,7 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
 
                       {rinci.rows.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
+                          <td colSpan={7} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
                             Tidak ada mutasi pada periode ini.
                           </td>
                         </tr>
@@ -507,10 +477,10 @@ export function TabMutasiStok({ products, booths }: { products: Product[]; booth
 
                     <tfoot className="bg-slate-50/80 dark:bg-surface-hover border-t-2 border-slate-200 dark:border-line">
                       <tr className="text-[11px] font-bold text-slate-700 dark:text-fg-secondary">
-                        <td colSpan={4} className="py-3 px-3 uppercase tracking-wide">
+                        <td colSpan={6} className="py-3 px-3 uppercase tracking-wide">
                           Saldo Akhir
                         </td>
-                        <td className="py-3 px-3 text-center tabular-nums text-slate-900 dark:text-fg">
+                        <td className="py-3 px-3 text-right tabular-nums text-slate-900 dark:text-fg">
                           {angka(rinci.ringkasan.saldoAkhir)}
                         </td>
                       </tr>

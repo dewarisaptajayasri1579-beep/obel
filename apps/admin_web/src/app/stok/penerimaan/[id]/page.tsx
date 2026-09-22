@@ -43,7 +43,7 @@ function DetailPenerimaanContent({ id }: { id: string }) {
       <Breadcrumb
         items={[
           { label: "Dashboard", href: "/dashboard" },
-          { label: "Transaksi Kantor" },
+          { label: "Transaksi" },
           { label: "Tambah Stok Gudang", href: "/stok/penerimaan" },
           { label: receipt?.receiptNo ?? "Detail" },
         ]}
@@ -101,7 +101,7 @@ function DetailPenerimaanContent({ id }: { id: string }) {
             <Spinner />
           </div>
         ) : (
-          <PenerimaanForm products={products} initial={receipt} />
+          <PenerimaanForm products={products} initial={receipt} onChanged={setReceipt} />
         )}
       </Card>
     </div>

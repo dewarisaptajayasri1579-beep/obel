@@ -25,6 +25,7 @@ import { ReconciliationCasesModule } from './modules/reconciliation-cases/reconc
 import { OwnerModule } from './modules/owner/owner.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CompanyProfileModule } from './modules/company-profile/company-profile.module';
+import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/booth-shift-assignments.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { CompanyProfileModule } from './modules/company-profile/company-profile.
     OwnerModule,
     NotificationsModule,
     CompanyProfileModule,
+    BoothShiftAssignmentsModule,
   ],
 })
 export class AppModule {}

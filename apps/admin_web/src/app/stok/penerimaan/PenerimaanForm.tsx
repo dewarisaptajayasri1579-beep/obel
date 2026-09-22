@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Check, Eye, History, Printer, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -13,6 +14,7 @@ import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError, type Product, type StockReceipt } from "@/lib/api-client";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 import { PenerimaanLivePreview } from "./PenerimaanLivePreview";
+import { PenerimaanActivityLog } from "./PenerimaanActivityLog";
 
 const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
@@ -46,9 +48,18 @@ interface BarisProduk {
 export function PenerimaanForm({
   products,
   initial,
+  onChanged,
 }: {
   products: Product[];
   initial?: StockReceipt;
+  /// Dipanggil dengan dokumen terbaru setiap kali Simpan/Posting berhasil
+  /// MENGUBAH dokumen `initial` yang sama (bukan membuat dokumen baru).
+  /// Halaman detail bersifat client-side penuh (`"use client"`, data diambil
+  /// lewat useEffect) — `router.push()` ke URL yang SAMA tidak memicu
+  /// fetch ulang, jadi tanpa ini status Draft→Posted tidak pernah terlihat
+  /// berubah di layar walau backend sudah benar. Lihat juga `router.refresh()`
+  /// di bawah, yang sengaja tetap dipanggil untuk me-refresh cache RSC lain.
+  onChanged?: (r: StockReceipt) => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -169,8 +180,9 @@ export function PenerimaanForm({
     setSimpanDraft(true);
     try {
       if (initial) {
-        await api.updateStockReceipt(initial.id, { receiptDate, note: note || undefined, items: payloadItems() });
+        const diperbarui = await api.updateStockReceipt(initial.id, { receiptDate, note: note || undefined, items: payloadItems() });
         toast.success("Draft diperbarui.");
+        onChanged?.(diperbarui);
         router.refresh();
       } else {
         const dibuat = await api.createStockReceipt({
@@ -202,9 +214,9 @@ export function PenerimaanForm({
         // angka terbaru, baru posting, supaya tidak ada perubahan yang
         // ketinggalan di layar tapi belum sempat tersimpan.
         await api.updateStockReceipt(initial.id, { receiptDate, note: note || undefined, items: payloadItems() });
-        await api.postStockReceipt(initial.id);
+        const diposting = await api.postStockReceipt(initial.id);
         toast.success(`${initial.receiptNo} diposting — stok Gudang bertambah.`);
-        router.push(`/stok/penerimaan/${initial.id}`);
+        onChanged?.(diposting);
         router.refresh();
       } else {
         const dibuat = await api.createStockReceipt({
@@ -289,6 +301,17 @@ export function PenerimaanForm({
               <span className="text-xs italic text-slate-400 dark:text-fg-muted">Otomatis saat disimpan</span>
             )}
           </div>
+          {initial?.revisionOf && (
+            <p className="text-[11px] text-slate-500 dark:text-fg-muted">
+              Revisi dari{" "}
+              <Link
+                href={`/stok/penerimaan/${initial.revisionOf.id}`}
+                className="font-mono font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+              >
+                {initial.revisionOf.receiptNo}
+              </Link>
+            </p>
+          )}
         </div>
       </div>
 
@@ -366,12 +389,21 @@ export function PenerimaanForm({
           </p>
           {initial?.status === "REVISED" && (
             <p className="text-amber-600 dark:text-amber-400 font-semibold">
-              Dokumen ini sudah digantikan oleh versi revisi yang lebih baru — angkanya di atas bukan lagi yang
-              berlaku.
+              Dokumen ini sudah digantikan oleh{" "}
+              {initial.revisedBy ? (
+                <Link href={`/stok/penerimaan/${initial.revisedBy.id}`} className="font-mono underline">
+                  {initial.revisedBy.receiptNo}
+                </Link>
+              ) : (
+                "versi revisi yang lebih baru"
+              )}{" "}
+              — angkanya di atas bukan lagi yang berlaku.
             </p>
           )}
         </div>
       )}
+
+      {initial && <PenerimaanActivityLog receiptId={initial.id} />}
 
       <div className="border-t border-slate-200/60 dark:border-line pt-4 space-y-2.5">
         {!readOnly && (
