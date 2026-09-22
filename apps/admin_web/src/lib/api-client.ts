@@ -691,6 +691,8 @@ export const api = {
     role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
     defaultBoothId?: string
   }) => request<UserAccount>("/users", { method: "POST", body: input }),
+  updateUser: (id: string, input: { fullName?: string; defaultBoothId?: string; active?: boolean }) =>
+    request<UserAccount>(`/users/${id}`, { method: "PATCH", body: input }),
   resetUserPassword: (id: string, newPassword: string) =>
     request<UserAccount>(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
 
