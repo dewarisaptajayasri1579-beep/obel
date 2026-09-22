@@ -127,7 +127,7 @@ function PenerimaanContent() {
 
   return (
     <div className="space-y-5">
-      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi Kantor" }, { label: "Tambah Stok Gudang" }]} />
+      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi" }, { label: "Tambah Stok Gudang" }]} />
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">

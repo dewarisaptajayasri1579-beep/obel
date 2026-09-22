@@ -31,7 +31,7 @@ function TambahPenerimaanContent() {
       <Breadcrumb
         items={[
           { label: "Dashboard", href: "/dashboard" },
-          { label: "Transaksi Kantor" },
+          { label: "Transaksi" },
           { label: "Tambah Stok Gudang", href: "/stok/penerimaan" },
           { label: "Tambah Baru" },
         ]}

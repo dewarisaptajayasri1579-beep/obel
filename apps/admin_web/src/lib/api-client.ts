@@ -470,6 +470,17 @@ export interface ShiftTemplate {
   active: boolean
 }
 
+/// Setting Booth-Petugas — Petugas default per Booth × template shift.
+/// Bukan jadwal harian (itu ShiftSession); ini cuma pasangan acuan Admin.
+export interface BoothShiftAssignment {
+  id: string
+  boothId: string
+  shiftTemplateId: string
+  staffId: string | null
+  staff: UserAccount | null
+  updatedAt: string
+}
+
 export interface BoothStockThreshold {
   productId: string
   productName: string
@@ -779,6 +790,16 @@ export const api = {
   getShiftTemplates: () => request<ShiftTemplate[]>("/shift-templates"),
   createShiftTemplate: (input: { name: string; startTime: string; endTime: string }) =>
     request<ShiftTemplate>("/shift-templates", { method: "POST", body: input }),
+  updateShiftTemplate: (
+    id: string,
+    input: { name?: string; startTime?: string; endTime?: string; active?: boolean },
+  ) => request<ShiftTemplate>(`/shift-templates/${id}`, { method: "PATCH", body: input }),
+  deleteShiftTemplate: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/shift-templates/${id}`, { method: "DELETE" }),
+
+  getBoothShiftAssignments: () => request<BoothShiftAssignment[]>("/booth-shift-assignments"),
+  upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null }) =>
+    request<BoothShiftAssignment>("/booth-shift-assignments", { method: "PUT", body: input }),
 
   getBoothStockThresholds: (boothId: string) =>
     request<BoothStockThreshold[]>(`/booth-stock-thresholds?boothId=${boothId}`),

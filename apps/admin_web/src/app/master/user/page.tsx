@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
-import { api, ApiError, type Booth, type UserAccount } from "@/lib/api-client";
+import { api, ApiError, type UserAccount } from "@/lib/api-client";
 import { KeyRound, Plus } from "lucide-react";
 
 const ROLE_LABEL: Record<UserAccount["role"], string> = {
@@ -27,8 +27,11 @@ const ROLE_LABEL: Record<UserAccount["role"], string> = {
   OWNER: "Owner",
 };
 
+/// Petugas Booth SENGAJA tidak bisa dibuat dari sini — punya halaman
+/// tersendiri (Data Operasional → Petugas) yang juga bisa aktif/nonaktifkan,
+/// tidak cuma reset password seperti di sini. Dua jalur bikin satu akun sama
+/// mungkin dikelola dari dua tempat berbeda.
 const ROLE_OPTIONS = [
-  { value: "BOOTH_STAFF", label: "Petugas Booth" },
   { value: "ADMIN", label: "Admin Pusat" },
   { value: "OWNER", label: "Owner" },
 ];
@@ -36,23 +39,22 @@ const ROLE_OPTIONS = [
 function UserContent() {
   const toast = useToast();
   const [users, setUsers] = useState<UserAccount[] | null>(null);
-  const [booths, setBooths] = useState<Booth[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<UserAccount["role"]>("BOOTH_STAFF");
-  const [defaultBoothId, setDefaultBoothId] = useState("");
+  const [role, setRole] = useState<UserAccount["role"]>("ADMIN");
   const [saving, setSaving] = useState(false);
   const [resetTarget, setResetTarget] = useState<UserAccount | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
 
+  // Petugas Booth dikelola di halaman tersendiri (Data Operasional →
+  // Petugas) — di sini sengaja hanya menampilkan Admin/Owner.
   async function load() {
     try {
-      const [userList, boothList] = await Promise.all([api.getUsers(), api.getBooths()]);
-      setUsers(userList);
-      setBooths(boothList);
+      const userList = await api.getUsers();
+      setUsers(userList.filter((u) => u.role !== "BOOTH_STAFF"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat data User.");
     }
@@ -67,20 +69,13 @@ function UserContent() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.createUser({
-        username,
-        password,
-        fullName,
-        role,
-        defaultBoothId: role === "BOOTH_STAFF" ? defaultBoothId || undefined : undefined,
-      });
+      await api.createUser({ username, password, fullName, role });
       toast.success(`User "${username}" berhasil dibuat.`);
       setModalOpen(false);
       setUsername("");
       setPassword("");
       setFullName("");
-      setRole("BOOTH_STAFF");
-      setDefaultBoothId("");
+      setRole("ADMIN");
       await load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal membuat User.");
@@ -110,7 +105,9 @@ function UserContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Master User</h1>
-          <p className="text-sm text-slate-500 dark:text-fg-muted">Kelola akun login Petugas Booth, Admin, dan Owner.</p>
+          <p className="text-sm text-slate-500 dark:text-fg-muted">
+            Kelola akun login Admin &amp; Owner. Petugas Booth ada di Data Operasional → Petugas.
+          </p>
         </div>
         <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
           Tambah User
@@ -129,7 +126,6 @@ function UserContent() {
                 <TableHead>Username</TableHead>
                 <TableHead>Nama Lengkap</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Booth</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -140,7 +136,6 @@ function UserContent() {
                   <TableCell className="font-mono text-xs">{u.username}</TableCell>
                   <TableCell className="font-semibold">{u.fullName}</TableCell>
                   <TableCell>{ROLE_LABEL[u.role]}</TableCell>
-                  <TableCell>{booths.find((b) => b.id === u.defaultBoothId)?.name ?? "-"}</TableCell>
                   <TableCell>
                     <StatusBadge type={u.active ? "safe" : "inactive"} label={u.active ? "Aktif" : "Nonaktif"} />
                   </TableCell>
@@ -160,7 +155,7 @@ function UserContent() {
               ))}
               {users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
+                  <TableCell colSpan={5} className="text-center text-slate-500 py-8">
                     Belum ada User.
                   </TableCell>
                 </TableRow>
@@ -188,15 +183,6 @@ function UserContent() {
             value={role}
             onChange={(v) => setRole(v as UserAccount["role"])}
           />
-          {role === "BOOTH_STAFF" && (
-            <Select
-              label="Default Booth"
-              placeholder="Pilih Booth"
-              options={booths.map((b) => ({ value: b.id, label: b.name }))}
-              value={defaultBoothId}
-              onChange={setDefaultBoothId}
-            />
-          )}
           <Button type="submit" fullWidth isLoading={saving}>
             Simpan
           </Button>

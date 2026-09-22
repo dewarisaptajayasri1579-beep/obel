@@ -1,12 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppLogo } from "../ui/AppLogo";
-import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Settings, ArrowLeft } from "lucide-react";
 import { APP_CONFIG } from "@/lib/app-config";
-import { NAV_GROUPS, type NavItem } from "@/lib/nav-config";
+import {
+  MAIN_NAV,
+  SETTINGS_NAV,
+  DASHBOARD_ITEM,
+  detectNavMode,
+  getActiveHref,
+  type NavItem,
+  type NavGroup,
+  type NavMode,
+} from "@/lib/nav-config";
 
 export interface SidebarProps {
   isCollapsed: boolean;
@@ -14,27 +23,26 @@ export interface SidebarProps {
   className?: string;
 }
 
-function isItemActive(pathname: string, href?: string): boolean {
-  if (!href) return false;
-  return pathname === href || pathname.startsWith(href + "/") || (pathname === "/" && href === "/dashboard");
+function containsActiveChild(activeHref: string | undefined, item: NavItem): boolean {
+  return !!activeHref && (item.children?.some((child) => child.href === activeHref) ?? false);
 }
 
-function containsActiveChild(pathname: string, item: NavItem): boolean {
-  return item.children?.some((child) => isItemActive(pathname, child.href)) ?? false;
-}
-
-const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: string }> = ({ item, isCollapsed, pathname }) => {
+const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; activeHref: string | undefined }> = ({
+  item,
+  isCollapsed,
+  activeHref,
+}) => {
   const hasChildren = !!item.children?.length;
-  const activeChild = hasChildren && containsActiveChild(pathname, item);
+  const activeChild = hasChildren && containsActiveChild(activeHref, item);
   const [isOpen, setIsOpen] = useState(activeChild);
-  const isActive = isItemActive(pathname, item.href);
+  const isActive = item.href === activeHref;
   const Icon = item.icon;
 
+  // Kedua panel (Utama & Pengaturan) tetap ter-mount saat mode berganti, jadi state awal
+  // `isOpen` di atas cuma terpakai sekali seumur hidup komponen.
   useEffect(() => {
-    if (activeChild) {
-      setIsOpen(true);
-    }
-  }, [pathname, activeChild]);
+    if (activeChild) setIsOpen(true);
+  }, [activeChild]);
 
   if (hasChildren) {
     return (
@@ -65,7 +73,7 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
         {!isCollapsed && isOpen && (
           <div className="ml-4 pl-3 border-l border-white/15 space-y-0.5 my-1">
             {item.children!.map((child) => {
-              const childActive = isItemActive(pathname, child.href);
+              const childActive = child.href === activeHref;
               return (
                 <Link
                   key={child.label}
@@ -113,8 +121,59 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; pathname: 
   );
 };
 
+/** Satu daftar grup menu (satu mode). Dua panel berbagi area scroll yang sama — yang
+ *  tidak aktif di-absolute-kan supaya tidak ikut menambah tinggi konten. */
+const NavPanel: React.FC<{
+  groups: NavGroup[];
+  isCollapsed: boolean;
+  activeHref: string | undefined;
+  isVisible: boolean;
+}> = ({ groups, isCollapsed, activeHref, isVisible }) => (
+  <div
+    className={`space-y-5 transition-all duration-250 ${
+      isVisible
+        ? "opacity-100 translate-y-0"
+        : "opacity-0 translate-y-2 pointer-events-none absolute inset-x-0"
+    }`}
+  >
+    {groups.map((group, groupIndex) => (
+      <div key={group.group ?? groupIndex} className="space-y-2">
+        {group.group && !isCollapsed && (
+          <p className="px-3.5 text-[11px] font-bold uppercase tracking-wide text-white/45">{group.group}</p>
+        )}
+        {group.items.map((item) => (
+          <SidebarNavItem key={item.label} item={item} isCollapsed={isCollapsed} activeHref={activeHref} />
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, className = "" }) => {
   const pathname = usePathname() || "/dashboard";
+  const activeHref = getActiveHref([{ items: [DASHBOARD_ITEM] }, ...MAIN_NAV, ...SETTINGS_NAV], pathname);
+
+  const [mode, setMode] = useState<NavMode>(() => detectNavMode(pathname));
+  const prevPathnameRef = useRef(pathname);
+  const navRef = useRef<HTMLElement>(null);
+
+  // Ikut pindah mode saat user berpindah halaman lewat jalur lain (search bar, tautan di
+  // dalam halaman) — bukan cuma lewat tombol Pengaturan.
+  useEffect(() => {
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      setMode(detectNavMode(pathname));
+    }
+  }, [pathname]);
+
+  // Dua panel berbagi satu area scroll. Tanpa reset ini, panel yang baru muncul ikut
+  // tergulir dan bisa mendarat di tengah daftar, bukan dari atas.
+  useEffect(() => {
+    navRef.current?.scrollTo({ top: 0 });
+  }, [mode]);
+
+  const DashboardIcon = DASHBOARD_ITEM.icon!;
+  const isDashboardActive = DASHBOARD_ITEM.href === activeHref;
 
   return (
     <aside
@@ -145,17 +204,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
         )}
       </div>
 
-      <nav className="flex-1 px-3 py-6 space-y-5 overflow-y-auto">
-        {NAV_GROUPS.map((group, groupIndex) => (
-          <div key={group.group ?? groupIndex} className="space-y-2">
-            {group.group && !isCollapsed && (
-              <p className="px-3.5 text-[11px] font-bold uppercase tracking-wide text-white/45">{group.group}</p>
-            )}
-            {group.items.map((item) => (
-              <SidebarNavItem key={item.label} item={item} isCollapsed={isCollapsed} pathname={pathname} />
-            ))}
+      {/* Pergantian mode tidak mengubah URL dan tidak memindah fokus — pembaca layar
+          tidak punya cara lain untuk tahu isi menu baru saja berganti total. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {mode === "pengaturan" ? "Menu Pengaturan ditampilkan" : "Menu Utama ditampilkan"}
+      </span>
+
+      <nav ref={navRef} className="relative flex-1 min-h-0 px-3 py-6 overflow-y-auto">
+        {/* Dashboard — selalu tampil di kedua mode */}
+        <div className="mb-5">
+          <Link
+            href={DASHBOARD_ITEM.href!}
+            title={isCollapsed ? DASHBOARD_ITEM.label : undefined}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
+              isDashboardActive
+                ? "bg-brand-600 text-white shadow-md shadow-black/30"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            } ${isCollapsed ? "justify-center px-0" : ""}`}
+          >
+            <span className={`flex-shrink-0 ${isDashboardActive ? "text-white" : "text-slate-400"}`}>
+              <DashboardIcon className="w-4 h-4" />
+            </span>
+            {!isCollapsed && <span className="truncate">{DASHBOARD_ITEM.label}</span>}
+          </Link>
+        </div>
+
+        {/* Tombol kembali — cuma di mode Pengaturan */}
+        {mode === "pengaturan" && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setMode("utama")}
+              title={isCollapsed ? "Kembali ke Menu Utama" : undefined}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer text-slate-300 hover:bg-white/5 hover:text-white ${
+                isCollapsed ? "justify-center px-0" : ""
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              {!isCollapsed && <span>Kembali ke Menu Utama</span>}
+            </button>
           </div>
-        ))}
+        )}
+
+        <NavPanel groups={MAIN_NAV} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "utama"} />
+
+        {/* Tombol masuk ke mode Pengaturan — di bawah menu alur, cuma di Menu Utama */}
+        {mode === "utama" && (
+          <div className="mt-5 pt-5 border-t border-white/10 dark:border-line">
+            <button
+              type="button"
+              onClick={() => setMode("pengaturan")}
+              title={isCollapsed ? "Pengaturan" : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 cursor-pointer text-slate-300 hover:bg-white/5 hover:text-white ${
+                isCollapsed ? "justify-center px-0" : ""
+              }`}
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <span className="truncate flex-1 text-left">Pengaturan</span>
+                  <ChevronRight className="w-4 h-4 shrink-0" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        <NavPanel groups={SETTINGS_NAV} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "pengaturan"} />
       </nav>
 
       <div className="p-4 border-t border-black/20 dark:border-line bg-black/15">

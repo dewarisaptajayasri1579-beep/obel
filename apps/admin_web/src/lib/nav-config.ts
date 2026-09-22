@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
   ShoppingCart,
-  TrendingUp,
   Truck,
   PackagePlus,
   PackageSearch,
@@ -15,10 +14,11 @@ import {
   Palette,
   Store,
   Clock,
-  SlidersHorizontal,
   Users,
   BookOpen,
   Building2,
+  UserRound,
+  CalendarClock,
 } from "lucide-react";
 
 export interface NavItem {
@@ -34,29 +34,30 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-/** 
- * Konfigurasi Menu Navigasi Obbel Admin
- */
-export const NAV_GROUPS: NavGroup[] = [
-  {
-    // Group Tanpa Label (Top-Level)
-    items: [
-      {
-        // Dashboard & Laporan digabung jadi satu halaman ber-tab (lihat
-        // app/dashboard/page.tsx) — dulu dua entri menu terpisah yang saling
-        // tumpang tindih (sama-sama "ringkasan operasional").
-        label: "Dashboard",
-        href: "/dashboard",
-        icon: LayoutGrid,
-        bottomBar: true,
-      },
-    ],
-  },
+/** Dua mode sidebar — sama seperti pola jsBerkah:
+ *  - "utama"      : alur kerja harian (Transaksi, Data).
+ *  - "pengaturan" : master data & konfigurasi sistem, dibuka lewat tombol Pengaturan. */
+export type NavMode = "utama" | "pengaturan";
+
+/** Dashboard berdiri sendiri karena ditampilkan di KEDUA mode sidebar. */
+export const DASHBOARD_ITEM: NavItem = {
+  // Dashboard & Laporan digabung jadi satu halaman ber-tab (lihat
+  // app/dashboard/page.tsx) — dulu dua entri menu terpisah yang saling
+  // tumpang tindih (sama-sama "ringkasan operasional").
+  label: "Dashboard",
+  href: "/dashboard",
+  icon: LayoutGrid,
+  bottomBar: true,
+};
+
+/* ─── MENU UTAMA — alur kerja harian ──────────────────────────────────── */
+
+export const MAIN_NAV: NavGroup[] = [
   {
     group: "TRANSAKSI",
     items: [
       {
-        label: "Transaksi Kantor",
+        label: "Transaksi",
         icon: ShoppingCart,
         children: [
           {
@@ -83,12 +84,6 @@ export const NAV_GROUPS: NavGroup[] = [
             icon: Undo2,
             bottomBar: false,
           },
-        ],
-      },
-      {
-        label: "Transaksi Booth",
-        icon: TrendingUp,
-        children: [
           {
             label: "Penjualan",
             href: "/penjualan",
@@ -122,10 +117,27 @@ export const NAV_GROUPS: NavGroup[] = [
             icon: Store,
             bottomBar: false,
           },
+          {
+            label: "Petugas",
+            href: "/master/petugas",
+            icon: UserRound,
+            bottomBar: false,
+          },
+          {
+            label: "Setting Booth-Petugas",
+            href: "/master/booth-petugas",
+            icon: CalendarClock,
+            bottomBar: false,
+          },
         ],
       },
     ],
   },
+];
+
+/* ─── MENU PENGATURAN — master data & konfigurasi ─────────────────────── */
+
+export const SETTINGS_NAV: NavGroup[] = [
   {
     group: "PENGATURAN",
     items: [
@@ -148,9 +160,14 @@ export const NAV_GROUPS: NavGroup[] = [
           // Produk & Booth dipindah ke grup DATA → Data Operasional: keduanya
           // pintu masuk ke riwayat & rekap (stok, mutasi, penjualan), jadi lebih
           // sering dibuka dari sana. Sengaja TIDAK diduplikasi di sini supaya
-          // tidak ada dua tautan ke halaman yang sama.
+          // tidak ada dua tautan ke halaman yang sama. Akun Petugas Booth juga
+          // pindah ke sana (/master/petugas) — "User" di sini kini isinya
+          // cuma akun Admin/Owner.
+          //
+          // Threshold Stok Booth: tautannya dilepas dari menu (bukan halamannya
+          // — masih bisa dibuka lewat /master/threshold langsung), sama pola
+          // dengan submenu lama lain di atas.
           { label: "Shift", href: "/master/shift", icon: Clock },
-          { label: "Threshold Stok Booth", href: "/master/threshold", icon: SlidersHorizontal },
           { label: "User", href: "/master/user", icon: Users },
         ],
       },
@@ -163,6 +180,54 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+/** Prefix URL yang otomatis membuka sidebar mode Pengaturan saat halaman
+ *  di-refresh — tanpa ini, refresh di halaman master melempar sidebar balik
+ *  ke Menu Utama persis ketika user sedang berada di dalamnya. */
+export const SETTINGS_PREFIXES = ["/pengaturan", "/master", "/dokumentasi"];
+
+/** Gabungan kedua mode — dipakai search bar / apa pun yang butuh daftar lengkap. */
+export const NAV_GROUPS: NavGroup[] = [
+  { items: [DASHBOARD_ITEM] },
+  ...MAIN_NAV,
+  ...SETTINGS_NAV,
+];
+
+/** Semua href di dalam satu item, termasuk anak submenu. */
+function allHrefs(item: NavItem): string[] {
+  const own = item.href ? [item.href] : [];
+  const nested = item.children ? item.children.flatMap(allHrefs) : [];
+  return [...own, ...nested];
+}
+
+/** Semua href yang benar-benar tercantum di MENU UTAMA, termasuk anak submenu. */
+const HREF_MENU_UTAMA = MAIN_NAV.flatMap((g) => g.items).flatMap(allHrefs);
+
+/** Mode sidebar yang cocok untuk sebuah URL.
+ *
+ *  Halaman yang memang ADA di menu utama selalu menang atas awalan path —
+ *  perlu karena "/master/produk" (Menu Utama) dan "/master/shift" (Pengaturan)
+ *  berbagi prefix "/master" yang sama. */
+export function detectNavMode(pathname: string): NavMode {
+  if (HREF_MENU_UTAMA.some((href) => pathname === href || pathname.startsWith(`${href}/`))) return "utama";
+  return SETTINGS_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ? "pengaturan" : "utama";
+}
+
+/** Href PALING SPESIFIK (terpanjang) yang cocok dengan pathname saat ini,
+ *  di antara semua menu yang lagi ditampilkan — supaya cuma SATU menu yang
+ *  nyala per halaman. */
+export function getActiveHref(navGroups: NavGroup[], pathname: string): string | undefined {
+  let best: string | undefined;
+  for (const group of navGroups) {
+    for (const item of group.items) {
+      for (const href of allHrefs(item)) {
+        const isMatch = pathname === href || pathname.startsWith(href + "/") || (pathname === "/" && href === "/dashboard");
+        if (isMatch && (!best || href.length > best.length)) best = href;
+      }
+    }
+  }
+  return best;
+}
 
 // Helper untuk perataan hierarki (pencarian/search bar)
 function flattenNavItems(
