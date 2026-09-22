@@ -17,6 +17,9 @@ import { DomainExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Coolify's Traefik proxy terminates TLS and forwards over plain HTTP,
+  // so without this req.protocol always reads "http" behind the proxy.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.enableCors();
   app.getHttpAdapter().getInstance().use('/uploads', express.static(join(process.cwd(), 'uploads')));
   app.useGlobalPipes(
