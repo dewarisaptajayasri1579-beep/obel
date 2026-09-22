@@ -761,7 +761,10 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Seluruh sisa fisik cup yang dihitung akan diterbitkan sebagai return ke Gudang Pusat.',
+            'Seluruh sisa fisik cup yang dihitung wajib dikembalikan ke Gudang '
+            'Pusat lewat menu "Kembalikan Stok" di tab Shift SEBELUM menekan '
+            'Konfirmasi Closing — setelah closing dikonfirmasi, sesi ini akan '
+            'langsung keluar (logout).',
             style: TextStyle(
               color: ObbelTheme.textLight,
               fontSize: 12.5,
@@ -893,36 +896,6 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                   ),
                   textStyle: const TextStyle(
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 9),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: null,
-                icon: const Icon(
-                  Icons.local_shipping_outlined,
-                  size: 20,
-                ),
-                label: const Text(
-                  'PENGEMBALIAN STOK KE GUDANG PUSAT (RETURN)',
-                  textAlign: TextAlign.center,
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ObbelTheme.primaryDark,
-                  disabledForegroundColor: ObbelTheme.primaryDark,
-                  side: const BorderSide(
-                    color: ObbelTheme.primaryDark,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
