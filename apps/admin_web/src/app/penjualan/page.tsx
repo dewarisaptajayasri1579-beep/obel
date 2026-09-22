@@ -51,14 +51,14 @@ function ImpactPreview({ impact }: { impact: SaleCorrectionImpact }) {
     <div className="rounded-xl border border-slate-200 dark:border-line p-3 space-y-1 text-sm">
       <p>
         Omzet:{" "}
-        <span className={impact.omzetDelta < 0 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+        <span className={impact.omzetDelta < 0 ? "text-red-500 font-semibold" : "text-brand-500 font-semibold"}>
           {impact.omzetDelta > 0 ? "+" : ""}
           {formatRupiah(impact.omzetDelta)}
         </span>
       </p>
       <p>
         Cup Terjual:{" "}
-        <span className={impact.cupSoldDelta < 0 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+        <span className={impact.cupSoldDelta < 0 ? "text-red-500 font-semibold" : "text-brand-500 font-semibold"}>
           {impact.cupSoldDelta > 0 ? "+" : ""}
           {impact.cupSoldDelta}
         </span>

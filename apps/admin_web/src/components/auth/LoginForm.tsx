@@ -44,7 +44,7 @@ export const LoginForm: React.FC<{ showTopLockIcon?: boolean; className?: string
     <div className={`w-full ${className}`}>
       {showTopLockIcon && (
         <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 rounded-full bg-[#f0f5ff] dark:bg-blue-500/10 text-[#0544cc] dark:text-[var(--accent-primary)] border border-blue-100 dark:border-blue-500/30 flex items-center justify-center shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-[#F0FFF8] dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-[var(--accent-primary)] border border-brand-100 dark:border-brand-500/30 flex items-center justify-center shadow-sm">
             <Lock className="w-7 h-7 stroke-[2.2]" />
           </div>
         </div>

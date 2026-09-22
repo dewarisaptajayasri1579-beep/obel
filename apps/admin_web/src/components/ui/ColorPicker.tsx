@@ -15,7 +15,7 @@ export interface ColorPickerProps {
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
   label,
-  value = "#3b82f6",
+  value = "var(--brand-500)",
   onChange,
   helperText,
   error,
@@ -56,7 +56,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         </span>
       )}
       <div
-        className={`flex items-center w-full bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] transition-all duration-200 focus-within:bg-white/95 dark:focus-within:bg-[var(--field-bg)] focus-within:border-blue-600 dark:focus-within:border-[#3B82F6] focus-within:ring-4 focus-within:ring-blue-500/10 dark:focus-within:ring-0 dark:focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.12),0_0_16px_rgba(59,130,246,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none ${
+        className={`flex items-center w-full bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] transition-all duration-200 focus-within:bg-white/95 dark:focus-within:bg-[var(--field-bg)] focus-within:border-brand-600 dark:focus-within:border-[var(--brand-500)] focus-within:ring-4 focus-within:ring-brand-500/10 dark:focus-within:ring-0 dark:focus-within:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12),0_0_16px_rgba(79, 169, 125,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none ${
           error ? "border-red-500 focus-within:ring-red-500/10 focus-within:border-red-500" : ""
         } ${sizeClasses[sizeVariant]}`}
       >

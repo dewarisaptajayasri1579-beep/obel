@@ -21,7 +21,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   };
 
   const colorClasses = {
-    primary: "border-blue-200 dark:border-line border-t-blue-700 dark:border-t-blue-400",
+    primary: "border-brand-200 dark:border-line border-t-brand-700 dark:border-t-brand-400",
     white: "border-white/30 border-t-white",
     slate: "border-slate-200 dark:border-line border-t-slate-700 dark:border-t-slate-300",
   };

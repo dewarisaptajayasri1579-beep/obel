@@ -14,6 +14,7 @@ import { RestockRequestsModule } from './modules/restock-requests/restock-reques
 import { ReturnsModule } from './modules/returns/returns.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BoothStockModule } from './modules/booth-stock/booth-stock.module';
+import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { BoothStockThresholdsModule } from './modules/booth-stock-thresholds/booth-stock-thresholds.module';
 import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.module';
@@ -40,6 +41,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ReturnsModule,
     DashboardModule,
     BoothStockModule,
+    StockMovementsModule,
     ReportsModule,
     BoothStockThresholdsModule,
     ShiftTemplatesModule,

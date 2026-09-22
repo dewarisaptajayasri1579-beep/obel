@@ -14,8 +14,8 @@ export interface StatTileProps {
 }
 
 const VALUE_COLOR_CLASSES: Record<NonNullable<StatTileProps["color"]>, string> = {
-  blue: "text-blue-600 dark:text-[var(--accent-primary)]",
-  emerald: "text-emerald-600 dark:text-emerald-400",
+  blue: "text-brand-600 dark:text-[var(--accent-primary)]",
+  emerald: "text-brand-600 dark:text-brand-400",
   amber: "text-amber-600 dark:text-amber-400",
   rose: "text-rose-600 dark:text-rose-400",
   purple: "text-violet-600 dark:text-violet-400",
@@ -23,25 +23,25 @@ const VALUE_COLOR_CLASSES: Record<NonNullable<StatTileProps["color"]>, string> =
 };
 
 const ICON_WRAP_CLASSES: Record<NonNullable<StatTileProps["color"]>, string> = {
-  blue: "bg-blue-500/15 dark:bg-[rgba(59,130,246,0.14)] text-blue-700 dark:text-[#60A5FA]",
-  emerald: "bg-emerald-500/15 dark:bg-[rgba(16,185,129,0.14)] text-emerald-700 dark:text-[#34D399]",
+  blue: "bg-brand-500/15 dark:bg-[rgba(79, 169, 125,0.14)] text-brand-700 dark:text-[var(--brand-400)]",
+  emerald: "bg-brand-500/15 dark:bg-[rgba(46,140,99,0.14)] text-brand-700 dark:text-[#34D399]",
   amber: "bg-amber-500/15 dark:bg-[rgba(245,158,11,0.14)] text-amber-700 dark:text-[#FBBF24]",
   rose: "bg-rose-500/15 dark:bg-[rgba(239,68,68,0.14)] text-rose-700 dark:text-[#F87171]",
-  purple: "bg-purple-500/15 dark:bg-[rgba(139,92,246,0.14)] text-purple-700 dark:text-[#C084FC]",
+  purple: "bg-purple-500/15 dark:bg-[rgba(92, 246, 130,0.14)] text-purple-700 dark:text-[#C084FC]",
   slate: "bg-slate-500/15 dark:bg-[rgba(148,163,184,0.14)] text-slate-700 dark:text-fg-secondary",
 };
 
 const CARD_COLOR_CLASSES: Record<NonNullable<StatTileProps["color"]>, string> = {
-  blue: "dark:border-blue-500/30 dark:shadow-[0_0_20px_rgba(59,130,246,0.12)]",
-  emerald: "dark:border-emerald-500/30 dark:shadow-[0_0_20px_rgba(16,185,129,0.12)]",
+  blue: "dark:border-brand-500/30 dark:shadow-[0_0_20px_rgba(79, 169, 125,0.12)]",
+  emerald: "dark:border-brand-500/30 dark:shadow-[0_0_20px_rgba(46,140,99,0.12)]",
   amber: "dark:border-amber-500/30 dark:shadow-[0_0_20px_rgba(245,158,11,0.12)]",
   rose: "dark:border-rose-500/30 dark:shadow-[0_0_20px_rgba(244,63,94,0.12)]",
-  purple: "dark:border-purple-500/30 dark:shadow-[0_0_20px_rgba(139,92,246,0.12)]",
+  purple: "dark:border-purple-500/30 dark:shadow-[0_0_20px_rgba(92, 246, 130,0.12)]",
   slate: "dark:border-[var(--line)]",
 };
 
 const SPARKLINE_COLORS: Record<NonNullable<StatTileProps["color"]>, string> = {
-  blue: "#3b82f6",
+  blue: "var(--brand-500)",
   emerald: "#10b981",
   amber: "#f59e0b",
   rose: "#f43f5e",
@@ -113,7 +113,7 @@ export const StatTile: React.FC<StatTileProps> = ({
           {trend && (
             <div
               className={`flex items-center gap-1 mt-1.5 text-xs font-bold ${
-                trend.direction === "up" ? "text-emerald-600 dark:text-[#34D399]" : "text-rose-600 dark:text-[#F87171]"
+                trend.direction === "up" ? "text-brand-600 dark:text-[#34D399]" : "text-rose-600 dark:text-[#F87171]"
               }`}
             >
               {trend.direction === "up" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}

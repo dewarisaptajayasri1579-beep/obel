@@ -136,8 +136,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           aria-haspopup="listbox"
           aria-controls={listboxId}
           onClick={() => (open ? setOpen(false) : openDropdown())}
-          className={`w-full flex items-center flex-wrap gap-1.5 ${sizeClasses[sizeVariant]} pr-10 bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-left transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-blue-600 dark:focus:border-[#3B82F6] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12),0_0_16px_rgba(59,130,246,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-            open ? "bg-white/95 dark:bg-[var(--field-bg)] border-blue-600 ring-4 ring-blue-500/10" : ""
+          className={`w-full flex items-center flex-wrap gap-1.5 ${sizeClasses[sizeVariant]} pr-10 bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-left transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-brand-600 dark:focus:border-[var(--brand-500)] focus:ring-4 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12),0_0_16px_rgba(79, 169, 125,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+            open ? "bg-white/95 dark:bg-[var(--field-bg)] border-brand-600 ring-4 ring-brand-500/10" : ""
           } ${error ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : ""} ${className}`}
         >
           {selectedOptions.length === 0 ? (
@@ -147,7 +147,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               {visibleChips.map((opt) => (
                 <span
                   key={opt.value}
-                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg bg-blue-500/15 text-blue-700 dark:text-[var(--accent-primary)] text-xs font-bold"
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg bg-brand-500/15 text-brand-700 dark:text-[var(--accent-primary)] text-xs font-bold"
                 >
                   {opt.label}
                   <span
@@ -157,7 +157,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                       e.stopPropagation();
                       removeValue(opt.value);
                     }}
-                    className="p-0.5 rounded hover:bg-blue-500/20 cursor-pointer"
+                    className="p-0.5 rounded hover:bg-brand-500/20 cursor-pointer"
                     aria-label={`Hapus ${opt.label}`}
                   >
                     <X className="w-3 h-3" />
@@ -205,7 +205,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-50 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-sm text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted font-medium focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                    className="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-50 dark:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-sm text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted font-medium focus:outline-none focus:bg-white dark:focus:bg-[var(--field-bg)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
                   />
                 </div>
               </div>
@@ -230,13 +230,13 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                         opt.disabled
                           ? "opacity-40 cursor-not-allowed"
                           : isSelected
-                          ? "bg-blue-50 dark:bg-blue-500/15 text-[#0544cc] dark:text-[var(--accent-primary)]"
+                          ? "bg-brand-50 dark:bg-brand-500/15 text-[var(--brand-700)] dark:text-[var(--accent-primary)]"
                           : "text-slate-700 dark:text-fg-secondary hover:bg-slate-50 dark:hover:bg-surface-hover"
                       }`}
                     >
                       <span
                         className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? "bg-[#0544cc] border-[#0544cc]" : "border-slate-300 dark:border-[rgba(148,163,184,0.14)]"
+                          isSelected ? "bg-[var(--brand-700)] border-[var(--brand-700)]" : "border-slate-300 dark:border-[rgba(148,163,184,0.14)]"
                         }`}
                       >
                         {isSelected && <Check className="w-3 h-3 text-white" />}

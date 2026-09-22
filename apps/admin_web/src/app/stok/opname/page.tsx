@@ -221,7 +221,7 @@ function OpnameContent() {
                           onChange={(v) => setActualByProduct((prev) => ({ ...prev, [item.productId]: v }))}
                         />
                       </TableCell>
-                      <TableCell className={diff < 0 ? "text-red-500 font-semibold" : diff > 0 ? "text-emerald-500 font-semibold" : ""}>
+                      <TableCell className={diff < 0 ? "text-red-500 font-semibold" : diff > 0 ? "text-brand-500 font-semibold" : ""}>
                         {diff > 0 ? `+${diff}` : diff}
                       </TableCell>
                     </TableRow>

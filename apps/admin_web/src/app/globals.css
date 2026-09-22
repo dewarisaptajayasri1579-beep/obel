@@ -9,41 +9,99 @@ html {
 }
 
 :root {
-  /* Brand Colors */
-  --brand-blue-50: #eff6ff;
-  --brand-blue-100: #dbeafe;
-  --brand-blue-500: #2563eb;
-  --brand-blue-600: #0b4ecb;
-  --brand-blue-700: #0544cc;
-  --brand-blue-800: #1e3a8a;
-  
-  /* Status Indicator Colors */
+  /* ---- Skala Brand (Aksen) — 10 langkah, dipilih SENGAJA lebih redup &
+     kurang jenuh daripada skala emerald bawaan Tailwind, supaya tombol,
+     sorotan menu, dan cincin fokus tidak menyala/neon (keluhan "silau").
+     700/800 mengunci ke identitas Obbel di apps/booth_flutter/lib/theme.dart
+     (#0B5D34 / #074526); langkah lainnya diturunkan darinya.
+
+     Ini PALET BAWAAN ("Hijau Obbel"). Palet lain tinggal mendefinisikan
+     ulang sepuluh variabel yang sama di bawah selector
+     :root[data-accent="..."] — lihat blok di bawah — dan seluruh aplikasi
+     ikut berganti karena setiap tombol/tab/link memakai token ini, bukan
+     warna literal. Accent dipilih di Pengaturan → Tampilan
+     (PreferencesProvider, disimpan per-browser). */
+  --brand-50: #EAF6EF;
+  --brand-100: #D2ECDC;
+  --brand-200: #A6D9BB;
+  --brand-300: #78C39B;
+  --brand-400: #4FA97D;
+  --brand-500: #2E8C63;
+  --brand-600: #1F7350;
+  --brand-700: #0B5D34;
+  --brand-800: #074526;
+  --brand-900: #043018;
+
+  /* Status Indicator Colors — SEMANTIK, tidak ikut berganti dengan accent.
+     "Aman"/"Lunas" harus tetap terbaca hijau apa pun warna brand yang
+     dipilih Admin, supaya artinya tidak pernah ambigu. */
   --status-safe: #10b981;    /* Hijau - aman/lunas */
-  --status-info: #0284c7;    /* Biru - bulan depan/dicicil */
+  --status-info: #0D9488;    /* Teal - bulan depan/dicicil */
   --status-warn: #f59e0b;    /* Kuning - bulan ini/dicicil */
   --status-danger: #ef4444;  /* Merah - expired/belum bayar */
   --status-claim: #8b5cf6;   /* Ungu - klaim belum diverifikasi */
   --status-inactive: #64748b;/* Abu-abu - nonaktif */
 
-  --background: #eef4fc;
+  --background: #F1F7F2;
   --foreground: #0f172a;
 }
 
+/* ---- Palet Aksen alternatif ----
+   Tiap palet mendefinisikan ulang --brand-50..900 dengan pola terang &
+   kepekatan yang SAMA seperti palet bawaan (500 = pertengahan, 700 = warna
+   tombol utama, 900 = paling gelap) — supaya kontras & keterbacaan tidak
+   ikut berubah saat Admin berpindah warna, hanya ronanya. */
+:root[data-accent="teal"] {
+  --brand-50: #E7F6F5; --brand-100: #C9EAE8; --brand-200: #96D3CE;
+  --brand-300: #64B8B1; --brand-400: #3B9D95; --brand-500: #26847C;
+  --brand-600: #1C6D66; --brand-700: #135952; --brand-800: #0C433D;
+  --brand-900: #072D29;
+}
+/* Biru bawaan ASLI admin_web sebelum aplikasi ini dijadikan hijau — nilai
+   50/100/500/600/700/800 di bawah adalah angka historisnya persis
+   (--brand-blue-* yang dulu ada di :root), bukan biru baru. 200/300/400/900
+   diisi dari skala biru Tailwind bawaan supaya tangganya lengkap 10 langkah,
+   karena token lama cuma py 6 titik. */
+:root[data-accent="blue"] {
+  --brand-50: #EFF6FF; --brand-100: #DBEAFE; --brand-200: #BFDBFE;
+  --brand-300: #93C5FD; --brand-400: #60A5FA; --brand-500: #2563EB;
+  --brand-600: #0B4ECB; --brand-700: #0544CC; --brand-800: #1E3A8A;
+  --brand-900: #142657;
+}
+:root[data-accent="violet"] {
+  --brand-50: #F1EDF9; --brand-100: #DED2F0; --brand-200: #BBA5E1;
+  --brand-300: #9B7FCF; --brand-400: #8264B9; --brand-500: #6B4EA0;
+  --brand-600: #563E82; --brand-700: #443167; --brand-800: #33254E;
+  --brand-900: #221935;
+}
+:root[data-accent="coffee"] {
+  --brand-50: #F5EEE6; --brand-100: #E6D3BE; --brand-200: #CDA97F;
+  --brand-300: #B3854E; --brand-400: #966B39; --brand-500: #7C572E;
+  --brand-600: #654624; --brand-700: #50381D; --brand-800: #3B2915;
+  --brand-900: #271B0E;
+}
+:root[data-accent="maroon"] {
+  --brand-50: #F7EBEC; --brand-100: #EBCBCD; --brand-200: #D6979C;
+  --brand-300: #BE6D74; --brand-400: #A24E56; --brand-500: #863C43;
+  --brand-600: #6C2F35; --brand-700: #56262B; --brand-800: #401C20;
+  --brand-900: #2B1315;
+}
+
 .dark {
-  --background: #060b14;
+  --background: #06120C;
   --foreground: #f8fafc;
 
   /* ---- Design token: "Premium Midnight SaaS + Subtle Electric Blue" ----
      Dipakai CUMA di dark mode (didefinisikan di sini, bukan di :root), jadi
      class dark:bg-surface dsb otomatis tidak pernah kepakai di light mode —
      light mode aman by construction, bukan cuma "hati-hati". */
-  --surface: #0d1625;
-  --surface-hover: #111c2c;
-  --elevated: #121d30;
-  --table-header: #0f1826;
-  --sidebar-bg: #080e1a;
-  --topbar-bg: rgba(6, 11, 20, 0.85);
-  --field-bg: #0c1220;
+  --surface: #0D1A13;
+  --surface-hover: #122218;
+  --elevated: #14261A;
+  --table-header: #101F16;
+  --sidebar-bg: #08150E;
+  --topbar-bg: rgba(6, 18, 12, 0.85);
+  --field-bg: #0B1711;
   --line: rgba(148, 163, 184, 0.12);
   --line-strong: rgba(148, 163, 184, 0.18);
   --hairline: rgba(148, 163, 184, 0.08);
@@ -51,19 +109,38 @@ html {
   --fg-secondary: #cbd5e1;
   --fg-muted: #94a3b8;
   --fg-disabled: #64748b;
-  --accent-primary: #3b82f6;
-  --accent-primary-hover: #2563eb;
-  --accent-highlight: #60a5fa;
-  --accent-electric: #38bdf8;
-  --glow-soft: 0 0 18px rgba(59, 130, 246, 0.12);
+  /* Diturunkan dari skala brand (bukan hex tersendiri) — jadi glow & cincin
+     fokus dark mode otomatis ikut redup dan ikut berganti saat accent
+     dipilih, bukan warna neon tetap yang terpisah dari sistemnya. */
+  --accent-primary: var(--brand-400);
+  --accent-primary-hover: var(--brand-300);
+  --accent-highlight: var(--brand-300);
+  --accent-electric: var(--brand-400);
+  --glow-soft: 0 0 18px rgba(79, 169, 125, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-brand-primary: var(--brand-blue-700);
-  --color-brand-dark: var(--brand-blue-800);
+  --color-brand-primary: var(--brand-700);
+  --color-brand-dark: var(--brand-800);
   --font-sans: var(--font-plus-jakarta), system-ui, -apple-system, sans-serif;
+
+  /* Skala aksen lengkap — mendaftarkan utility bg-brand-500, text-brand-700,
+     border-brand-600/40, shadow-brand-800, dst secara otomatis (pola Tailwind
+     v4 "@theme inline": kelas yang dihasilkan membaca variabel runtime, jadi
+     mengganti --brand-* di :root/[data-accent] cukup untuk mewarnai ulang
+     SELURUH aplikasi tanpa membangun ulang CSS-nya). */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
 
   /* Token dark-mode yang paling sering dipakai — didaftarkan sebagai utility
      class (dark:bg-surface, dark:text-fg-muted, dst). Token yang lebih jarang
@@ -96,20 +173,20 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(220, 230, 245, 0.5);
+  background: rgba(220, 245, 233, 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(180, 200, 230, 0.8);
+  background: rgba(180, 230, 205, 0.8);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(140, 170, 210, 1);
+  background: rgba(140, 210, 175, 1);
 }
 
 .dark ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 42, 29, 0.6);
 }
 
 .dark ::-webkit-scrollbar-thumb {
@@ -128,61 +205,61 @@ body {
 .glass-mockup-card,
 .glass-card {
   position: relative;
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 246, 255, 0.65) 60%, rgba(230, 240, 255, 0.72) 100%);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 255, 248, 0.65) 60%, rgba(230, 255, 242, 0.72) 100%);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: 
-    0 30px 65px -12px rgba(28, 78, 188, 0.18),
+    0 30px 65px -12px rgba(28, 188, 108, 0.18),
     0 0 35px rgba(255, 255, 255, 0.9) inset,
-    0 15px 35px -5px rgba(37, 99, 235, 0.1);
+    0 15px 35px -5px color-mix(in srgb, var(--brand-500) 10%, transparent);
 }
 
 /* Semi-transparent Glossy Feature & Stats Cards */
 .glass-mockup-feature-card,
 .glass-feature-card {
   position: relative;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 246, 255, 0.65) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 255, 248, 0.65) 100%);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: 
-    0 15px 32px -8px rgba(28, 78, 188, 0.14),
+    0 15px 32px -8px rgba(28, 188, 108, 0.14),
     0 0 20px rgba(255, 255, 255, 0.85) inset,
-    0 4px 14px rgba(37, 99, 235, 0.08);
+    0 4px 14px color-mix(in srgb, var(--brand-500) 8%, transparent);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-mockup-feature-card:hover,
 .glass-feature-card:hover {
   transform: translateY(-2px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(240, 246, 255, 0.75) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(240, 255, 248, 0.75) 100%);
   box-shadow:
-    0 20px 40px -8px rgba(28, 78, 188, 0.2),
+    0 20px 40px -8px rgba(28, 188, 108, 0.2),
     0 0 25px rgba(255, 255, 255, 0.95) inset;
 }
 
 /* Reusable Glass Panel Wrapper (Sections, Content Containers) */
 .glass-panel {
   position: relative;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(245, 250, 255, 0.45) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(245, 255, 250, 0.45) 100%);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow:
-    0 35px 70px -15px rgba(15, 37, 85, 0.16),
+    0 35px 70px -15px rgba(15, 85, 50, 0.16),
     0 0 30px rgba(255, 255, 255, 0.7) inset;
 }
 
 /* Reusable Glass Modal / Overlay Container */
 .glass-modal {
   position: relative;
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(243, 248, 255, 0.88) 100%);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(243, 255, 249, 0.88) 100%);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow:
-    0 35px 80px -15px rgba(15, 37, 85, 0.28),
+    0 35px 80px -15px rgba(15, 85, 50, 0.28),
     0 0 40px rgba(255, 255, 255, 0.9) inset;
 }
 
@@ -192,26 +269,32 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 20px -2px rgba(28, 78, 188, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(28, 188, 108, 0.08);
 }
 
 /* Reusable Glass Dropdown Menu */
 .glass-dropdown {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(245, 250, 255, 0.85) 100%);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(245, 255, 250, 0.85) 100%);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1.5px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 40px -10px rgba(15, 37, 85, 0.18);
+  box-shadow: 0 20px 40px -10px rgba(15, 85, 50, 0.18);
 }
 
-/* App Background Mesh Gradient */
+/* App Background Mesh Gradient — INI kanvas di belakang seluruh halaman
+   (dipasang di .app-shell yang membungkus sidebar+konten), bukan cuma warna
+   di balik satu kartu. Sebelumnya empat radial-gradient di sini hardcode
+   rgba() literal, jadi tidak pernah ikut berganti saat accent dipilih —
+   itulah "latar konten" yang dilaporkan tidak berubah padahal sidebar sudah.
+   Sekarang dibangun dari --brand-* lewat color-mix(), jadi warnanya ikut
+   pindah bersama accent yang sama seperti sidebar/tombol. */
 .bg-app-mesh {
-  background-color: #eef4fc;
+  background-color: var(--brand-50);
   background-image:
-    radial-gradient(at 0% 0%, rgba(219, 234, 254, 0.9) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(191, 219, 254, 0.75) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(238, 242, 255, 0.95) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(224, 231, 255, 0.8) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, color-mix(in srgb, var(--brand-200) 55%, transparent) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, color-mix(in srgb, var(--brand-300) 45%, transparent) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, color-mix(in srgb, var(--brand-100) 60%, transparent) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, color-mix(in srgb, var(--brand-200) 50%, transparent) 0px, transparent 50%);
 }
 
 /* ---- Dark mode: "Premium Midnight SaaS + Subtle Electric Blue" ----
@@ -225,12 +308,12 @@ body {
 .dark .glass-card {
   background: linear-gradient(180deg, var(--surface-hover) 0%, var(--surface) 14%);
   border-width: 1px;
-  border-color: rgba(59, 130, 246, 0.25);
+  border-color: color-mix(in srgb, var(--brand-400) 25%, transparent);
   box-shadow:
     0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 16px 40px -12px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(59, 130, 246, 0.08);
+    0 0 20px color-mix(in srgb, var(--brand-400) 8%, transparent);
 }
 
 .dark .glass-mockup-feature-card,
@@ -257,12 +340,12 @@ body {
 .dark .glass-panel {
   background: linear-gradient(180deg, var(--surface-hover) 0%, var(--surface) 10%);
   border-width: 1px;
-  border-color: rgba(59, 130, 246, 0.25);
+  border-color: color-mix(in srgb, var(--brand-400) 25%, transparent);
   box-shadow:
     0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 20px 50px -15px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(59, 130, 246, 0.08);
+    0 0 20px color-mix(in srgb, var(--brand-400) 8%, transparent);
 }
 
 .dark .glass-modal {
@@ -294,10 +377,13 @@ body {
 }
 
 .dark .bg-app-mesh {
+  /* rgba literal lama (37,235,136 / 59,246,153) lolos dari pembersihan neon
+     sebelumnya karena berada di file .css, sementara skrip yang dipakai saat
+     itu cuma menyisir *.ts/*.tsx. Sekarang ikut var(--brand-*) juga. */
   background:
-    radial-gradient(circle at 75% 12%, rgba(37, 99, 235, 0.08), transparent 32%),
-    radial-gradient(circle at 10% 90%, rgba(59, 130, 246, 0.04), transparent 28%),
-    #060b14;
+    radial-gradient(circle at 75% 12%, color-mix(in srgb, var(--brand-400) 12%, transparent), transparent 32%),
+    radial-gradient(circle at 10% 90%, color-mix(in srgb, var(--brand-300) 8%, transparent), transparent 28%),
+    var(--background);
 }
 
 /* Smooth Subtle Animations */

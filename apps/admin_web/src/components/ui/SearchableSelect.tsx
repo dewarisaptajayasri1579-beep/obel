@@ -75,7 +75,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between text-left ${sizeClasses[sizeVariant]} bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-800 dark:text-fg font-medium transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-blue-600 dark:focus:border-[#3B82F6] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12),0_0_16px_rgba(59,130,246,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none cursor-pointer ${
+        className={`w-full flex items-center justify-between text-left ${sizeClasses[sizeVariant]} bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-slate-800 dark:text-fg font-medium transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-brand-600 dark:focus:border-[var(--brand-500)] focus:ring-4 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12),0_0_16px_rgba(79, 169, 125,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none cursor-pointer ${
           error ? "border-red-500 focus:ring-red-500/10" : ""
         }`}
       >
@@ -96,7 +96,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari..."
-              className="w-full h-9 pl-9 pr-3 text-xs font-semibold rounded-xl bg-slate-100/50 dark:bg-black/20 border border-slate-200/80 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-blue-500 dark:focus:border-[#3B82F6]"
+              className="w-full h-9 pl-9 pr-3 text-xs font-semibold rounded-xl bg-slate-100/50 dark:bg-black/20 border border-slate-200/80 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-brand-500 dark:focus:border-[var(--brand-500)]"
             />
           </div>
 
@@ -110,7 +110,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   onClick={() => handleSelect(opt.value)}
                   className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                     opt.value === value
-                      ? "bg-blue-500/10 text-blue-700 dark:bg-[rgba(59,130,246,0.10)] dark:text-[#60A5FA]"
+                      ? "bg-brand-500/10 text-brand-700 dark:bg-[rgba(79, 169, 125,0.10)] dark:text-[var(--brand-400)]"
                       : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                   }`}
                 >

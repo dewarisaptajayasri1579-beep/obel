@@ -6,7 +6,7 @@ import { usePreferences } from "@/components/providers/PreferencesProvider"
  *  cukup legible di kedua tema karena cukup jenuh — cuma grid/axis/tooltip yang perlu
  *  varian gelap eksplisit, makanya lewat useChartColors() (bukan CSS var) karena Recharts
  *  butuh nilai warna langsung, bukan class Tailwind. */
-export const CHART_COLORS = ["#0544cc", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0284c7"] as const
+export const CHART_COLORS = ["var(--brand-700)", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0284c7"] as const
 
 export interface ChartSeries {
   key: string

@@ -146,7 +146,7 @@ export const CommandPalette: React.FC = () => {
                     onClick={() => go(s.href)}
                     onMouseEnter={() => setActiveIndex(i)}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-colors cursor-pointer ${
-                      active ? "bg-[#0544cc] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
+                      active ? "bg-[var(--brand-700)] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                     }`}
                   >
                     <span>{s.label}</span>
@@ -172,12 +172,12 @@ export const CommandPalette: React.FC = () => {
                     onClick={() => go(r.href)}
                     onMouseEnter={() => setActiveIndex(idx)}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors cursor-pointer ${
-                      active ? "bg-[#0544cc] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
+                      active ? "bg-[var(--brand-700)] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                     }`}
                   >
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{r.title}</p>
-                      {r.subtitle && <p className={`text-xs truncate ${active ? "text-blue-100" : "text-slate-400 dark:text-fg-muted"}`}>{r.subtitle}</p>}
+                      {r.subtitle && <p className={`text-xs truncate ${active ? "text-brand-100" : "text-slate-400 dark:text-fg-muted"}`}>{r.subtitle}</p>}
                     </div>
                     <span
                       className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${

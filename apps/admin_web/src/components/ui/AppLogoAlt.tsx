@@ -19,7 +19,7 @@ export const AppLogoAlt: React.FC<AppLogoAltProps> = ({
   layout = "horizontal",
   showTagline = true,
   iconOnly = false,
-  textColor = "text-[#1B357A] dark:text-white",
+  textColor = "text-[#1B7A4B] dark:text-white",
   className = "",
 }) => {
   const iconSizes = {
@@ -51,8 +51,8 @@ export const AppLogoAlt: React.FC<AppLogoAltProps> = ({
     >
       <div className={`relative flex-shrink-0 ${iconSizes[size]}`}>
         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-md select-none">
-          <rect x="12" y="12" width="176" height="176" rx="48" fill="#132A63" />
-          <rect x="12" y="12" width="176" height="176" rx="48" fill="none" stroke="#3B82F6" strokeOpacity="0.4" strokeWidth="5" />
+          <rect x="12" y="12" width="176" height="176" rx="48" fill="#13633B" />
+          <rect x="12" y="12" width="176" height="176" rx="48" fill="none" stroke="var(--brand-500)" strokeOpacity="0.4" strokeWidth="5" />
           <text x="100" y="148" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="128" fontWeight="800" fill="#FFFFFF">
             7
           </text>
@@ -65,7 +65,7 @@ export const AppLogoAlt: React.FC<AppLogoAltProps> = ({
           <h1 className={`font-black tracking-tight leading-none ${textColor} ${titleSizes[size]}`}>{APP_CONFIG.name}</h1>
           {showTagline && (
             <div className={`mt-1.5 font-bold leading-tight ${subtitleSizes[size]}`}>
-              <div className="text-blue-600 dark:text-[var(--accent-primary)]">{APP_CONFIG.tagline}</div>
+              <div className="text-brand-600 dark:text-[var(--accent-primary)]">{APP_CONFIG.tagline}</div>
               <div className="text-slate-600 dark:text-fg-muted font-semibold">{APP_CONFIG.subTagline}</div>
             </div>
           )}

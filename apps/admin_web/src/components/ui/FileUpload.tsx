@@ -85,7 +85,7 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
               : "cursor-pointer bg-white/60 hover:bg-white/80 dark:bg-surface dark:hover:bg-surface-hover"
           } ${
             isDragOver
-              ? "border-blue-600 bg-blue-50/60 dark:bg-blue-500/10 ring-4 ring-blue-500/10"
+              ? "border-brand-600 bg-brand-50/60 dark:bg-brand-500/10 ring-4 ring-brand-500/10"
               : error
               ? "border-red-400"
               : "border-slate-300 dark:border-[rgba(148,163,184,0.14)]"
@@ -102,8 +102,8 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
               </div>
 
               <div className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 dark:text-fg-muted">
-                <Upload className="w-4 h-4 text-blue-700 dark:text-[var(--accent-primary)]" />
-                <span className="text-blue-700 dark:text-[var(--accent-primary)]">
+                <Upload className="w-4 h-4 text-brand-700 dark:text-[var(--accent-primary)]" />
+                <span className="text-brand-700 dark:text-[var(--accent-primary)]">
                   Klik untuk mengganti foto
                 </span>
               </div>
@@ -113,13 +113,13 @@ export const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
               <Upload
                 className={`w-6 h-6 ${
                   isDragOver
-                    ? "text-blue-600 dark:text-[var(--accent-primary)]"
+                    ? "text-brand-600 dark:text-[var(--accent-primary)]"
                     : "text-slate-400 dark:text-fg-muted"
                 }`}
               />
 
               <p className="text-sm font-semibold text-slate-600 dark:text-fg-muted">
-                <span className="text-blue-700 dark:text-[var(--accent-primary)]">
+                <span className="text-brand-700 dark:text-[var(--accent-primary)]">
                   Klik untuk unggah
                 </span>{" "}
                 atau tarik file ke sini

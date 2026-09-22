@@ -11,10 +11,8 @@ import {
   Receipt,
   Database,
   Package,
-  Warehouse,
-  ClipboardCheck,
   Settings,
-  Sliders,
+  Palette,
   Store,
   Clock,
   SlidersHorizontal,
@@ -98,6 +96,10 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // Submenu lama (Monitor Stok Booth, Stok Gudang, Stok Opname, Adjustment)
+    // sedang disusun ulang mengikuti docsV2/06-data-operasional.md. Halamannya
+    // TIDAK dihapus dan masih bisa dibuka lewat URL langsung — yang dilepas
+    // hanya tautannya, sampai penggantinya siap.
     group: "DATA",
     items: [
       {
@@ -105,27 +107,9 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Database,
         children: [
           {
-            label: "Monitor Stok Booth",
-            href: "/stok/booth",
+            label: "Produk",
+            href: "/master/produk",
             icon: Package,
-            bottomBar: false,
-          },
-          {
-            label: "Stok Gudang",
-            href: "/stok/gudang",
-            icon: Warehouse,
-            bottomBar: false,
-          },
-          {
-            label: "Stok Opname",
-            href: "/stok/opname",
-            icon: ClipboardCheck,
-            bottomBar: false,
-          },
-          {
-            label: "Adjustment / Koreksi Stok",
-            href: "/stok/adjustment",
-            icon: Sliders,
             bottomBar: false,
           },
         ],
@@ -136,10 +120,18 @@ export const NAV_GROUPS: NavGroup[] = [
     group: "PENGATURAN",
     items: [
       {
+        label: "Tampilan",
+        href: "/pengaturan/tampilan",
+        icon: Palette,
+        bottomBar: false,
+      },
+      {
         label: "Master Data",
         icon: Settings,
         children: [
-          { label: "Produk", href: "/master/produk", icon: Package },
+          // Produk dipindah ke grup DATA → Data Operasional: dia pintu masuk ke
+          // riwayat & rekap stok, jadi lebih sering dibuka dari sana. Sengaja
+          // TIDAK diduplikasi di sini supaya tidak ada dua tautan ke halaman sama.
           { label: "Booth", href: "/master/booth", icon: Store },
           { label: "Shift", href: "/master/shift", icon: Clock },
           { label: "Threshold Stok Booth", href: "/master/threshold", icon: SlidersHorizontal },

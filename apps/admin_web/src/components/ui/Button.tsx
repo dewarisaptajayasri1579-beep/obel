@@ -32,23 +32,23 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        "bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white shadow-lg shadow-blue-700/25 hover:shadow-blue-700/40 hover:from-blue-600 hover:to-indigo-800 focus:ring-blue-500/30 border border-blue-600/30 dark:border-transparent dark:from-[#2563EB] dark:via-[#2563EB] dark:to-[#3B82F6] dark:hover:from-[#2563EB] dark:hover:via-[#3B82F6] dark:hover:to-[#60A5FA] dark:shadow-[0_4px_14px_rgba(37,99,235,0.25),0_0_20px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_4px_18px_rgba(37,99,235,0.32),0_0_26px_rgba(59,130,246,0.22)]",
+        "bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 text-white shadow-lg shadow-brand-700/25 hover:shadow-brand-700/40 hover:from-brand-600 hover:to-brand-800 focus:ring-brand-500/30 border border-brand-600/30 dark:border-transparent dark:from-[var(--brand-600)] dark:via-[var(--brand-600)] dark:to-[var(--brand-500)] dark:hover:from-[var(--brand-600)] dark:hover:via-[var(--brand-500)] dark:hover:to-[var(--brand-400)] dark:shadow-[0_4px_14px_rgba(31, 115, 80,0.25),0_0_20px_rgba(79, 169, 125,0.15)] dark:hover:shadow-[0_4px_18px_rgba(31, 115, 80,0.32),0_0_26px_rgba(79, 169, 125,0.22)]",
       secondary:
         "bg-slate-100 dark:bg-surface text-slate-800 dark:text-fg-secondary hover:bg-slate-200 dark:hover:bg-surface-hover focus:ring-slate-400/20 border border-slate-200/80 dark:border-line",
       outline:
-        "bg-transparent border-2 dark:border border-blue-700 dark:border-[var(--accent-primary)] text-blue-700 dark:text-[var(--accent-primary)] hover:bg-blue-50 dark:hover:bg-[rgba(59,130,246,0.08)] focus:ring-blue-500/20",
+        "bg-transparent border-2 dark:border border-brand-700 dark:border-[var(--accent-primary)] text-brand-700 dark:text-[var(--accent-primary)] hover:bg-brand-50 dark:hover:bg-[rgba(79, 169, 125,0.08)] focus:ring-brand-500/20",
       ghost:
         "bg-transparent text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover focus:ring-slate-300/20",
       glass:
-        "bg-white/80 dark:bg-surface backdrop-blur-md dark:backdrop-blur-none border border-white/90 dark:border-line text-blue-900 dark:text-[var(--accent-highlight)] shadow-md dark:shadow-none hover:bg-white dark:hover:bg-surface-hover focus:ring-white/50",
+        "bg-white/80 dark:bg-surface backdrop-blur-md dark:backdrop-blur-none border border-white/90 dark:border-line text-brand-900 dark:text-[var(--accent-highlight)] shadow-md dark:shadow-none hover:bg-white dark:hover:bg-surface-hover focus:ring-white/50",
       danger:
         "bg-gradient-to-r from-rose-600 to-red-700 text-white shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 hover:from-rose-500 hover:to-red-600 focus:ring-rose-500/30 border border-rose-600/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(225,29,72,0.25),0_0_20px_rgba(244,63,94,0.15)] dark:hover:shadow-[0_4px_18px_rgba(225,29,72,0.32),0_0_26px_rgba(244,63,94,0.22)]",
       success:
-        "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:bg-emerald-500 focus:ring-emerald-500/30 border border-emerald-600/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(5,150,105,0.25),0_0_20px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_4px_18px_rgba(5,150,105,0.32),0_0_26px_rgba(16,185,129,0.22)]",
+        "bg-brand-600 text-white shadow-lg shadow-brand-600/25 hover:shadow-brand-600/40 hover:bg-brand-500 focus:ring-brand-500/30 border border-brand-600/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(31,115,80,0.25),0_0_20px_rgba(46,140,99,0.15)] dark:hover:shadow-[0_4px_18px_rgba(31,115,80,0.32),0_0_26px_rgba(46,140,99,0.22)]",
       warning:
         "bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 focus:ring-amber-500/30 border border-amber-500/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(245,158,11,0.25),0_0_20px_rgba(245,158,11,0.15)] dark:hover:shadow-[0_4px_18px_rgba(245,158,11,0.32),0_0_26px_rgba(245,158,11,0.22)]",
       info:
-        "bg-sky-600 text-white shadow-lg shadow-sky-600/25 hover:shadow-sky-600/40 hover:bg-sky-500 focus:ring-sky-500/30 border border-sky-600/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(3,105,161,0.25),0_0_20px_rgba(56,189,248,0.15)] dark:hover:shadow-[0_4px_18px_rgba(3,105,161,0.32),0_0_26px_rgba(56,189,248,0.22)]",
+        "bg-teal-600 text-white shadow-lg shadow-teal-600/25 hover:shadow-teal-600/40 hover:bg-teal-500 focus:ring-teal-500/30 border border-teal-600/30 dark:border-transparent dark:shadow-[0_4px_14px_rgba(3, 161, 122,0.25),0_0_20px_rgba(38, 132, 124,0.15)] dark:hover:shadow-[0_4px_18px_rgba(3, 161, 122,0.32),0_0_26px_rgba(38, 132, 124,0.22)]",
     };
 
     const sizes = {

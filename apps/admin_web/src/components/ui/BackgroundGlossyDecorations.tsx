@@ -13,7 +13,7 @@ export const BackgroundGlossyDecorations: React.FC = () => {
           <defs>
             <linearGradient id="sparkleGrad1" x1="0" y1="0" x2="24" y2="24">
               <stop stopColor="#FFFFFF" />
-              <stop offset="100%" stopColor="#93C5FD" />
+              <stop offset="100%" stopColor="var(--brand-300)" />
             </linearGradient>
           </defs>
         </svg>
@@ -37,7 +37,7 @@ export const BackgroundGlossyDecorations: React.FC = () => {
           <defs>
             <linearGradient id="sparkleGrad2" x1="0" y1="0" x2="24" y2="24">
               <stop stopColor="#FFFFFF" />
-              <stop offset="100%" stopColor="#60A5FA" />
+              <stop offset="100%" stopColor="var(--brand-400)" />
             </linearGradient>
           </defs>
         </svg>
@@ -49,7 +49,7 @@ export const BackgroundGlossyDecorations: React.FC = () => {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M12 4V20M4 12H20"
-              stroke="#2563EB"
+              stroke="var(--brand-600)"
               strokeWidth="4"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -65,12 +65,12 @@ export const BackgroundGlossyDecorations: React.FC = () => {
             <path
               d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
               fill="none"
-              stroke="#3B82F6"
+              stroke="var(--brand-500)"
               strokeWidth="2"
             />
             <path
               d="M7 12h2.5l1.5-3 2 6 1.5-3H17"
-              stroke="#3B82F6"
+              stroke="var(--brand-500)"
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -105,14 +105,14 @@ export const BackgroundGlossyDecorations: React.FC = () => {
         />
         <defs>
           <linearGradient id="rayGrad1" x1="0" y1="0" x2="1200" y2="0">
-            <stop stopColor="#93C5FD" stopOpacity="0.2" />
+            <stop stopColor="var(--brand-300)" stopOpacity="0.2" />
             <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="var(--brand-400)" stopOpacity="0.2" />
           </linearGradient>
           <linearGradient id="rayGrad2" x1="0" y1="0" x2="1200" y2="0">
-            <stop stopColor="#60A5FA" stopOpacity="0.1" />
-            <stop offset="50%" stopColor="#93C5FD" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.1" />
+            <stop stopColor="var(--brand-400)" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="var(--brand-300)" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="var(--brand-500)" stopOpacity="0.1" />
           </linearGradient>
         </defs>
       </svg>

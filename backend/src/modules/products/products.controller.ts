@@ -25,6 +25,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
@@ -46,6 +47,12 @@ export class ProductsController {
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findCategories() {
     return this.productsService.findCategories();
+  }
+
+  @Post('categories')
+  @Roles(UserRole.ADMIN)
+  createCategory(@Body() dto: CreateProductCategoryDto) {
+    return this.productsService.createCategory(dto);
   }
 
   @Post()

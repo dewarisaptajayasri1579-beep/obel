@@ -108,6 +108,76 @@ export interface Product {
   active: boolean
 }
 
+/// Rekap & riwayat mutasi stok (GET /stock-movements/*). Dihitung backend dari
+/// ledger `stock_movements`; klien tidak pernah menyimpulkan arah mutasi sendiri.
+export interface BarisRekapStok {
+  productId: string
+  sku: string
+  name: string
+  saldoAwal: number
+  masuk: number
+  keluar: number
+  saldoAkhir: number
+  perluVerifikasi: boolean
+}
+
+export interface RekapStokResponse {
+  periode: { bulan: number; tahun: number }
+  lokasi: string
+  rows: BarisRekapStok[]
+  total: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number; perluVerifikasi: boolean }
+}
+
+export interface BarisRinciMutasi {
+  id: string
+  tanggal: string
+  movementNo: string
+  keterangan: string
+  arah: "MASUK" | "KELUAR"
+  qty: number
+  saldo: number
+  perluVerifikasi: boolean
+}
+
+export interface RinciMutasiResponse {
+  product: { id: string; sku: string; name: string }
+  periode: { bulan: number; tahun: number }
+  lokasi: string
+  ringkasan: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number }
+  rows: BarisRinciMutasi[]
+  perluVerifikasi: boolean
+}
+
+export interface SaldoLokasi {
+  tipe: "WAREHOUSE" | "BOOTH"
+  lokasiId: string
+  nama: string
+  saldoAwal: number
+  masuk: number
+  keluar: number
+  saldoAkhir: number
+  perluVerifikasi: boolean
+}
+
+export interface RingkasStokProduk {
+  productId: string
+  sku: string
+  name: string
+  lokasi: SaldoLokasi[]
+  total: { saldoAwal: number; masuk: number; keluar: number; saldoAkhir: number; perluVerifikasi: boolean }
+}
+
+export interface RingkasStokResponse {
+  periode: { bulan: number; tahun: number }
+  rows: RingkasStokProduk[]
+}
+
+export interface FilterLaporanProduk {
+  q?: string
+  kategoriId?: string
+  status?: "active" | "inactive"
+}
+
 export interface UserAccount {
   id: string
   username: string
@@ -410,6 +480,8 @@ export const api = {
 
   getProducts: () => request<Product[]>("/products"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
+  createProductCategory: (input: { name: string }) =>
+    request<ProductCategory>("/products/categories", { method: "POST", body: input }),
   uploadProductImage: async (file: File) => {
     const token = getToken()
     const body = new FormData()
@@ -426,7 +498,9 @@ export const api = {
     }
     return data as { imageUrl: string }
   },
-  createProduct: (input: { sku: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
+  /// `sku` opsional — backend membuatkannya otomatis (`OBL-0001`). Dikirim
+  /// hanya oleh jalur seed/impor data lama, tidak oleh form.
+  createProduct: (input: { sku?: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
     request<Product>("/products", { method: "POST", body: input }),
   updateProduct: (id: string, input: { name?: string; categoryId?: string; sellPrice?: number; active?: boolean; imageUrl?: string | null }) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
@@ -568,6 +642,37 @@ export const api = {
   getNotifications: () =>
     request<{ id: string; title: string; message: string; type: "info" | "success" | "warning" | "error"; readAt: string | null; createdAt: string }[]>(
       "/notifications",
+    ),
+
+  getStockRingkas: (params: { bulan: number; tahun: number }) =>
+    request<RingkasStokResponse>(`/stock-movements/ringkas?bulan=${params.bulan}&tahun=${params.tahun}`),
+
+  /// Laporan diambil sebagai Blob lewat fetch ber-Authorization, BUKAN <a href>
+  /// langsung ke backend: token Obbel ada di localStorage, bukan cookie, jadi
+  /// navigasi biasa tidak membawa kredensialnya dan selalu kena 401.
+  getProductReport: async (format: "pdf" | "excel", filter: FilterLaporanProduk = {}) => {
+    const params = new URLSearchParams()
+    if (filter.q) params.set("q", filter.q)
+    if (filter.kategoriId) params.set("kategoriId", filter.kategoriId)
+    if (filter.status) params.set("status", filter.status)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/products/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockRekap: (params: { bulan: number; tahun: number; lokasi?: string }) =>
+    request<RekapStokResponse>(
+      `/stock-movements/rekap?bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
+    ),
+  getStockRinci: (params: { productId: string; bulan: number; tahun: number; lokasi?: string }) =>
+    request<RinciMutasiResponse>(
+      `/stock-movements/rinci?productId=${params.productId}&bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}`,
     ),
 
   getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),

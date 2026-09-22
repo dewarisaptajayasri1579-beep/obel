@@ -15,7 +15,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({
   layout = "horizontal",
   showTagline = true,
   iconOnly = false,
-  textColor = "text-[#1B357A] dark:text-white",
+  textColor = "text-[#1B7A4B] dark:text-white",
   className = "",
 }) => {
   const iconSizes = {
@@ -52,21 +52,21 @@ export const AppLogo: React.FC<AppLogoProps> = ({
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-full drop-shadow-md select-none"
         >
-          <ellipse cx="100" cy="186" rx="64" ry="10" fill="#1E3A8A" fillOpacity="0.18" />
-          <circle cx="100" cy="104" r="80" fill="#1B357A" />
+          <ellipse cx="100" cy="186" rx="64" ry="10" fill="#1E8A54" fillOpacity="0.18" />
+          <circle cx="100" cy="104" r="80" fill="#1B7A4B" />
           <path
             d="M100 44L146 70V122L100 148L54 122V70L100 44Z"
             fill="#FFFFFF"
           />
-          <path d="M100 44L146 70L100 96L54 70L100 44Z" fill="#DCE7F7" />
-          <path d="M100 96V148L54 122V70L100 96Z" fill="#EEF4FC" />
+          <path d="M100 44L146 70L100 96L54 70L100 44Z" fill="#DCF7EA" />
+          <path d="M100 96V148L54 122V70L100 96Z" fill="#EEFCF5" />
           <text
             x="100"
             y="103"
             textAnchor="middle"
             fontSize="34"
             fontWeight="800"
-            fill="#1B357A"
+            fill="#1B7A4B"
           >
             7
           </text>
@@ -80,7 +80,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({
           </h1>
           {showTagline && (
             <div className={`mt-1.5 font-bold leading-tight ${subtitleSizes[size]}`}>
-              <div className="text-blue-600 dark:text-[var(--accent-primary)]">{APP_CONFIG.tagline}</div>
+              <div className="text-brand-600 dark:text-[var(--accent-primary)]">{APP_CONFIG.tagline}</div>
               <div className="text-slate-600 dark:text-fg-muted font-semibold">{APP_CONFIG.subTagline}</div>
             </div>
           )}
