@@ -58,11 +58,7 @@ class ApiClient {
   /// Absen Berangkat. `boothId` opsional — kosong berarti server pakai Booth
   /// default dari BoothShiftAssignment staff ybs.
   Future<Map<String, dynamic>> checkIn(String token, {String? boothId}) {
-    return _post(
-      '/shifts/check-in',
-      token: token,
-      body: {if (boothId != null) 'boothId': boothId},
-    );
+    return _post('/shifts/check-in', token: token, body: {'boothId': ?boothId});
   }
 
   /// Preview Booth/Shift yang bakal otomatis terpilih di layar Check-In.
