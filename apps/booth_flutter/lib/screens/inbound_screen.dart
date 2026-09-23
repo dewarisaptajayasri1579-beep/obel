@@ -232,32 +232,14 @@ class _InboundScreenState extends State<InboundScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: ObbelTheme.accentRed),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Laporan selisih dikirim ke Admin.'),
-                            backgroundColor: ObbelTheme.accentRed,
-                          ),
-                        );
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Tolak / Laporkan Selisih',
-                        style: TextStyle(
-                          color: ObbelTheme.accentRed,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  const Text(
+                    'Jika jumlah fisik tidak sesuai, sesuaikan qty per produk di '
+                    'atas sebelum menekan tombol Terima — selisihnya otomatis '
+                    'tercatat ke Admin.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: ObbelTheme.textLight,
+                      fontSize: 12,
                     ),
                   ),
                 ],

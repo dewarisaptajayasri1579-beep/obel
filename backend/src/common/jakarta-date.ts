@@ -17,6 +17,21 @@ export function startOfDayJakarta(date: Date): Date {
   return new Date(startOfDayWallClock - JAKARTA_OFFSET_MS);
 }
 
+/// Gabungkan tanggal bisnis Asia/Jakarta (dari startOfDayJakarta) dengan jam
+/// "HH:mm" jadi satu instant UTC, mis. untuk ShiftSession.scheduledStartAt.
+export function combineJakartaDateAndTime(businessDate: Date, hhmm: string): Date {
+  const [hours, minutes] = hhmm.split(':').map(Number);
+  const jakartaMidnight = new Date(businessDate.getTime() + JAKARTA_OFFSET_MS);
+  const wallClock = Date.UTC(
+    jakartaMidnight.getUTCFullYear(),
+    jakartaMidnight.getUTCMonth(),
+    jakartaMidnight.getUTCDate(),
+    hours,
+    minutes,
+  );
+  return new Date(wallClock - JAKARTA_OFFSET_MS);
+}
+
 /// Kunci "YYYY-MM-DD" berdasarkan tanggal lokal Asia/Jakarta, dipakai untuk
 /// mengelompokkan baris transaksi per business date.
 export function businessDateKeyJakarta(date: Date): string {

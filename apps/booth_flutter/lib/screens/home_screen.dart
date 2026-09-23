@@ -1140,9 +1140,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
 
-                      child: const Text(
-                        'BOOTH 1',
-                        style: TextStyle(
+                      child: Text(
+                        appState.boothName.isNotEmpty
+                            ? appState.boothName.toUpperCase()
+                            : 'BOOTH',
+                        style: const TextStyle(
                           fontFamily: 'Outfit',
                           color: Colors.white,
                           fontSize: 12,
@@ -1153,9 +1155,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 10),
 
-                    const Text(
-                      'SHIFT 1 AKTIF',
-                      style: TextStyle(
+                    Text(
+                      appState.shiftLabel.isNotEmpty
+                          ? appState.shiftLabel
+                          : 'SHIFT AKTIF',
+                      style: const TextStyle(
                         fontFamily: 'Outfit',
                         color: Colors.white,
                         fontSize: 24,
@@ -1167,18 +1171,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 4),
 
                     Row(
-                      children: const [
-                        Icon(
+                      children: [
+                        const Icon(
                           Icons.access_time,
                           color: Color(0xCCFFFFFF),
                           size: 14,
                         ),
 
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
 
                         Text(
-                          '08.00 - 16.30 WIB',
-                          style: TextStyle(
+                          appState.shiftTime,
+                          style: const TextStyle(
                             fontFamily: 'Outfit',
                             color: Color(0xCCFFFFFF),
                             fontSize: 14,

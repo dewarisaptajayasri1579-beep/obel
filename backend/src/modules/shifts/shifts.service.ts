@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
+import { Prisma, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { startOfTodayJakarta, batasBulanJakarta } from '../../common/jakarta-date';
+import { combineJakartaDateAndTime, startOfTodayJakarta, batasBulanJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReturnsService } from '../returns/returns.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -14,6 +14,8 @@ import { CheckInDto } from './dto/check-in.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
+
+const UNIQUE_VIOLATION = 'P2002';
 
 function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -33,14 +35,6 @@ function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: 
   const sinLng = Math.sin(dLng / 2);
   const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
   return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(h));
-}
-
-/// `businessDate` adalah instant UTC yang mewakili tengah malam Jakarta
-/// (lihat `startOfTodayJakarta`); `time` adalah string "HH:mm" milik
-/// ShiftTemplate. Fungsi ini menambahkan jam:menit itu ke businessDate.
-function combineJakartaDateAndTime(businessDate: Date, time: string): Date {
-  const [hours, minutes] = time.split(':').map(Number);
-  return new Date(businessDate.getTime() + (hours * 60 + minutes) * 60 * 1000);
 }
 
 @Injectable()
@@ -99,8 +93,12 @@ export class ShiftsService {
   /// BoothShiftAssignment staff ybs (roster tetap Booth+Shift per staff),
   /// `dto.boothId` boleh override manual. Idempotent terhadap double-tap:
   /// kalau staff SUDAH aktif di Booth yang sama, kembalikan session yang
-  /// sudah ada apa adanya alih-alih membuat baris baru (tidak ada unique
-  /// constraint di schema yang mencegah dobel, jadi guard ini wajib di sini).
+  /// sudah ada apa adanya alih-alih membuat baris baru. Guard ini sudah
+  /// dijamin race-safe di level DB juga lewat partial unique index
+  /// (shift_sessions_one_active_per_staff, migration
+  /// 20260922165212_shift_session_checkin) — kalau dua request check-in
+  /// beneran race lolos dari cek `existing` di atas, insert-nya sendiri yang
+  /// bakal gagal kena constraint itu, ditangkap di bawah.
   async checkIn(user: JwtPayload, dto: CheckInDto) {
     const existing = await this.prisma.shiftSession.findFirst({
       where: { staffId: user.sub, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
@@ -138,22 +136,33 @@ export class ShiftsService {
     const scheduledStartAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.startTime);
     const scheduledEndAt = combineJakartaDateAndTime(businessDate, assignment.shiftTemplate.endTime);
 
-    const created = await this.prisma.shiftSession.create({
-      data: {
-        businessDate,
-        boothId,
-        shiftTemplateId: assignment.shiftTemplateId,
-        staffId: user.sub,
-        status: ShiftStatus.OPEN,
-        scheduledStartAt,
-        scheduledEndAt,
-        openedAt,
-        checkInLatitude: dto.latitude,
-        checkInLongitude: dto.longitude,
-        checkInPhotoUrl: dto.photoUrl,
-      },
-      include: { booth: true, shiftTemplate: true },
-    });
+    let created;
+    try {
+      created = await this.prisma.shiftSession.create({
+        data: {
+          businessDate,
+          boothId,
+          shiftTemplateId: assignment.shiftTemplateId,
+          staffId: user.sub,
+          status: ShiftStatus.OPEN,
+          scheduledStartAt,
+          scheduledEndAt,
+          openedAt,
+          checkInLatitude: dto.latitude,
+          checkInLongitude: dto.longitude,
+          checkInPhotoUrl: dto.photoUrl,
+        },
+        include: { booth: true, shiftTemplate: true },
+      });
+    } catch (err) {
+      const raced = err instanceof Prisma.PrismaClientKnownRequestError && err.code === UNIQUE_VIOLATION;
+      if (!raced) throw err;
+      const winner = await this.prisma.shiftSession.findFirstOrThrow({
+        where: { staffId: user.sub, status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+        include: { booth: true, shiftTemplate: true },
+      });
+      return this.toActiveShiftResponse(winner, await this.reissueToken(user, winner.boothId));
+    }
 
     const locationWarning = this.computeLocationWarning(dto.latitude, dto.longitude, booth);
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId), locationWarning);
