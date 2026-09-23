@@ -10,35 +10,31 @@ import {
   ParseFilePipe,
   Patch,
   Post,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { randomUUID } from 'crypto';
-import { diskStorage } from 'multer';
-import { mkdirSync } from 'fs';
-import { extname, join } from 'path';
-import type { Request } from 'express';
+import { extname } from 'path';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { StorageService } from '../../common/storage/storage.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
-const productUploadDir = join(process.cwd(), 'uploads', 'products');
-mkdirSync(productUploadDir, { recursive: true });
-
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
@@ -79,12 +75,6 @@ export class ProductsController {
   @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: productUploadDir,
-        filename: (_request, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
-        },
-      }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_request, file, callback) => {
         if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
@@ -95,7 +85,7 @@ export class ProductsController {
       },
     }),
   )
-  uploadImage(
+  async uploadImage(
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -108,10 +98,9 @@ export class ProductsController {
       }),
     )
     file: Express.Multer.File,
-    @Req() request: Request,
   ) {
-    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
-    return { imageUrl: `${publicBaseUrl}/uploads/products/${file.filename}` };
+    const { url } = await this.storage.upload('products', file.buffer, file.mimetype, extname(file.originalname).toLowerCase());
+    return { imageUrl: url };
   }
 
   @Patch(':id')
