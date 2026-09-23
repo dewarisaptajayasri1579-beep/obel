@@ -45,6 +45,27 @@ export class ProductsService {
     return this.prisma.productCategory.findMany({ orderBy: { sortOrder: 'asc' } });
   }
 
+  /// Ranking "Terlaris" utk grid Kasir Petugas Booth — dihitung on-the-fly
+  /// dari `stock_movements` (ledger append-only yang sudah ada, movementType
+  /// SALE, fromBoothId = booth ybs) 7 hari terakhir. TIDAK menulis apa pun:
+  /// query ini bukan tabel/cache log terpisah, jadi tidak ada yang perlu
+  /// "dihapus" setelahnya — hasilnya cuma dipakai sekali utk urutan respons
+  /// ini, tidak disimpan di mana pun.
+  async terlarisUntukBooth(boothId: string): Promise<{ productId: string; qty: number }[]> {
+    const tujuhHariLalu = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.stockMovement.groupBy({
+      by: ['productId'],
+      where: {
+        fromBoothId: boothId,
+        movementType: 'SALE',
+        occurredAt: { gte: tujuhHariLalu },
+      },
+      _sum: { qty: true },
+      orderBy: { _sum: { qty: 'desc' } },
+    });
+    return rows.map((r) => ({ productId: r.productId, qty: r._sum.qty ?? 0 }));
+  }
+
   /// Tambah kategori dari form Produk (Select kategori dengan opsi "Tambah
   /// kategori ..."). Nama dicek dulu case-insensitive supaya dua admin yang
   /// mengetik "Snack" / "snack" tidak berakhir jadi dua baris kategori kembar

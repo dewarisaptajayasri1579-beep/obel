@@ -3,10 +3,13 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsLatitude,
+  IsLongitude,
   IsOptional,
   IsString,
   IsUUID,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -33,4 +36,16 @@ export class ConfirmClosingDto {
   @ValidateNested({ each: true })
   @Type(() => ConfirmClosingItemDto)
   items!: ConfirmClosingItemDto[];
+
+  /// GPS + foto selfie diambil saat Check-Out ("Absen Pulang") — sama pola
+  /// soft-check dgn Check-In, lihat ShiftsService.computeLocationWarning.
+  @IsLatitude()
+  checkOutLatitude!: number;
+
+  @IsLongitude()
+  checkOutLongitude!: number;
+
+  @IsString()
+  @MinLength(1)
+  checkOutPhotoUrl!: string;
 }

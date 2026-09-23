@@ -7,11 +7,13 @@ export class BoothStockService {
   constructor(private readonly prisma: PrismaService) {}
 
   /// Monitor Stok Booth (05-feature-specification.md §B5) — lintas semua
-  /// Booth, dipakai Admin/Owner untuk melihat matrix stok.
-  async findAll() {
+  /// Booth (boothId kosong) dipakai Admin/Owner; di-filter satu Booth
+  /// dipakai endpoint Petugas Booth (`/booth-stock/mine`, boothId dari JWT).
+  async findAll(boothId?: string) {
     const [stocks, thresholds] = await Promise.all([
       this.prisma.boothStock.findMany({
-        include: { booth: true, product: true },
+        where: boothId ? { boothId } : undefined,
+        include: { booth: true, product: { include: { category: true } } },
         orderBy: [{ booth: { name: 'asc' } }, { product: { sortOrder: 'asc' } }],
       }),
       this.prisma.boothStockThreshold.findMany(),
@@ -27,7 +29,10 @@ export class BoothStockService {
         boothName: s.booth.name,
         productId: s.productId,
         productName: s.product.name,
+        productImageUrl: s.product.imageUrl,
+        categoryName: s.product.category?.name ?? null,
         qtyOnHand: s.qtyOnHand,
+        minimumQty,
         status: resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty),
       };
     });

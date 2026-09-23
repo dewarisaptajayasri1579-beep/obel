@@ -15,4 +15,10 @@ export class DashboardController {
   getAdminDashboard() {
     return this.dashboardService.getAdminDashboard();
   }
+
+  @Get('booth-aktif')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  getBoothAktif() {
+    return this.dashboardService.getBoothAktif();
+  }
 }

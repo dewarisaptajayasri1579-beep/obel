@@ -396,6 +396,28 @@ body {
   animation: pulse-subtle 3s ease-in-out infinite;
 }
 
+/* Glow berdenyut untuk kartu Booth Monitoring berstatus Kritis/Habis
+   (app/monitoring/booth-aktif) — bayangan warna mengembang lalu mengecil
+   di luar border, supaya alert-nya kelihatan dari sudut mata (gerakan),
+   bukan cuma warna statis. */
+@keyframes glow-amber {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 10px 1px rgba(245, 158, 11, 0.25); }
+  50% { box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.55), 0 0 22px 6px rgba(245, 158, 11, 0.45); }
+}
+
+@keyframes glow-rose {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.4), 0 0 10px 1px rgba(244, 63, 94, 0.3); }
+  50% { box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.6), 0 0 24px 7px rgba(244, 63, 94, 0.5); }
+}
+
+.animate-glow-amber {
+  animation: glow-amber 2.2s ease-in-out infinite;
+}
+
+.animate-glow-rose {
+  animation: glow-rose 2.2s ease-in-out infinite;
+}
+
 /* Styling minimal buat konten RichTextEditor (Tiptap) — sengaja tidak pakai plugin
    @tailwindcss/typography, cukup style manual buat heading/list/paragraf. */
 .rte-content p {

@@ -26,6 +26,7 @@ import { OwnerModule } from './modules/owner/owner.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CompanyProfileModule } from './modules/company-profile/company-profile.module';
 import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/booth-shift-assignments.module';
+import { StockHandoversModule } from './modules/stock-handovers/stock-handovers.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/b
     NotificationsModule,
     CompanyProfileModule,
     BoothShiftAssignmentsModule,
+    StockHandoversModule,
   ],
 })
 export class AppModule {}

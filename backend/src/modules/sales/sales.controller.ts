@@ -1,11 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { DomainError } from '../../common/domain-error';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateDraftSaleDto } from './dto/create-draft-sale.dto';
+import { PayDraftSaleDto } from './dto/pay-draft-sale.dto';
 import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
 import { VoidSaleDto } from './dto/void-sale.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
@@ -26,6 +29,35 @@ export class SalesController {
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateSaleDto) {
     return this.salesService.createPaidSale(user, dto);
+  }
+
+  @Post('draft')
+  @Roles(UserRole.BOOTH_STAFF)
+  createDraft(@CurrentUser() user: JwtPayload, @Body() dto: CreateDraftSaleDto) {
+    return this.salesService.createDraftSale(user, dto);
+  }
+
+  /// Rute statis 'drafts' HARUS didaftarkan sebelum ':id' di bawah, sama
+  /// alasannya dengan 'me' di users.controller.ts.
+  @Get('drafts')
+  @Roles(UserRole.BOOTH_STAFF)
+  listDrafts(@CurrentUser() user: JwtPayload) {
+    if (!user.boothId) {
+      throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
+    }
+    return this.salesService.listDrafts(user.boothId);
+  }
+
+  @Post(':id/pay')
+  @Roles(UserRole.BOOTH_STAFF)
+  payDraft(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: PayDraftSaleDto) {
+    return this.salesService.payDraftSale(user, id, dto);
+  }
+
+  @Delete(':id/draft')
+  @Roles(UserRole.BOOTH_STAFF)
+  deleteDraft(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.salesService.deleteDraft(user, id);
   }
 
   /// Tab "Riwayat Penjualan" halaman Booth — lihat SalesService.riwayatBooth.

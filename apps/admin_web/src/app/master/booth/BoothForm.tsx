@@ -12,6 +12,7 @@ import { useHotkey } from "@/hooks/useHotkey";
 import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError } from "@/lib/api-client";
 import { nilaiAwalBooth, type BoothFormValues } from "./form-values";
+import { KodeQrisInput } from "./KodeQrisInput";
 
 const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
@@ -126,7 +127,11 @@ export const BoothForm: React.FC<{
       } else {
         // `code` sengaja TIDAK ikut dikirim saat edit — sama seperti SKU Produk,
         // kode ini bisa sudah terpakai di dokumen/laporan yang sudah terbit.
-        await api.updateBooth(form.id, { ...payload, status: form.isActive ? "ACTIVE" : "INACTIVE" });
+        await api.updateBooth(form.id, {
+          ...payload,
+          status: form.isActive ? "ACTIVE" : "INACTIVE",
+          qrisImageUrl: form.qrisImageUrl || undefined,
+        });
         toast.success(`Booth "${form.name}" diperbarui`);
       }
 
@@ -240,6 +245,17 @@ export const BoothForm: React.FC<{
         Titik ini dipakai peta Monitoring saat belum ada transaksi hari ini dari Booth ini. Salin dari Google Maps
         (klik kanan titik lokasi → salin koordinat).
       </p>
+
+      {/* Kode QRIS baru bisa diunggah setelah Booth punya id (mode edit) —
+          sama polanya dengan Foto Produk yg butuh endpoint upload
+          tersendiri, bedanya create Booth tidak langsung menampung field ini. */}
+      {mode === "edit" && (
+        <KodeQrisInput
+          value={form.qrisImageUrl}
+          onChange={(url) => set("qrisImageUrl", url)}
+          labelClassName={COMPACT_LABEL}
+        />
+      )}
 
       {mode === "edit" && (
         <Switch

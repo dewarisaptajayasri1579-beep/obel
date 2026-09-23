@@ -17,10 +17,17 @@ import { batasBulanJakarta, businessDateKeyJakarta } from '../../common/jakarta-
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleDto, PaymentSplitDto } from './dto/create-sale.dto';
+import { CreateDraftSaleDto } from './dto/create-draft-sale.dto';
+import { PayDraftSaleDto } from './dto/pay-draft-sale.dto';
 import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
 import { VoidSaleDto } from './dto/void-sale.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
+
+interface PaymentPlan {
+  saleMethod: PaymentMethod;
+  rows: { method: PaymentMethod; amount: bigint }[];
+}
 
 interface StockDelta {
   productId: string;
@@ -150,7 +157,8 @@ export class SalesService {
         });
       }
 
-      const total = subtotal;
+      const { discount, total } = this.applyDiscount(subtotal, dto.discount);
+      const plan = this.resolvePaymentPlan(dto, total);
 
       await tx.sale.create({
         data: {
@@ -162,21 +170,249 @@ export class SalesService {
           staffId: user.sub,
           status: 'PAID',
           subtotal,
-          discount: 0n,
+          discount,
           total,
-          paymentMethod: dto.paymentMethod as PaymentMethod,
+          paymentMethod: plan.saleMethod,
           paidAt,
         },
       });
 
       await tx.saleItem.createMany({ data: saleItemsData });
-      await tx.payment.create({
-        data: { saleId, method: dto.paymentMethod as PaymentMethod, amount: total, paidAt },
+      await tx.payment.createMany({
+        data: plan.rows.map((r) => ({ saleId, method: r.method, amount: r.amount, paidAt })),
       });
       await tx.stockMovement.createMany({ data: movementsData });
     });
 
     return this.toSaleResponse(saleId);
+  }
+
+  /// Diskon manual (nominal Rupiah, bukan promo/kupon bernama — belum ada
+  /// katalog promo di sistem ini). `dto.discount` opsional, default 0.
+  private applyDiscount(subtotal: bigint, discountInput?: number): { discount: bigint; total: bigint } {
+    const discount = BigInt(discountInput ?? 0);
+    if (discount < 0n) {
+      throw new DomainError('INVALID_DISCOUNT', 'Diskon tidak boleh negatif.');
+    }
+    if (discount > subtotal) {
+      throw new DomainError('INVALID_DISCOUNT', 'Diskon tidak boleh lebih besar dari subtotal.', {
+        subtotal: Number(subtotal),
+        discount: Number(discount),
+      });
+    }
+    return { discount, total: subtotal - discount };
+  }
+
+  /// Satu dari dua bentuk WAJIB diisi client: `paymentMethod` (bayar satu
+  /// metode penuh) atau `payments` (Split, >=2 baris, jumlahnya harus PAS
+  /// sama dengan total — tidak ada toleransi pembulatan karena Rupiah
+  /// integer). `Sale.paymentMethod` jadi SPLIT kalau lewat jalur Split;
+  /// pecahan sebenarnya selalu di baris-baris Payment, bukan di situ.
+  private resolvePaymentPlan(
+    dto: { paymentMethod?: PaymentMethod; payments?: PaymentSplitDto[] },
+    total: bigint,
+  ): PaymentPlan {
+    if (dto.payments && dto.payments.length > 0) {
+      const sum = dto.payments.reduce((acc, p) => acc + BigInt(p.amount), 0n);
+      if (sum !== total) {
+        throw new DomainError('PAYMENT_AMOUNT_MISMATCH', 'Total pecahan pembayaran Split tidak sama dengan total tagihan.', {
+          total: Number(total),
+          sum: Number(sum),
+        });
+      }
+      return {
+        saleMethod: PaymentMethod.SPLIT,
+        rows: dto.payments.map((p) => ({ method: p.method, amount: BigInt(p.amount) })),
+      };
+    }
+    if (dto.paymentMethod) {
+      return { saleMethod: dto.paymentMethod, rows: [{ method: dto.paymentMethod, amount: total }] };
+    }
+    throw new DomainError('PAYMENT_METHOD_REQUIRED', 'Metode pembayaran (paymentMethod atau payments) wajib diisi.');
+  }
+
+  /// "Simpan Draft" — Sale PENDING, item & harga di-snapshot, TAPI stok
+  /// BELUM dipotong dan belum ada Payment (metode bayar belum ditentukan).
+  /// Baru menyentuh stok saat payDraftSale() dipanggil.
+  async createDraftSale(user: JwtPayload, dto: CreateDraftSaleDto) {
+    const existing = await this.prisma.sale.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existing) {
+      return this.toSaleResponse(existing.id);
+    }
+
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: dto.shiftSessionId } });
+    if (!shift) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Shift tidak ditemukan.');
+    }
+    if (shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Shift tidak sedang berjalan.');
+    }
+    if (user.role === UserRole.BOOTH_STAFF && shift.staffId !== user.sub) {
+      throw new DomainError('UNAUTHORIZED_BOOTH', 'Shift ini bukan milik user yang login.');
+    }
+
+    const productIds = dto.items.map((i) => i.productId);
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
+    const productById = new Map(products.map((p) => [p.id, p]));
+    for (const item of dto.items) {
+      const product = productById.get(item.productId);
+      if (!product || !product.active) {
+        throw new DomainError('PRODUCT_INACTIVE', 'Salah satu produk tidak aktif atau tidak ditemukan.', {
+          productId: item.productId,
+        });
+      }
+    }
+
+    const saleId = randomUUID();
+    const saleNo = generateDocNo('OBL');
+
+    let subtotal = 0n;
+    const saleItemsData: Prisma.SaleItemCreateManyInput[] = [];
+    for (const item of dto.items) {
+      const product = productById.get(item.productId)!;
+      const lineTotal = product.sellPrice * BigInt(item.qty);
+      subtotal += lineTotal;
+      saleItemsData.push({
+        id: randomUUID(),
+        saleId,
+        productId: item.productId,
+        productNameSnapshot: product.name,
+        unitPrice: product.sellPrice,
+        qty: item.qty,
+        lineTotal,
+      });
+    }
+
+    const { discount, total } = this.applyDiscount(subtotal, dto.discount);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sale.create({
+        data: {
+          id: saleId,
+          saleNo,
+          idempotencyKey: dto.idempotencyKey,
+          boothId: shift.boothId,
+          shiftSessionId: shift.id,
+          staffId: user.sub,
+          status: SaleStatus.PENDING,
+          subtotal,
+          discount,
+          total,
+          paymentMethod: null,
+        },
+      });
+      await tx.saleItem.createMany({ data: saleItemsData });
+    });
+
+    return this.toDraftResponse(saleId);
+  }
+
+  /// Daftar draft (PENDING) milik Booth staff yang login — dipakai layar
+  /// Kasir utk "lanjutkan" transaksi yang sempat disimpan tapi belum dibayar.
+  async listDrafts(boothId: string) {
+    const drafts = await this.prisma.sale.findMany({
+      where: { boothId, status: SaleStatus.PENDING },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return drafts.map((s) => this.toDraftShape(s));
+  }
+
+  /// Melunasi draft — DI SINI stok baru benar-benar dipotong (BR-002 no
+  /// negative stock, sama seperti createPaidSale), bukan saat draft dibuat.
+  async payDraftSale(user: JwtPayload, saleId: string, dto: PayDraftSaleDto) {
+    const sale = await this.prisma.sale.findUnique({ where: { id: saleId }, include: { items: true } });
+    if (!sale) {
+      throw new DomainError('NOT_FOUND', 'Draft tidak ditemukan.');
+    }
+    if (user.role === UserRole.BOOTH_STAFF && sale.staffId !== user.sub) {
+      throw new DomainError('UNAUTHORIZED_BOOTH', 'Draft ini bukan milik user yang login.');
+    }
+    if (sale.status === SaleStatus.PAID) {
+      // Idempotent terhadap double-tap tombol Bayar.
+      return this.toSaleResponse(sale.id);
+    }
+    if (sale.status !== SaleStatus.PENDING) {
+      throw new DomainError('DRAFT_NOT_PAYABLE', 'Draft ini sudah tidak bisa dibayar.', { status: sale.status });
+    }
+
+    const shift = await this.prisma.shiftSession.findUniqueOrThrow({ where: { id: sale.shiftSessionId } });
+    if (shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Shift untuk draft ini sudah tidak berjalan.');
+    }
+
+    const plan = this.resolvePaymentPlan(dto, sale.total);
+    const paidAt = new Date();
+    const businessDate = businessDateOf(paidAt);
+
+    await this.prisma.$transaction(async (tx) => {
+      const movementsData: Prisma.StockMovementCreateManyInput[] = [];
+      for (const item of sale.items) {
+        const decremented = await tx.boothStock.updateMany({
+          where: { boothId: sale.boothId, productId: item.productId, qtyOnHand: { gte: item.qty } },
+          data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
+        });
+        if (decremented.count !== 1) {
+          const current = await tx.boothStock.findUnique({
+            where: { boothId_productId: { boothId: sale.boothId, productId: item.productId } },
+          });
+          throw new DomainError('INSUFFICIENT_STOCK', `Stok ${item.productNameSnapshot} tidak cukup.`, {
+            productId: item.productId,
+            available: current?.qtyOnHand ?? 0,
+            requested: item.qty,
+          });
+        }
+        movementsData.push({
+          id: randomUUID(),
+          movementNo: generateDocNo('MOV'),
+          movementType: StockMovementType.SALE,
+          productId: item.productId,
+          qty: item.qty,
+          fromBoothId: sale.boothId,
+          toBoothId: null,
+          referenceType: 'sale',
+          referenceId: sale.id,
+          shiftSessionId: sale.shiftSessionId,
+          businessDate,
+          occurredAt: paidAt,
+          createdBy: user.sub,
+        });
+      }
+
+      await tx.stockMovement.createMany({ data: movementsData });
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { status: SaleStatus.PAID, paidAt, paymentMethod: plan.saleMethod },
+      });
+      await tx.payment.createMany({
+        data: plan.rows.map((r) => ({ saleId: sale.id, method: r.method, amount: r.amount, paidAt })),
+      });
+    });
+
+    return this.toSaleResponse(sale.id);
+  }
+
+  /// Buang draft yang tidak jadi dipakai — HARD DELETE aman di sini karena
+  /// draft belum pernah menyentuh stok/kas (belum "posted", beda dari Sale
+  /// PAID yang tidak boleh dihapus, cuma boleh Void — AGENTS.md).
+  async deleteDraft(user: JwtPayload, saleId: string) {
+    const sale = await this.prisma.sale.findUnique({ where: { id: saleId } });
+    if (!sale) {
+      throw new DomainError('NOT_FOUND', 'Draft tidak ditemukan.');
+    }
+    if (user.role === UserRole.BOOTH_STAFF && sale.staffId !== user.sub) {
+      throw new DomainError('UNAUTHORIZED_BOOTH', 'Draft ini bukan milik user yang login.');
+    }
+    if (sale.status !== SaleStatus.PENDING) {
+      throw new DomainError('DRAFT_NOT_DELETABLE', 'Hanya draft (belum dibayar) yang bisa dihapus.', {
+        status: sale.status,
+      });
+    }
+    await this.prisma.$transaction([
+      this.prisma.saleItem.deleteMany({ where: { saleId } }),
+      this.prisma.sale.delete({ where: { id: saleId } }),
+    ]);
+    return { id: saleId, deleted: true };
   }
 
   /// Sales list untuk Admin (05-feature-specification.md §B7). Hanya
@@ -425,7 +661,11 @@ export class SalesService {
       sale,
       dto.items,
     );
-    const paymentMethod = dto.paymentMethod ?? sale.paymentMethod;
+    // `sale` di sini datang dari loadVoidableSale(), yang mensyaratkan
+    // status PAID — Sale PAID selalu punya paymentMethod terisi (cuma
+    // PENDING/draft yang null, lihat SalesService.createDraftSale), jadi
+    // non-null assertion ini aman.
+    const paymentMethod = dto.paymentMethod ?? sale.paymentMethod!;
     const newSaleId = randomUUID();
     const newSaleNo = generateDocNo('OBL');
     const revisedAt = new Date();
@@ -847,19 +1087,46 @@ export class SalesService {
     };
   }
 
+  private toDraftShape(sale: Prisma.SaleGetPayload<{ include: { items: true } }>) {
+    return {
+      id: sale.id,
+      saleNo: sale.saleNo,
+      subtotal: Number(sale.subtotal),
+      discount: Number(sale.discount),
+      total: Number(sale.total),
+      createdAt: sale.createdAt,
+      items: sale.items.map((i) => ({
+        productId: i.productId,
+        productName: i.productNameSnapshot,
+        unitPrice: Number(i.unitPrice),
+        qty: i.qty,
+      })),
+    };
+  }
+
+  private async toDraftResponse(saleId: string) {
+    const sale = await this.prisma.sale.findUniqueOrThrow({ where: { id: saleId }, include: { items: true } });
+    return this.toDraftShape(sale);
+  }
+
   private async toSaleResponse(saleId: string) {
     const sale = await this.prisma.sale.findUniqueOrThrow({
       where: { id: saleId },
-      include: { items: true },
+      include: { items: true, payments: { where: { status: PaymentStatus.POSTED } } },
     });
     const remainingStock = await this.prisma.boothStock.findMany({
       where: { boothId: sale.boothId, productId: { in: sale.items.map((i) => i.productId) } },
     });
 
     return {
+      id: sale.id,
       saleId: sale.id,
       saleNo: sale.saleNo,
+      subtotal: Number(sale.subtotal),
+      discount: Number(sale.discount),
       total: Number(sale.total),
+      paymentMethod: sale.paymentMethod,
+      payments: sale.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
       paidAt: sale.paidAt,
       remainingStock: remainingStock.map((s) => ({
         productId: s.productId,

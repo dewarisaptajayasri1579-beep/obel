@@ -1,6 +1,6 @@
 /// Client HTTP tipis ke Backend API (Node.js/NestJS) — satu backend yang
 /// sama dipakai Petugas Booth, Admin Pusat, dan Owner (AGENTS.md).
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"
 
 /// Error dari Backend API mengikuti envelope {code, message, details} di
 /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
@@ -15,15 +15,50 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
+const ADMIN_SESSION_STORAGE_KEY = "obbel-admin-session"
+const PETUGAS_SESSION_STORAGE_KEY = "obbel-petugas-session"
+
+/// Admin dan Web Petugas Booth (/petugas/*) SENGAJA punya slot sesi
+/// localStorage terpisah (lihat auth-context.tsx `areaKeyFor`) — supaya dua
+/// role bisa login bersamaan di browser yang sama tanpa saling menimpa.
+/// `getToken()` di sini dipakai LANGSUNG oleh `request()` (bukan lewat
+/// context React), jadi harus ikut logika area yang sama berdasarkan
+/// halaman yang sedang dibuka.
+function currentSessionStorageKey(): string {
+  if (typeof window === "undefined") return ADMIN_SESSION_STORAGE_KEY
+  return window.location.pathname.startsWith("/petugas") ? PETUGAS_SESSION_STORAGE_KEY : ADMIN_SESSION_STORAGE_KEY
+}
+
+export function getToken(): string | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = localStorage.getItem("obbel-admin-session")
+    const raw = localStorage.getItem(currentSessionStorageKey())
     if (!raw) return null
     return (JSON.parse(raw) as { token?: string }).token ?? null
   } catch {
     return null
   }
+}
+
+/// Token expired/invalid di tengah pemakaian (bukan salah username/password
+/// saat login) — bersihkan sesi lalu paksa balik ke /login supaya user tidak
+/// terjebak di halaman yang terus menampilkan toast "Unauthorized". Satu
+/// halaman biasanya memanggil beberapa API sekaligus, jadi beberapa 401 bisa
+/// datang bersamaan — flag ini mencegah redirect/reload terpicu berkali-kali
+/// (itu yang bikin layar login berkedip lalu putih blank).
+let reauthInFlight = false
+
+function forceReauth() {
+  if (typeof window === "undefined" || reauthInFlight) return
+  // Web Petugas Booth (app/petugas/) punya halaman login sendiri, beda dari
+  // /login admin — redirect 401 harus balik ke shell yang sedang dipakai,
+  // bukan selalu ke login Admin.
+  const isPetugas = window.location.pathname.startsWith("/petugas")
+  const loginPath = isPetugas ? "/petugas/login" : "/login"
+  if (window.location.pathname === loginPath) return
+  reauthInFlight = true
+  localStorage.removeItem(currentSessionStorageKey())
+  window.location.href = loginPath
 }
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -63,6 +98,9 @@ async function request<T>(
   const data = text ? JSON.parse(text) : null
 
   if (!res.ok) {
+    if (res.status === 401 && path !== "/auth/login") {
+      forceReauth()
+    }
     if (data && typeof data === "object" && "code" in data) {
       const message = Array.isArray(data.message) ? data.message.join(", ") : String(data.message)
       throw new ApiError(data.code, message, data.details)
@@ -92,6 +130,9 @@ export interface Booth {
   address: string | null
   latitude: number | null
   longitude: number | null
+  /// Kode QRIS statis Booth ini, ditampilkan di layar Kasir Petugas saat
+  /// metode QRIS/Split dipilih. Diunggah Admin di Data Booth.
+  qrisImageUrl: string | null
   status: "ACTIVE" | "INACTIVE"
 }
 
@@ -295,6 +336,64 @@ export interface Distribution {
   items: DistributionItem[]
 }
 
+/// Serah Terima Stok — 1 transaksi gabungan (RestockRequest + StockDistribution
+/// di backend, disatukan di sini). `id` berprefix "req_"/"dist_", dipakai apa
+/// adanya di endpoint aksi (approve/reject/receive/cancel/revise/correct).
+export interface StockHandoverItem {
+  productId: string
+  productName: string
+  qty: number
+  qtyReceived: number | null
+}
+
+export interface StockHandover {
+  id: string
+  kind: "request" | "distribution"
+  docNo: string
+  status: "DIAJUKAN" | "DIPROSES" | "DITERIMA" | "DITOLAK" | "DIBATALKAN"
+  sumber: "PETUGAS" | "ADMIN"
+  jenis: "STOK_AWAL" | "RE_STOK" | null
+  boothId: string
+  boothName: string
+  staffName: string | null
+  date: string
+  note: string | null
+  rejectReason?: string | null
+  discrepancy?: boolean
+  items: StockHandoverItem[]
+}
+
+export interface FilterLaporanSerahTerima {
+  q?: string
+  status?: StockHandover["status"]
+}
+
+/// Rekap stok yang masih Diproses (in-transit) — belum dikonfirmasi diterima
+/// Petugas, dikelompokkan per produk + rincian tujuan Booth.
+export interface StockHandoverInTransitDestination {
+  boothId: string
+  boothName: string
+  staffName: string | null
+  qty: number
+}
+
+export interface StockHandoverInTransitItem {
+  productId: string
+  productName: string
+  totalQty: number
+  destinations: StockHandoverInTransitDestination[]
+}
+
+/// Petugas yang sedang Aktif (sudah Check-In) — dipakai picker "Petugas" di
+/// Serah Terima Stok; Booth ikut otomatis, tidak dipilih manual.
+export interface ActiveAssignment {
+  shiftSessionId: string
+  staffId: string
+  staffName: string
+  boothId: string
+  boothName: string
+}
+
 /// Tambah Stok Gudang. DRAFT tidak menyentuh stok; POSTED sudah menambah
 /// WarehouseStock dan tercatat di /stock-movements. REVISED = digantikan
 /// versi revisi yang lebih baru (dokumen tetap ada untuk riwayat).
@@ -342,6 +441,15 @@ export interface ActivityLogEntry {
   occurredAt: string
 }
 
+export interface NotificationItem {
+  id: string
+  title: string
+  message: string
+  type: "info" | "success" | "warning" | "error"
+  readAt: string | null
+  createdAt: string
+}
+
 export interface RestockRequestItemView {
   id: string
   productId: string
@@ -367,12 +475,34 @@ export interface AdminDashboard {
   reconciliationCasesOpen: number
 }
 
+export interface BoothAktifCard {
+  boothId: string
+  boothCode: string
+  boothName: string
+  locationName: string | null
+  latitude: number | null
+  longitude: number | null
+  isActive: boolean
+  staffName: string | null
+  shiftLabel: string | null
+  shiftStartAt: string | null
+  cupSoldToday: number
+  cupSoldYesterday: number
+  omzetToday: number
+  stockQty: number
+  stockStatus: "Aman" | "Menipis" | "Kritis" | "Habis"
+  topStock: { productName: string; qty: number }[]
+}
+
 export interface BoothStockRow {
   boothId: string
   boothName: string
   productId: string
   productName: string
+  productImageUrl: string | null
+  categoryName: string | null
   qtyOnHand: number
+  minimumQty: number
   status: "Aman" | "Menipis" | "Kritis" | "Habis"
 }
 
@@ -597,6 +727,144 @@ export interface StockAdjustmentRecord {
   createdAt: string
 }
 
+/* ─── Petugas Booth ────────────────────────────────────────────────────── */
+
+export interface ActiveShift {
+  shiftSessionId: string
+  booth: { id: string; code: string; name: string }
+  shiftName: string
+  status: "OPEN" | "CLOSING" | "CLOSED"
+  scheduledStartAt: string
+  scheduledEndAt: string
+  accessToken?: string
+  locationWarning?: string
+}
+
+export interface ClosingItem {
+  productId: string
+  productName: string
+  expectedQty: number
+  actualQty: number
+  discrepancyQty: number
+  reasonCode: string | null
+}
+
+export interface ClosingResponse {
+  id: string
+  shiftSessionId: string
+  status: "DRAFT" | "CONFIRMED"
+  confirmedAt: string | null
+  items: ClosingItem[]
+  locationWarning?: string
+}
+
+export interface ShiftHistoryItem {
+  id: string
+  businessDate: string
+  status: "SCHEDULED" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELLED"
+  openedAt: string | null
+  closedAt: string | null
+  boothName: string
+}
+
+export interface ShiftHistoryResponse {
+  totalHadir: number
+  totalHariKerja: number
+  items: ShiftHistoryItem[]
+}
+
+export interface ShiftReportItem {
+  productId: string
+  productName: string
+  stokAwal: number
+  restock: number
+  terjual: number
+  retur: number
+  sisaSistem: number
+}
+
+export interface ShiftReport {
+  boothName: string
+  shiftTemplateName: string
+  businessDate: string
+  items: ShiftReportItem[]
+  totalPenjualan: number
+  kasTunai: number
+  kasQris: number
+}
+
+export interface MyBoothShiftAssignment {
+  id: string
+  boothId: string
+  booth: Booth
+  shiftTemplateId: string
+  shiftTemplate: ShiftTemplate
+  staffId: string | null
+  updatedAt: string
+}
+
+export interface MyStockMovement {
+  id: string
+  movementNo: string
+  movementType: "OPENING" | "WAREHOUSE_TO_BOOTH" | "SALE" | "RESTOCK" | "RETURN_TO_WAREHOUSE" | "ADJUSTMENT" | "VOID_REVERSAL"
+  productId: string
+  productName: string
+  qty: number
+  direction: "IN" | "OUT"
+  occurredAt: string
+  note: string | null
+}
+
+export interface StockLedgerRow {
+  id: string
+  tanggal: string
+  movementNo: string
+  jenis: "MASUK" | "KELUAR" | "PENYESUAIAN"
+  qty: number
+  stokAkhir: number
+  keterangan: string
+}
+
+export interface StockLedgerResponse {
+  product: { id: string; name: string }
+  periode: { dari: string; sampai: string }
+  ringkasan: { stokAwal: number; masuk: number; keluar: number; stokAkhir: number }
+  rows: StockLedgerRow[]
+}
+
+export interface PaymentSplitInput {
+  method: "CASH" | "QRIS"
+  amount: number
+}
+
+export interface SaleResult {
+  id: string
+  saleNo: string
+  subtotal: number
+  discount: number
+  total: number
+  paymentMethod: "CASH" | "QRIS" | "SPLIT"
+  payments: PaymentSplitInput[]
+  paidAt: string | null
+}
+
+export interface DraftSaleItem {
+  productId: string
+  productName: string
+  unitPrice: number
+  qty: number
+}
+
+export interface DraftSale {
+  id: string
+  saleNo: string
+  subtotal: number
+  discount: number
+  total: number
+  createdAt: string
+  items: DraftSaleItem[]
+}
+
 async function fetchCsvBlob(path: string): Promise<Blob> {
   const token = getToken()
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -630,10 +898,30 @@ export const api = {
       latitude?: number
       longitude?: number
       status?: "ACTIVE" | "INACTIVE"
+      qrisImageUrl?: string
     },
   ) => request<Booth>(`/booths/${id}`, { method: "PATCH", body: input }),
+  uploadBoothQris: async (file: File) => {
+    const token = getToken()
+    const body = new FormData()
+    body.append("file", file)
+    const res = await fetch(`${BASE_URL}/booths/upload-qris`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah kode QRIS.")
+      throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
+    }
+    return data as { qrisImageUrl: string }
+  },
 
   getProducts: () => request<Product[]>("/products"),
+  /// Ranking terlaris 7 hari terakhir milik booth staff yg login — dihitung
+  /// on-the-fly dari ledger stock_movements, tidak ada tabel log terpisah.
+  getTerlarisMine: () => request<{ productId: string; qty: number }[]>("/products/terlaris-mine"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
   createProductCategory: (input: { name: string }) =>
     request<ProductCategory>("/products/categories", { method: "POST", body: input }),
@@ -738,6 +1026,55 @@ export const api = {
   rejectRestockRequest: (id: string, reason: string) =>
     request<RestockRequest>(`/restock-requests/${id}/reject`, { method: "POST", body: { reason } }),
 
+  getStockHandovers: () => request<StockHandover[]>("/stock-handovers"),
+  getStockHandoverInTransit: () => request<StockHandoverInTransitItem[]>("/stock-handovers/in-transit"),
+  getStockHandover: (id: string) => request<StockHandover>(`/stock-handovers/${id}`),
+  getStockHandoverActivityLog: (id: string) => request<ActivityLogEntry[]>(`/stock-handovers/${id}/activity-log`),
+  getActiveAssignments: () => request<ActiveAssignment[]>("/shifts/active-assignments"),
+  createStockHandover: (input: { staffId: string; items: { productId: string; qty: number }[]; note?: string }) =>
+    request<Distribution>("/stock-handovers", { method: "POST", body: input }),
+  approveStockHandover: (id: string, items: { productId: string; qtyApproved: number }[]) =>
+    request<RestockRequest>(`/stock-handovers/${id}/approve`, { method: "POST", body: { items } }),
+  rejectStockHandover: (id: string, reason: string) =>
+    request<RestockRequest>(`/stock-handovers/${id}/reject`, { method: "POST", body: { reason } }),
+  receiveStockHandover: (id: string, items: { productId: string; actualQty: number }[]) =>
+    request<Distribution>(`/stock-handovers/${id}/receive`, { method: "POST", body: { items } }),
+  cancelStockHandover: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
+    request<Distribution>(`/stock-handovers/${id}/cancel`, { method: "POST", body: input }),
+  reviseStockHandover: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<Distribution>(`/stock-handovers/${id}/revise`, { method: "POST", body: input }),
+  correctStockHandoverReceipt: (
+    id: string,
+    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+  ) => request<Distribution>(`/stock-handovers/${id}/correct-receipt`, { method: "POST", body: input }),
+
+  getStockHandoverReport: async (format: "pdf" | "excel", filter: FilterLaporanSerahTerima = {}) => {
+    const params = new URLSearchParams()
+    if (filter.q) params.set("q", filter.q)
+    if (filter.status) params.set("status", filter.status)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/stock-handovers/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockHandoverNotaPdf: async (id: string) => {
+    const res = await fetch(`${BASE_URL}/reports/stock-handovers/${id}/pdf`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat nota. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
   getReturns: () => request<StockReturn[]>("/returns"),
   receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[]) =>
     request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
@@ -753,6 +1090,7 @@ export const api = {
   ) => request<StockReturn>(`/returns/${id}/correct-receipt`, { method: "POST", body: input }),
 
   getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
+  getBoothAktif: () => request<BoothAktifCard[]>("/dashboard/booth-aktif"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   exportReportsCsv: () => fetchCsvBlob("/reports/export"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
@@ -840,10 +1178,7 @@ export const api = {
 
   getTransactionCorrections: () => request<TransactionCorrectionRecord[]>("/transaction-corrections"),
 
-  getNotifications: () =>
-    request<{ id: string; title: string; message: string; type: "info" | "success" | "warning" | "error"; readAt: string | null; createdAt: string }[]>(
-      "/notifications",
-    ),
+  getNotifications: () => request<NotificationItem[]>("/notifications"),
 
   getStockRingkas: (params: { bulan: number; tahun: number }) =>
     request<RingkasStokResponse>(`/stock-movements/ringkas?bulan=${params.bulan}&tahun=${params.tahun}`),
@@ -937,4 +1272,93 @@ export const api = {
   getReconciliationCases: () => request<ReconciliationCaseRecord[]>("/reconciliation-cases"),
   resolveReconciliationCase: (id: string, input: { status: "RESOLVED" | "IGNORED"; resolutionNote?: string }) =>
     request<ReconciliationCaseRecord>(`/reconciliation-cases/${id}/resolve`, { method: "POST", body: input }),
+
+  /* ─── Petugas Booth ──────────────────────────────────────────────────── */
+
+  getMyAssignment: () => request<MyBoothShiftAssignment | null>("/booth-shift-assignments/mine"),
+  getActiveShift: () => request<ActiveShift>("/shifts/active"),
+  checkIn: (input: { boothId?: string; latitude: number; longitude: number; photoUrl: string }) =>
+    request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
+  uploadAttendancePhoto: async (file: File) => {
+    const token = getToken()
+    const body = new FormData()
+    body.append("file", file)
+    const res = await fetch(`${BASE_URL}/shifts/attendance/photo`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah foto.")
+      throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
+    }
+    return data as { photoUrl: string }
+  },
+  startClosing: (shiftSessionId: string) =>
+    request<ClosingResponse>(`/shifts/${shiftSessionId}/closing/start`, { method: "POST" }),
+  confirmClosing: (
+    shiftSessionId: string,
+    input: {
+      items: { productId: string; actualQty: number; reasonCode?: string; reasonNote?: string }[]
+      checkOutLatitude: number
+      checkOutLongitude: number
+      checkOutPhotoUrl: string
+    },
+  ) => request<ClosingResponse>(`/shifts/${shiftSessionId}/closing/confirm`, { method: "POST", body: input }),
+  getShiftHistory: (month?: string) =>
+    request<ShiftHistoryResponse>(`/shifts/history${month ? `?month=${month}` : ""}`),
+  getShiftReport: (shiftSessionId: string) => request<ShiftReport>(`/shifts/${shiftSessionId}/report`),
+
+  getPendingDistributions: () => request<Distribution[]>("/distributions/pending"),
+  getMyDistributions: () => request<Distribution[]>("/distributions/mine"),
+  receiveDistribution: (id: string, items: { productId: string; actualQty: number }[]) =>
+    request<Distribution>(`/distributions/${id}/receive`, { method: "POST", body: { items } }),
+
+  /// Salah satu WAJIB diisi: `paymentMethod` (satu metode) atau `payments`
+  /// (Split, >=2 baris, jumlahnya harus PAS sama dengan total setelah diskon).
+  createSale: (input: {
+    idempotencyKey: string
+    shiftSessionId: string
+    paymentMethod?: "CASH" | "QRIS"
+    payments?: PaymentSplitInput[]
+    discount?: number
+    items: { productId: string; qty: number }[]
+  }) => request<SaleResult>("/sales", { method: "POST", body: input }),
+
+  /// "Simpan Draft" — stok BELUM dipotong, baru dipotong saat `payDraftSale`.
+  createDraftSale: (input: {
+    idempotencyKey: string
+    shiftSessionId: string
+    items: { productId: string; qty: number }[]
+    discount?: number
+  }) => request<DraftSale>("/sales/draft", { method: "POST", body: input }),
+  getMyDrafts: () => request<DraftSale[]>("/sales/drafts"),
+  payDraftSale: (
+    saleId: string,
+    input: { paymentMethod?: "CASH" | "QRIS"; payments?: PaymentSplitInput[] },
+  ) => request<SaleResult>(`/sales/${saleId}/pay`, { method: "POST", body: input }),
+  deleteDraftSale: (saleId: string) => request<{ id: string; deleted: boolean }>(`/sales/${saleId}/draft`, { method: "DELETE" }),
+
+  createRestockRequest: (input: { items: { productId: string; qty: number }[]; note?: string }) =>
+    request<RestockRequest>("/restock-requests", { method: "POST", body: input }),
+  getMyRestockRequests: () => request<RestockRequest[]>("/restock-requests/mine"),
+
+  getMyBoothStock: () => request<BoothStockRow[]>("/booth-stock/mine"),
+  getMyStockMovements: (params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.from) qs.set("from", params.from)
+    if (params?.to) qs.set("to", params.to)
+    const suffix = qs.toString()
+    return request<MyStockMovement[]>(`/stock-movements/mine${suffix ? `?${suffix}` : ""}`)
+  },
+  /// Ledger satu produk + saldo berjalan, dikunci ke Booth staff yg login —
+  /// dipakai tab "Riwayat Stok".
+  getMyStockLedger: (params: { productId: string; from: string; to: string }) =>
+    request<StockLedgerResponse>(
+      `/stock-movements/rinci-mine?productId=${params.productId}&from=${params.from}&to=${params.to}`,
+    ),
+
+  getMyProfile: () => request<UserAccount>("/users/me"),
+  updateMyProfile: (input: { fullName?: string }) => request<UserAccount>("/users/me", { method: "PATCH", body: input }),
 }

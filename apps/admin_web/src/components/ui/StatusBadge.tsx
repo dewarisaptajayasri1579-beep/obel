@@ -12,7 +12,11 @@ export type StatusBadgeType =
   | "inactive"
   | "draft"
   | "posted"
-  | "voided";
+  | "voided"
+  | "stock_aman"
+  | "stock_menipis"
+  | "stock_kritis"
+  | "stock_habis";
 
 export interface StatusBadgeProps {
   type: StatusBadgeType;
@@ -125,6 +129,38 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       borderColor: "border-rose-500/30 dark:border-[rgba(239,68,68,0.22)]",
       dotColor: "bg-rose-400",
       badgeColor: "bg-rose-500 text-white",
+    },
+    stock_aman: {
+      defaultLabel: "Aman",
+      bgColor: "bg-emerald-500/15 dark:bg-[rgba(46,140,99,0.10)]",
+      textColor: "text-emerald-700 dark:text-[#34D399]",
+      borderColor: "border-emerald-500/30 dark:border-[rgba(46,140,99,0.22)]",
+      dotColor: "bg-emerald-500",
+      badgeColor: "bg-emerald-600 text-white",
+    },
+    stock_menipis: {
+      defaultLabel: "Menipis",
+      bgColor: "bg-amber-500/15 dark:bg-[rgba(245,158,11,0.10)]",
+      textColor: "text-amber-700 dark:text-[#FBBF24]",
+      borderColor: "border-amber-500/30 dark:border-[rgba(245,158,11,0.22)]",
+      dotColor: "bg-amber-500",
+      badgeColor: "bg-amber-600 text-white",
+    },
+    stock_kritis: {
+      defaultLabel: "Kritis",
+      bgColor: "bg-orange-500/15 dark:bg-[rgba(249,115,22,0.10)]",
+      textColor: "text-orange-700 dark:text-[#FB923C]",
+      borderColor: "border-orange-500/30 dark:border-[rgba(249,115,22,0.22)]",
+      dotColor: "bg-orange-500",
+      badgeColor: "bg-orange-600 text-white",
+    },
+    stock_habis: {
+      defaultLabel: "Habis",
+      bgColor: "bg-rose-500/15 dark:bg-[rgba(239,68,68,0.10)]",
+      textColor: "text-rose-700 dark:text-[#F87171]",
+      borderColor: "border-rose-500/30 dark:border-[rgba(239,68,68,0.22)]",
+      dotColor: "bg-rose-500",
+      badgeColor: "bg-rose-600 text-white",
     },
   };
 

@@ -43,6 +43,10 @@ enum SaleStatus {
 enum PaymentMethod {
   CASH
   QRIS
+  /// Sale.paymentMethod dipakai kalau satu Sale dibayar dgn >1 metode
+  /// sekaligus — pecahan sebenarnya (Tunai Rp X, QRIS Rp Y) tersimpan di
+  /// baris-baris Payment terpisah, bukan di sini.
+  SPLIT
 
   @@map("payment_method")
 }
@@ -195,6 +199,9 @@ model Booth {
   // koordinat GPS-nya sendiri (lihat Sale.latitude/longitude di bawah).
   latitude     Decimal?    @db.Decimal(9, 6)
   longitude    Decimal?    @db.Decimal(9, 6)
+  // Kode QRIS statis milik Booth ini, ditampilkan di layar Kasir saat
+  // Petugas Booth pilih metode QRIS/Split — diunggah Admin di Data Booth.
+  qrisImageUrl String?     @map("qris_image_url")
   status       BoothStatus @default(ACTIVE)
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
@@ -462,6 +469,15 @@ model ShiftSession {
   openedAt         DateTime?     @map("opened_at")
   closingStartedAt DateTime?     @map("closing_started_at")
   closedAt         DateTime?     @map("closed_at")
+  // Absen GPS+Selfie (Check-In/Check-Out) — soft-check saja terhadap
+  // Booth.latitude/longitude (lihat ShiftsService.computeLocationWarning),
+  // TIDAK memblokir absen. Sama pola dgn Sale.latitude/longitude di atas.
+  checkInLatitude   Decimal?  @db.Decimal(9, 6) @map("check_in_latitude")
+  checkInLongitude  Decimal?  @db.Decimal(9, 6) @map("check_in_longitude")
+  checkInPhotoUrl   String?   @map("check_in_photo_url")
+  checkOutLatitude  Decimal?  @db.Decimal(9, 6) @map("check_out_latitude")
+  checkOutLongitude Decimal?  @db.Decimal(9, 6) @map("check_out_longitude")
+  checkOutPhotoUrl  String?   @map("check_out_photo_url")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -502,7 +518,9 @@ model Sale {
   subtotal           BigInt
   discount           BigInt        @default(0)
   total              BigInt
-  paymentMethod      PaymentMethod @map("payment_method")
+  // Null selama status PENDING (draft belum ditentukan metode bayarnya) —
+  // wajib terisi begitu status jadi PAID (lihat SalesService.payDraftSale).
+  paymentMethod      PaymentMethod? @map("payment_method")
   paidAt             DateTime?     @map("paid_at")
   voidedAt           DateTime?     @map("voided_at")
   voidReason         String?       @map("void_reason")

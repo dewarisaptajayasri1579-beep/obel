@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
+import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -22,6 +23,7 @@ export class DistributionsService {
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
     private readonly reconciliationCases: ReconciliationCasesService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   findAll() {
@@ -40,10 +42,22 @@ export class DistributionsService {
     return distributions.map(this.toResponse);
   }
 
+  /// Layar "Terima Stok" Petugas Booth (tab Semua/Menunggu/Selesai) — beda
+  /// dari findPendingForBooth() yang cuma SENT, ini SEMUA status supaya tab
+  /// "Selesai" (RECEIVED/DISCREPANCY) ikut punya isi, bukan selalu kosong.
+  async findAllForBooth(boothId: string) {
+    const distributions = await this.prisma.stockDistribution.findMany({
+      where: { boothId },
+      include: { booth: true, items: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return distributions.map(this.toResponse);
+  }
+
   /// Kirim distribusi (Admin). Digabung create+SENT dalam satu langkah untuk
   /// MVP, sesuai rekomendasi BR-003: "deduct Gudang saat SENT". Atomik dan
   /// idempotent (BR-017) seperti create_paid_sale.
-  async create(dto: CreateDistributionDto, actorId: string) {
+  async create(dto: CreateDistributionDto, actorId: string, actorName: string) {
     const existing = await this.prisma.stockDistribution.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
     });
@@ -104,6 +118,15 @@ export class DistributionsService {
             },
           },
         },
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distributionId,
+        action: 'SENT',
+        actorId,
+        actorName,
+        note: `Dikirim ke Booth ${booth.name}, ${dto.items.length} baris.`,
       });
     });
 
@@ -180,6 +203,15 @@ export class DistributionsService {
           receivedById: user.sub,
         },
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: hasDiscrepancy ? 'RECEIVED_WITH_DISCREPANCY' : 'RECEIVED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: hasDiscrepancy ? 'Diterima dengan selisih qty.' : 'Diterima sesuai qty dikirim.',
+      });
     });
 
     return this.toResponse((await this.loadWithRelations(distributionId))!);
@@ -244,6 +276,15 @@ export class DistributionsService {
         impactSnapshot: { warehouseRestored: distribution.items.map((i) => ({ productId: i.productId, qty: i.qtySent })) },
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: 'CANCELLED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: dto.reasonNote ?? dto.reasonCode,
       });
     });
 
@@ -373,6 +414,15 @@ export class DistributionsService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: 'REVISED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `Direvisi menjadi dokumen baru (v${distribution.versionNo + 1}). ${dto.reasonNote ?? dto.reasonCode}`,
+      });
       });
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
@@ -481,6 +531,15 @@ export class DistributionsService {
           impactSnapshot: { deltas },
           createdById: user.sub,
           idempotencyKey: dto.idempotencyKey,
+        });
+
+        await this.activityLog.record(tx, {
+          entityType: 'stock_distribution',
+          entityId: distribution.id,
+          action: 'RECEIPT_CORRECTED',
+          actorId: user.sub,
+          actorName: user.username,
+          note: dto.reasonNote ?? dto.reasonCode,
         });
       });
     } catch (err) {

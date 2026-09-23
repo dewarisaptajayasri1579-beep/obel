@@ -8,6 +8,7 @@ export interface BoothFormValues {
   address: string;
   latitude: string;
   longitude: string;
+  qrisImageUrl: string;
   isActive: boolean;
 }
 
@@ -20,6 +21,7 @@ export function nilaiAwalBooth(): BoothFormValues {
     address: "",
     latitude: "",
     longitude: "",
+    qrisImageUrl: "",
     isActive: true,
   };
 }
@@ -33,6 +35,7 @@ export function keFormValues(b: Booth): BoothFormValues {
     address: b.address ?? "",
     latitude: b.latitude === null ? "" : String(b.latitude),
     longitude: b.longitude === null ? "" : String(b.longitude),
+    qrisImageUrl: b.qrisImageUrl ?? "",
     isActive: b.status === "ACTIVE",
   };
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Settings } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { formatThousands, parseDigits } from "@/components/ui/CurrencyInput";
 import { api, ApiError, type Product } from "@/lib/api-client";
 
 function angka(n: number) {
@@ -128,10 +129,10 @@ export function TabPengaturan({
           <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200/90 dark:border-line bg-white/90 dark:bg-surface px-2.5 h-8">
             <span className="text-slate-400 dark:text-fg-muted text-xs">Rp</span>
             <input
-              type="number"
-              min={0}
-              value={draft.sellPrice}
-              onChange={(e) => setDraftField(p.id, "sellPrice", e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={formatThousands(Number(draft.sellPrice) || 0)}
+              onChange={(e) => setDraftField(p.id, "sellPrice", String(parseDigits(e.target.value)))}
               onBlur={() => simpanField(p, "sellPrice", "sellPrice")}
               className="w-24 text-right bg-transparent text-xs font-semibold text-slate-800 dark:text-fg outline-none tabular-nums"
             />
@@ -195,7 +196,12 @@ export function TabPengaturan({
           <thead>
             <tr className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
               <th className="py-3 px-3">Produk</th>
-              <th className="py-3 px-3 text-right">Harga Jual</th>
+              <th
+                className="py-3 px-3 text-right cursor-help"
+                title="Harga jual produk ini di kasir Booth. Berlaku sama untuk SEMUA Booth — belum bisa diset beda per Booth."
+              >
+                Harga Jual
+              </th>
               <th className="py-3 px-3 text-center">Stok Aman</th>
               <th className="py-3 px-3 text-center">Stok Menipis</th>
               <th className="py-3 px-3 text-center">Stok Kritis</th>
