@@ -27,6 +27,7 @@ import {
   CalendarClock,
   LayoutGrid,
   MapPin,
+  Send,
 } from "lucide-react";
 
 // Leaflet menyentuh `window`/`document` langsung — wajib no-SSR, dan cukup
@@ -216,6 +217,13 @@ function KartuBooth({ booth, dipilih, onClick }: { booth: BoothAktifCard; dipili
         <span className={`w-2 h-2 rounded-full ${style.dot}`} />
       </div>
 
+      {booth.pendingDistribution && (
+        <div className="flex items-center gap-1 mb-2 px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-bold w-fit">
+          <Send className="w-2.5 h-2.5" />
+          Kirim Stok Proses
+        </div>
+      )}
+
       <div className="flex items-center gap-1.5 mb-1">
         <Coffee className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         <span className="text-base font-black text-slate-800 dark:text-fg">
@@ -252,6 +260,12 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
     booth.cupSoldYesterday > 0
       ? Math.round(((booth.cupSoldToday - booth.cupSoldYesterday) / booth.cupSoldYesterday) * 100)
       : null;
+  // Kirim Stok cuma relevan kalau Booth ini aktif (ada Petugas yang bisa
+  // menerima) dan stoknya memang butuh diisi ulang (Kritis/Habis). Tombolnya
+  // dinonaktifkan kalau masih ada Serah Terima Stok berstatus SENT ke Booth
+  // ini (belum dikonfirmasi diterima) — supaya Admin tidak kirim dobel.
+  const perluKirimStok = booth.isActive && (booth.stockStatus === "Kritis" || booth.stockStatus === "Habis");
+  const sedangKirimStok = booth.pendingDistribution !== null;
 
   return (
     <div className="w-full lg:w-[380px] shrink-0">
@@ -362,6 +376,38 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
             </div>
           )}
         </div>
+
+        {sedangKirimStok && (
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/15 border border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-400">
+            <Send className="w-4 h-4 shrink-0" />
+            <p className="text-xs font-semibold leading-snug">
+              Masih ada pengiriman stok yang belum dikonfirmasi diterima (
+              <span className="font-mono">{booth.pendingDistribution!.distributionNo}</span>
+              {booth.pendingDistribution!.count > 1 ? ` +${booth.pendingDistribution!.count - 1} lainnya` : ""}).
+            </p>
+          </div>
+        )}
+
+        {perluKirimStok &&
+          (sedangKirimStok ? (
+            <button
+              type="button"
+              disabled
+              title="Selesaikan dulu pengiriman stok yang sedang berjalan"
+              className="flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-200 dark:bg-surface-hover text-slate-400 dark:text-fg-disabled text-sm font-bold cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+              Kirim Stok
+            </button>
+          ) : (
+            <Link
+              href={`/serah-terima-stok/baru?boothId=${booth.boothId}`}
+              className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white text-sm font-bold shadow-sm cursor-pointer transition-colors"
+            >
+              <Send className="w-4 h-4" />
+              Kirim Stok
+            </Link>
+          ))}
 
         <Link
           href={`/master/booth?tab=riwayat-penjualan&boothId=${booth.boothId}`}

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Ban, Check, Pencil, Printer, Truck, Wrench, X } from "lucide-react";
+import { ArrowLeft, Ban, Check, History, Printer, Truck, Wrench, X } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
@@ -17,11 +17,31 @@ import {
   ApiError,
   REASON_CODE_OPTIONS,
   type ReasonCode,
+  type TindakLanjutSelisih,
   type StockHandover,
 } from "@/lib/api-client";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 import { SerahTerimaActivityLog } from "../SerahTerimaActivityLog";
 import { SerahTerimaNotaPreviewModal } from "../SerahTerimaNotaPreviewModal";
+
+const ALASAN_SELISIH_LABEL: Record<string, string> = {
+  LEBIH: "Stok Lebih",
+  KURANG: "Stok Kurang",
+  RUSAK: "Rusak",
+  LAINNYA: "Lainnya",
+};
+
+/// Tindak lanjut Admin per baris produk yang selisih saat Koreksi Penerimaan
+/// (lihat TindakLanjutSelisih di api-client.ts & correctReceipt() backend):
+/// Rusak = qty tetap dipotong & masuk Laporan Stok Rusak, Salah Hitung =
+/// qty dikembalikan/dikoreksi biasa, Ganti Rugi Petugas = dicatat sebagai
+/// beban ke Petugas yang menerima (belum ada alur pelunasan).
+const TINDAK_LANJUT_LABEL: Record<TindakLanjutSelisih, string> = {
+  RUSAK: "Rusak",
+  SALAH_HITUNG: "Salah Hitung",
+  GANTI_RUGI_PETUGAS: "Ganti Rugi Petugas",
+  LAINNYA: "Lainnya",
+};
 
 const STATUS_LABEL: Record<StockHandover["status"], { label: string; kelas: string }> = {
   DIAJUKAN: { label: "Diajukan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
@@ -31,8 +51,20 @@ const STATUS_LABEL: Record<StockHandover["status"], { label: string; kelas: stri
   DIBATALKAN: { label: "Dibatalkan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
 
-const JENIS_LABEL: Record<string, string> = { STOK_AWAL: "Stok Awal", RE_STOK: "Re-Stok" };
-const SUMBER_LABEL: Record<string, string> = { PETUGAS: "Petugas", ADMIN: "Admin" };
+/// Gabungan jenis+sumber jadi satu label yang langsung menjelaskan asal
+/// dokumen (lihat penjelasan sama di ../page.tsx `keteranganDokumen`).
+function keteranganDokumen(r: StockHandover): { label: string; kelas: string } {
+  if (r.jenis === "STOK_AWAL") {
+    return { label: "Kirim Stok (Awal)", kelas: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20" };
+  }
+  if (r.kind === "request") {
+    return { label: "Pengajuan dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+  }
+  if (r.sumber === "ADMIN") {
+    return { label: "Kirim Stok (Re-Stok)", kelas: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20" };
+  }
+  return { label: "Re-Stok dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+}
 
 function tanggalJakarta(iso: string) {
   return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(iso));
@@ -51,6 +83,9 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showNota, setShowNota] = useState(false);
+  const [tampilkanSemuaProduk, setTampilkanSemuaProduk] = useState(false);
+  const [tindakLanjut, setTindakLanjut] = useState<Record<string, TindakLanjutSelisih>>({});
+  const [tindakLanjutNote, setTindakLanjutNote] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -74,8 +109,22 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
     setReasonCode("WRONG_QTY");
     setReasonNote("");
     setRejectReason("");
+    setTampilkanSemuaProduk(false);
+    setTindakLanjut({});
+    setTindakLanjutNote({});
     setMode(m);
   }
+
+  const itemSelisihDetail = detail
+    ? detail.items.filter((i) => (i.qtyReceived ?? i.qty) !== i.qty)
+    : [];
+  const semuaTindakLanjutTerisi =
+    mode !== "correct" ||
+    itemSelisihDetail.every((i) => {
+      const t = tindakLanjut[i.productId];
+      if (!t) return false;
+      return t !== "LAINNYA" || (tindakLanjutNote[i.productId] ?? "").trim().length > 0;
+    });
 
   async function konfirmasi() {
     if (!detail) return;
@@ -105,7 +154,22 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
         window.location.href = `/serah-terima-stok/dist_${revisi.id}`;
         return;
       } else if (mode === "correct") {
-        await api.correctStockHandoverReceipt(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        if (!semuaTindakLanjutTerisi) {
+          toast.warning("Pilih tindak lanjut untuk setiap produk yang selisih.");
+          setSubmitting(false);
+          return;
+        }
+        const itemsDenganTindakLanjut = items.map((i) => ({
+          ...i,
+          tindakLanjut: tindakLanjut[i.productId],
+          tindakLanjutNote: tindakLanjut[i.productId] === "LAINNYA" ? tindakLanjutNote[i.productId]?.trim() : undefined,
+        }));
+        await api.correctStockHandoverReceipt(detail.id, {
+          idempotencyKey: crypto.randomUUID(),
+          items: itemsDenganTindakLanjut,
+          reasonCode,
+          reasonNote: reasonNote || undefined,
+        });
         toast.success(`Penerimaan "${detail.docNo}" dikoreksi.`);
       }
       setMode(null);
@@ -172,18 +236,23 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs">
               <div>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Tanggal</p>
                 <p className="font-semibold text-slate-800 dark:text-fg mt-0.5">{tanggalJakarta(detail.date)}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Jenis</p>
-                <p className="font-semibold text-slate-800 dark:text-fg mt-0.5">{detail.jenis ? JENIS_LABEL[detail.jenis] : "-"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Sumber</p>
-                <p className="font-semibold text-slate-800 dark:text-fg mt-0.5">{SUMBER_LABEL[detail.sumber]}</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Keterangan</p>
+                <p className="mt-0.5">
+                  {(() => {
+                    const keterangan = keteranganDokumen(detail);
+                    return (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${keterangan.kelas}`}>
+                        {keterangan.label}
+                      </span>
+                    );
+                  })()}
+                </p>
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Catatan</p>
@@ -197,42 +266,140 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
               </div>
             )}
 
-            <div>
-              <p className="text-sm font-bold text-slate-700 dark:text-fg mb-2">
-                {mode === "approve" || mode === "revise" || mode === "correct" ? "Sesuaikan Qty" : "Item"}
-              </p>
-              <div className="overflow-x-auto rounded-lg border border-slate-200/70 dark:border-line">
-                <table className="w-full text-xs">
-                  <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
-                    <tr>
-                      <th className="py-2.5 px-3 text-left">Nama Produk</th>
-                      <th className="py-2.5 px-3 text-right w-32">Qty Dikirim/Diajukan</th>
-                      <th className="py-2.5 px-3 text-right w-32">Qty Diterima</th>
-                      {(mode === "approve" || mode === "revise" || mode === "correct") && (
-                        <th className="py-2.5 px-3 text-right w-36">Koreksi</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-line">
-                    {detail.items.map((item) => (
-                      <tr key={item.productId}>
-                        <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{item.productName}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">{item.qty}</td>
-                        <td className="py-2 px-3 text-right tabular-nums text-slate-600 dark:text-fg-secondary">{item.qtyReceived ?? "-"}</td>
-                        {(mode === "approve" || mode === "revise" || mode === "correct") && (
-                          <td className="py-2 px-3 text-right">
-                            <QuantityStepperInline
-                              value={itemQty[item.productId] ?? item.qty}
-                              onChange={(v) => setItemQty((prev) => ({ ...prev, [item.productId]: v }))}
-                            />
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {(() => {
+              const adaSelisih = (item: (typeof detail.items)[number]) => (item.qtyReceived ?? item.qty) !== item.qty;
+              const itemSelisih = detail.items.filter(adaSelisih);
+              const persempitKeSelisih = mode === "correct" && !tampilkanSemuaProduk && itemSelisih.length > 0;
+              const itemDitampilkan = persempitKeSelisih ? itemSelisih : detail.items;
+              return (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className="text-sm font-bold text-slate-700 dark:text-fg">
+                      {mode === "approve" || mode === "revise" || mode === "correct" ? "Sesuaikan Qty" : "Item"}
+                    </p>
+                    {mode === "correct" && itemSelisih.length > 0 && itemSelisih.length < detail.items.length && (
+                      <button
+                        type="button"
+                        onClick={() => setTampilkanSemuaProduk((v) => !v)}
+                        className="text-[11px] font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline cursor-pointer"
+                      >
+                        {persempitKeSelisih ? `Tampilkan semua ${detail.items.length} produk` : "Tampilkan yang selisih saja"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200/70 dark:border-line">
+                    <table className="w-full text-xs">
+                      <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
+                        <tr>
+                          <th className={`py-2.5 px-3 text-left ${mode === "correct" ? "w-40" : ""}`}>Nama Produk</th>
+                          <th className="py-2.5 px-3 text-right w-28">Qty Dikirim/Diajukan</th>
+                          <th className="py-2.5 px-3 text-right w-24">Qty Diterima</th>
+                          {mode === "correct" && <th className="py-2.5 px-3 text-left">Tindak Lanjut</th>}
+                          {(mode === "approve" || mode === "revise" || mode === "correct") && (
+                            <th className="py-2.5 px-3 text-right w-32">Koreksi</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-line">
+                        {itemDitampilkan.map((item) => {
+                          const selisih = adaSelisih(item) ? (item.qtyReceived ?? item.qty) - item.qty : 0;
+                          const qtyRugi = item.qty - (itemQty[item.productId] ?? item.qty);
+                          return (
+                            <tr key={item.productId} className={selisih !== 0 ? "bg-rose-50/60 dark:bg-rose-900/10" : undefined}>
+                              <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${mode === "correct" ? "max-w-[160px]" : ""}`}>
+                                <span className="break-words">{item.productName}</span>
+                                {selisih !== 0 && item.discrepancyReasonCode && (
+                                  <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
+                                    Alasan Petugas: {ALASAN_SELISIH_LABEL[item.discrepancyReasonCode] ?? item.discrepancyReasonCode}
+                                    {item.discrepancyNote ? ` — ${item.discrepancyNote}` : ""}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">{item.qty}</td>
+                              <td
+                                className={`py-2 px-3 text-right tabular-nums font-semibold ${
+                                  selisih !== 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-600 dark:text-fg-secondary"
+                                }`}
+                              >
+                                {item.qtyReceived ?? "-"}
+                                {selisih !== 0 && (
+                                  <span className="ml-1.5 text-[10px] font-bold">({selisih > 0 ? `+${selisih}` : selisih})</span>
+                                )}
+                              </td>
+                              {mode === "correct" && (
+                                <td className="py-2 px-3 align-top">
+                                  {selisih !== 0 ? (
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex flex-wrap gap-1">
+                                        {(["RUSAK", "SALAH_HITUNG", "GANTI_RUGI_PETUGAS", "LAINNYA"] as TindakLanjutSelisih[]).map((opt) => {
+                                          const aktif = tindakLanjut[item.productId] === opt;
+                                          return (
+                                            <button
+                                              key={opt}
+                                              type="button"
+                                              onClick={() => {
+                                                setTindakLanjut((prev) => ({ ...prev, [item.productId]: opt }));
+                                                if (opt !== "SALAH_HITUNG") {
+                                                  setItemQty((prev) => ({ ...prev, [item.productId]: item.qtyReceived ?? item.qty }));
+                                                }
+                                              }}
+                                              className={`text-[10px] font-bold rounded-full px-2 py-1 border cursor-pointer transition-colors ${
+                                                aktif
+                                                  ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)]"
+                                                  : "bg-white dark:bg-surface text-slate-600 dark:text-fg-secondary border-slate-200 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
+                                              }`}
+                                            >
+                                              {TINDAK_LANJUT_LABEL[opt]}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      {tindakLanjut[item.productId] === "GANTI_RUGI_PETUGAS" && qtyRugi > 0 && (
+                                        <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                                          Beban: {qtyRugi} x Rp{(item.sellPrice ?? 0).toLocaleString("id-ID")} = Rp
+                                          {(qtyRugi * (item.sellPrice ?? 0)).toLocaleString("id-ID")}
+                                        </span>
+                                      )}
+                                      {tindakLanjut[item.productId] === "LAINNYA" && (
+                                        <input
+                                          type="text"
+                                          value={tindakLanjutNote[item.productId] ?? ""}
+                                          onChange={(e) =>
+                                            setTindakLanjutNote((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                                          }
+                                          placeholder="Catatan tindak lanjut (wajib)..."
+                                          className="w-full rounded-lg border border-slate-200 dark:border-line px-2 py-1 text-[11px]"
+                                        />
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-fg-disabled">-</span>
+                                  )}
+                                </td>
+                              )}
+                              {(mode === "approve" || mode === "revise" || mode === "correct") && (
+                                <td className="py-2 px-3 text-right">
+                                  {mode === "correct" && selisih !== 0 && tindakLanjut[item.productId] !== "SALAH_HITUNG" ? (
+                                    <span className="text-xs font-bold text-slate-400 dark:text-fg-disabled" title="Qty terkunci — hanya bisa diubah kalau Tindak Lanjut-nya Salah Hitung">
+                                      {itemQty[item.productId] ?? item.qty} (terkunci)
+                                    </span>
+                                  ) : (
+                                    <QuantityStepperInline
+                                      value={itemQty[item.productId] ?? item.qty}
+                                      onChange={(v) => setItemQty((prev) => ({ ...prev, [item.productId]: v }))}
+                                    />
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {mode === "reject" && (
               <Input
@@ -244,7 +411,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
               />
             )}
 
-            {(mode === "cancel" || mode === "revise" || mode === "correct") && (
+            {(mode === "cancel" || mode === "revise") && (
               <div className="space-y-3">
                 <Select
                   label="Alasan Koreksi"
@@ -263,6 +430,12 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
 
             <SerahTerimaActivityLog id={detail.id} />
 
+            {mode === "correct" && !semuaTindakLanjutTerisi && (
+              <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 text-right">
+                Pilih Tindak Lanjut untuk setiap produk yang selisih sebelum konfirmasi.
+              </p>
+            )}
+
             <div className="border-t border-slate-200/60 dark:border-line pt-4 flex flex-wrap items-center justify-end gap-2">
               {mode ? (
                 <>
@@ -271,6 +444,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                   </Button>
                   <Button
                     isLoading={submitting}
+                    disabled={mode === "correct" && !semuaTindakLanjutTerisi}
                     variant={mode === "cancel" || mode === "reject" ? "danger" : "primary"}
                     leftIcon={<Check className="w-3.5 h-3.5" />}
                     onClick={konfirmasi}
@@ -314,16 +488,26 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                       <Button variant="danger" leftIcon={<Ban className="w-3.5 h-3.5" />} onClick={() => bukaMode("cancel")}>
                         Batalkan
                       </Button>
-                      <Button variant="secondary" leftIcon={<Pencil className="w-3.5 h-3.5" />} onClick={() => bukaMode("revise")}>
-                        Revisi
-                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => bukaMode("revise")}
+                        className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        <span>Revisi</span>
+                      </button>
                     </>
                   )}
 
                   {detail.status === "DITERIMA" && (
-                    <Button variant="secondary" leftIcon={<Wrench className="w-3.5 h-3.5" />} onClick={() => bukaMode("correct")}>
-                      Koreksi Penerimaan
-                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => bukaMode("correct")}
+                      className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Koreksi Penerimaan</span>
+                    </button>
                   )}
                 </>
               )}

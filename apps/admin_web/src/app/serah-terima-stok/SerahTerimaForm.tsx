@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
-import { Check, Eye, Save, X } from "lucide-react";
+import { Check, Eye, Save, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
@@ -17,10 +17,34 @@ const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 const TANPA_KATEGORI = "Tanpa Kategori";
 
+/// Badge Keterangan Dokumen di form ini cuma bisa jadi "Kirim Stok (Awal)"
+/// atau "Kirim Stok (Re-Stok)" (never "Pengajuan dari Petugas" — itu cuma
+/// muncul lewat alur pengajuan Petugas, bukan dari form Kirim Stok Admin).
+/// Ditebak dari riwayat Booth: kalau Booth ini belum punya kiriman yang
+/// sudah Diproses/Diterima SEJAK Petugas ybs Check-In (bukan awal hari
+/// kalender — shift Malam yang check-in lewat tengah malam tetap dianggap
+/// "Awal" untuk kiriman pertamanya), kiriman berikutnya jadi Awal — meniru
+/// logic computeJenisFor di stock-handovers.service.ts.
+const KETERANGAN_STOK_AWAL = { label: "Kirim Stok (Awal)", kelas: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20" };
+const KETERANGAN_RE_STOK = { label: "Kirim Stok (Re-Stok)", kelas: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20" };
+
 interface BarisProduk {
   productId: string;
   sku: string;
   name: string;
+  minimumQty: number;
+  criticalQty: number;
+}
+
+/// Warna label "Gudang: N" mengikuti status stok yang sama dengan BR-007
+/// (backend/src/common/stock-status.ts) — Habis/Kritis merah, Menipis kuning,
+/// Aman hijau — supaya konsisten dengan badge status di halaman lain, cuma
+/// dipadatkan jadi 3 warna (tanpa admin_web punya salinan resolveStockStatus
+/// sendiri). Tebal (font-bold) kalau masih ada sisa stok sama sekali.
+function warnaGudang(gudang: number, minimumQty: number, criticalQty: number): string {
+  if (gudang <= 0 || gudang <= criticalQty) return "text-rose-600 dark:text-rose-400";
+  if (gudang <= minimumQty) return "text-amber-600 dark:text-amber-400";
+  return "text-emerald-600 dark:text-emerald-400";
 }
 
 /// Form "Kirim Stok" — satu-satunya cara membuat dokumen Serah Terima Stok
@@ -30,7 +54,7 @@ interface BarisProduk {
 /// SENT) dan koreksinya lewat halaman detail (Batalkan/Revisi), bukan edit
 /// ulang di sini. Pola tabel produk (kategori, keyboard cascade, tfoot) &
 /// hotkeys tetap mengikuti PenerimaanForm.tsx persis.
-export function SerahTerimaForm({ products }: { products: Product[] }) {
+export function SerahTerimaForm({ products, prefillBoothId }: { products: Product[]; prefillBoothId?: string }) {
   const router = useRouter();
   const toast = useToast();
 
@@ -42,6 +66,8 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
   const [konfirmasi, setKonfirmasi] = useState(false);
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [gudangQty, setGudangQty] = useState<Record<string, number>>({});
+  const [terisiOtomatis, setTerisiOtomatis] = useState(false);
+  const [keteranganDokumen, setKeteranganDokumen] = useState<typeof KETERANGAN_STOK_AWAL | null>(null);
 
   const formRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -55,6 +81,33 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Petugas Aktif."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Datang dari tombol "Kirim Stok" di panel Booth Aktif (Kritis/Habis) —
+  // begitu Petugas Aktif untuk Booth itu ketemu, pilih otomatis lalu isi Qty
+  // Kirim sesuai kekurangan tiap produk yang statusnya Menipis/Kritis/Habis
+  // (target: naik sampai pas di ambang Aman == minimumQty).
+  useEffect(() => {
+    if (!prefillBoothId || terisiOtomatis) return;
+    const assignment = assignments.find((a) => a.boothId === prefillBoothId);
+    if (!assignment) return;
+    setStaffId(assignment.staffId);
+    setTerisiOtomatis(true);
+
+    api
+      .getBoothStock({ boothId: prefillBoothId })
+      .then((rows) => {
+        const kekurangan = rows.filter((r) => r.status !== "Aman" && r.minimumQty > r.qtyOnHand);
+        if (kekurangan.length === 0) return;
+        setQty((prev) => {
+          const next = { ...prev };
+          for (const r of kekurangan) next[r.productId] = r.minimumQty - r.qtyOnHand;
+          return next;
+        });
+        toast.success(`Qty Kirim terisi otomatis untuk ${kekurangan.length} produk yang Menipis/Kritis/Habis.`);
+      })
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat Stok Booth untuk auto-isi."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillBoothId, assignments, terisiOtomatis]);
 
   // Label "Gudang: N" di samping tiap baris Qty Kirim — cuma tampil di form
   // ini, bukan disimpan/dikirim. Ambil snapshot awal via REST (fallback kalau
@@ -88,6 +141,33 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
   }, []);
 
   const selectedAssignment = assignments.find((a) => a.staffId === staffId);
+  const selectedBoothId = selectedAssignment?.boothId;
+  const selectedOpenedAt = selectedAssignment?.openedAt;
+
+  useEffect(() => {
+    if (!selectedBoothId || !selectedOpenedAt) {
+      setKeteranganDokumen(null);
+      return;
+    }
+    let batal = false;
+    setKeteranganDokumen(null);
+    api
+      .getStockHandovers({ boothId: selectedBoothId, limit: 10 })
+      .then((res) => {
+        if (batal) return;
+        const bukaSesi = new Date(selectedOpenedAt).getTime();
+        const sudahAdaSejakCheckIn = res.rows.some(
+          (r) => r.jenis !== null && r.status !== "DIBATALKAN" && new Date(r.date).getTime() >= bukaSesi,
+        );
+        setKeteranganDokumen(sudahAdaSejakCheckIn ? KETERANGAN_RE_STOK : KETERANGAN_STOK_AWAL);
+      })
+      .catch(() => {
+        if (!batal) setKeteranganDokumen(KETERANGAN_RE_STOK);
+      });
+    return () => {
+      batal = true;
+    };
+  }, [selectedBoothId, selectedOpenedAt]);
 
   const kelompok = useMemo(() => {
     const perKategori = new Map<string, BarisProduk[]>();
@@ -95,7 +175,7 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
       if (!p.active) continue;
       const kunci = p.category ?? TANPA_KATEGORI;
       if (!perKategori.has(kunci)) perKategori.set(kunci, []);
-      perKategori.get(kunci)!.push({ productId: p.id, sku: p.sku, name: p.name });
+      perKategori.get(kunci)!.push({ productId: p.id, sku: p.sku, name: p.name, minimumQty: p.minimumQty, criticalQty: p.criticalQty });
     }
     for (const rows of perKategori.values()) rows.sort((a, b) => a.name.localeCompare(b.name, "id"));
     return Array.from(perKategori.entries())
@@ -198,10 +278,16 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
             options={assignments.map((a) => ({ value: a.staffId, label: a.staffName }))}
             value={staffId}
             onChange={setStaffId}
+            disabled={terisiOtomatis}
             sizeVariant="sm"
             className={COMPACT_FIELD}
             labelClassName={COMPACT_LABEL}
           />
+          {terisiOtomatis && (
+            <p className="text-[10px] text-slate-400 dark:text-fg-muted mt-1">
+              Petugas terkunci karena Booth tujuan sudah ditentukan dari panel Booth Aktif.
+            </p>
+          )}
         </div>
 
         <div className="w-full flex flex-col gap-1.5">
@@ -222,6 +308,25 @@ export function SerahTerimaForm({ products }: { products: Product[] }) {
           </div>
         </div>
       </div>
+
+      {terisiOtomatis && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200/80 dark:border-amber-900/40 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          Qty Kirim terisi otomatis sesuai produk yang Menipis/Kritis/Habis di Booth ini — cek ulang sebelum Kirim.
+        </div>
+      )}
+
+      {keteranganDokumen && (
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200/80 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 text-[11px]">
+          <span className="font-bold text-slate-500 dark:text-fg-muted uppercase tracking-wide">Keterangan Dokumen:</span>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-bold border ${keteranganDokumen.kelas}`}>
+            {keteranganDokumen.label}
+          </span>
+          <span className="text-slate-400 dark:text-fg-muted font-medium">
+            — otomatis ditentukan sistem sesuai riwayat Booth.
+          </span>
+        </div>
+      )}
 
       <input
         type="text"
@@ -434,8 +539,8 @@ function RenderKelompokBaris({
               <div className="flex items-center justify-end gap-2">
                 <span
                   title="Sisa Stok Gudang saat ini"
-                  className={`text-[10px] font-semibold tabular-nums whitespace-nowrap ${
-                    kurang ? "text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-fg-muted"
+                  className={`text-[10px] tabular-nums whitespace-nowrap ${gudang > 0 ? "font-bold" : "font-semibold"} ${
+                    kurang ? "text-rose-600 dark:text-rose-400" : warnaGudang(gudang, b.minimumQty, b.criticalQty)
                   }`}
                 >
                   Gudang: {gudang}

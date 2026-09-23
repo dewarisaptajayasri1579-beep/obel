@@ -3,7 +3,7 @@ import { OpnameLocationType, StockMovementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -82,7 +82,7 @@ export class StockAdjustmentsService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
             productId: dto.productId,
             qty: Math.abs(delta),
@@ -190,7 +190,7 @@ export class StockAdjustmentsService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.VOID_REVERSAL,
             productId: snapshot.productId,
             qty: Math.abs(inverseDelta),

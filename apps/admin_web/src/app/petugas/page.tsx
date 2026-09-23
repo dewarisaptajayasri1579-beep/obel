@@ -23,12 +23,12 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, BASE_URL, getToken, type ActiveShift, type NotificationItem } from "@/lib/api-client";
+import { api, ApiError, BASE_URL, getToken, type ActiveShift, type NotificationItem, type SaleListItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
-import { formatJamJakarta } from "./_lib/format";
-import { OBBEL } from "./_lib/theme";
+import { formatJamJakarta, formatRupiah, startOfTodayJakarta } from "./_lib/format";
+import { OBBEL, OBBEL_SCALE } from "./_lib/theme";
 
 const GREEN = OBBEL.primaryDark;
 
@@ -38,7 +38,7 @@ const MENU = [
     label: "Kasir",
     desc: "Mulai transaksi penjualan",
     icon: CreditCard,
-    bg: "#E4F3E9",
+    bg: OBBEL_SCALE[50],
     fg: GREEN,
     watermark: CreditCard,
   },
@@ -76,9 +76,11 @@ function HomeContent() {
   const router = useRouter();
   const toast = useToast();
   const [shift, setShift] = useState<ActiveShift | null>(null);
+  const [noShift, setNoShift] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [salesHariIni, setSalesHariIni] = useState<SaleListItem[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -94,7 +96,10 @@ function HomeContent() {
         setShift(active);
       } catch (err) {
         if (err instanceof ApiError && err.code === "NOT_FOUND") {
-          router.replace("/petugas/check-in");
+          // Belum ada shift aktif — tetap tampilkan Beranda (bukan auto-
+          // redirect ke Check-In), dengan CTA supaya Petugas yang pertama
+          // kali buka jelas melihat dulu ada di Beranda.
+          setNoShift(true);
           return;
         }
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat status shift.");
@@ -124,6 +129,25 @@ function HomeContent() {
       socket.disconnect();
     };
   }, [shift]);
+
+  // Ringkasan Kasir (cup + omzet) di kartu menu Beranda — booth-scoped
+  // otomatis oleh backend (JWT BOOTH_STAFF, sama seperti /petugas/riwayat-
+  // penjualan), disaring ke "hari ini" Asia/Jakarta di sisi klien.
+  useEffect(() => {
+    if (!shift) return;
+    api
+      .getSales({ status: "PAID", limit: 100 })
+      .then((res) => {
+        const cutoff = startOfTodayJakarta();
+        setSalesHariIni(res.rows.filter((s) => new Date(s.paidAt ?? s.createdAt) >= cutoff));
+      })
+      .catch(() => {
+        // Diam-diam gagal — cuma ringkasan di kartu, jangan halangi Beranda.
+      });
+  }, [shift]);
+
+  const cupTerjualHariIni = salesHariIni.reduce((sum, s) => sum + s.cupCount, 0);
+  const omzetHariIni = salesHariIni.reduce((sum, s) => sum + s.total, 0);
 
   const stokMasukBaru = notifications.filter((n) => n.id.startsWith("distribution:")).length;
 
@@ -160,10 +184,57 @@ function HomeContent() {
     error: OBBEL.accentRed,
   };
 
-  if (loading || !shift) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (noShift || !shift) {
+    return (
+      <div className="pb-6">
+        <div className="bg-white px-5 pt-5 pb-4 flex items-start justify-between">
+          <div>
+            <p className="text-xs text-slate-500 font-semibold">Selamat bekerja,</p>
+            <p className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">{session?.profile.fullName} 👋</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            title="Keluar Akun"
+            className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0"
+          >
+            <LogOut size={17} className="text-slate-500" />
+          </button>
+        </div>
+
+        <div className="px-4 pt-2">
+          <div
+            className="rounded-[28px] p-6 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-[190px] flex flex-col items-start justify-center"
+            style={{ background: `linear-gradient(135deg, ${OBBEL.primaryMedium} 0%, ${GREEN} 65%, ${OBBEL_SCALE[800]} 100%)` }}
+          >
+            <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-[20deg]" strokeWidth={1} />
+            <Coffee size={64} className="absolute right-5 bottom-4 text-white/25" strokeWidth={1.2} />
+            <DoorOpen size={28} className="relative text-white/80 mb-2" />
+            <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Belum Ada Shift Aktif</p>
+            <p className="relative text-white/80 text-sm mt-2 font-medium max-w-[220px]">
+              Lakukan Check-In dulu untuk mulai bekerja hari ini.
+            </p>
+          </div>
+
+          <Link
+            href="/petugas/check-in"
+            className="mt-4 w-full flex items-center justify-center gap-2 rounded-full py-4 font-extrabold tracking-wide text-white active:scale-[0.99] transition relative"
+            style={{ backgroundColor: GREEN }}
+          >
+            <DoorOpen size={18} />
+            CHECK IN SEKARANG
+            <ChevronRight size={16} className="absolute right-5" />
+          </Link>
+        </div>
       </div>
     );
   }
@@ -202,7 +273,7 @@ function HomeContent() {
       <div className="px-4 pt-2">
         <div
           className="rounded-[28px] p-5 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-[190px]"
-          style={{ background: `linear-gradient(135deg, ${OBBEL.primaryMedium} 0%, ${GREEN} 65%, #073E26 100%)` }}
+          style={{ background: `linear-gradient(135deg, ${OBBEL.primaryMedium} 0%, ${GREEN} 65%, ${OBBEL_SCALE[800]} 100%)` }}
         >
           {/* Dekorasi daun & cangkir kopi — mengganti ilustrasi foto di mockup
               dengan ikon, supaya tidak butuh aset gambar baru. */}
@@ -273,6 +344,10 @@ function HomeContent() {
                       ]
                         .filter(Boolean)
                         .join(", ")}
+                    </p>
+                  ) : item.href === "/petugas/kasir" && cupTerjualHariIni > 0 ? (
+                    <p className="text-[11px] mt-0.5 font-bold" style={{ color: GREEN }}>
+                      {cupTerjualHariIni} cup · {formatRupiah(omzetHariIni)}
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-500 mt-0.5 font-medium">{item.desc}</p>

@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 function SettingContent() {
@@ -60,7 +60,7 @@ function SettingContent() {
 
       <div className="p-4">
         <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E8F5E9" }}>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
             <User size={24} style={{ color: GREEN }} />
           </div>
           <div>

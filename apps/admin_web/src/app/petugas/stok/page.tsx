@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Minus,
   Plus,
@@ -32,11 +33,11 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
 
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 const STATUS_STYLE: Record<BoothStockRow["status"], { bg: string; fg: string; bar: string; icon: typeof CheckCircle2 }> = {
-  Aman: { bg: "#E8F5E9", fg: GREEN, bar: "#1F9254", icon: CheckCircle2 },
+  Aman: { bg: OBBEL_SCALE[50], fg: GREEN, bar: OBBEL_SCALE[600], icon: CheckCircle2 },
   Menipis: { bg: "#FFF8E1", fg: "#B45309", bar: "#D9A441", icon: AlertTriangle },
   Kritis: { bg: "#FFF3E0", fg: "#C2740C", bar: "#E38A1F", icon: AlertTriangle },
   Habis: { bg: "#FEE2E2", fg: "#D21919", bar: "#D21919", icon: Ban },
@@ -107,9 +108,14 @@ const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
   { value: "Habis", label: "Habis" },
 ];
 
+const VALID_TABS: Tab[] = ["STOK", "RESTOCK", "RIWAYAT"];
+
 function StokContent() {
   const toast = useToast();
-  const [tab, setTab] = useState<Tab>("STOK");
+  const searchParams = useSearchParams();
+  const tabFromQuery = searchParams.get("tab")?.toUpperCase();
+  const initialTab = VALID_TABS.includes(tabFromQuery as Tab) ? (tabFromQuery as Tab) : "STOK";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [loading, setLoading] = useState(true);
   const [stock, setStock] = useState<BoothStockRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -345,13 +351,13 @@ function StokContent() {
       ) : tab === "STOK" ? (
         <div className="p-4">
           <div className="grid grid-cols-4 gap-2 mb-4">
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E8F5E9" }}>
+            <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <Package size={16} style={{ color: GREEN }} />
               <p className="text-[10px] text-slate-600 mt-1.5">Total Item</p>
               <p className="text-lg font-extrabold text-slate-900">{ringkasan.total}</p>
               <p className="text-[9px] text-slate-400">produk</p>
             </div>
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E8F5E9" }}>
+            <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <CheckCircle2 size={16} style={{ color: GREEN }} />
               <p className="text-[10px] mt-1.5" style={{ color: GREEN }}>Aman</p>
               <p className="text-lg font-extrabold" style={{ color: GREEN }}>{ringkasan.aman}</p>
@@ -406,7 +412,7 @@ function StokContent() {
                         setFilterOpen(false);
                       }}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold"
-                      style={filterStatus === o.value ? { backgroundColor: "#E8F5E9", color: GREEN } : { color: "#475569" }}
+                      style={filterStatus === o.value ? { backgroundColor: OBBEL_SCALE[50], color: GREEN } : { color: "#475569" }}
                     >
                       {o.label}
                     </button>
@@ -468,7 +474,7 @@ function StokContent() {
       ) : tab === "RESTOCK" ? (
         <div className="p-4 pb-32">
           <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "#E4F3E9" }}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
@@ -481,7 +487,7 @@ function StokContent() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E8F5E9" }}>
+            <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <FileText size={16} style={{ color: GREEN }} />
               <p className="text-lg font-extrabold text-slate-900 mt-1.5">{itemDiajukan}</p>
               <p className="text-[10px] text-slate-500">item diajukan</p>
@@ -557,7 +563,7 @@ function StokContent() {
                       <button type="button" onClick={() => changeRequestQty(p.id, -1)} className="w-7 h-7 rounded-full border flex items-center justify-center">
                         <Minus size={14} />
                       </button>
-                      <span className="w-8 text-center text-sm font-bold rounded-lg py-1" style={{ backgroundColor: "#E8F5E9", color: GREEN }}>
+                      <span className="w-8 text-center text-sm font-bold rounded-lg py-1" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
                         {qty}
                       </span>
                       <button
@@ -578,7 +584,7 @@ function StokContent() {
           <div className="fixed bottom-4 inset-x-4 z-20">
             <div className="max-w-md mx-auto bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 p-3 flex items-center gap-2.5">
               <div className="flex items-center gap-2 shrink-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E8F5E9" }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                   <Package size={14} style={{ color: GREEN }} />
                 </div>
                 <div>
@@ -613,7 +619,7 @@ function StokContent() {
       ) : (
         <div className="p-4">
           <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "#E4F3E9" }}>
+            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
@@ -671,7 +677,7 @@ function StokContent() {
                   <p className="text-[10px] text-slate-500 mt-1.5">Stok Awal</p>
                   <p className="text-base font-extrabold text-slate-900">{ledger.ringkasan.stokAwal}</p>
                 </div>
-                <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E8F5E9" }}>
+                <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                   <ArrowUp size={15} style={{ color: GREEN }} />
                   <p className="text-[10px] mt-1.5" style={{ color: GREEN }}>Masuk</p>
                   <p className="text-base font-extrabold" style={{ color: GREEN }}>{ledger.ringkasan.masuk}</p>
@@ -701,7 +707,7 @@ function StokContent() {
                     .map((r) => {
                       const jenisStyle =
                         r.jenis === "MASUK"
-                          ? { bg: "#E8F5E9", fg: GREEN, Icon: ArrowUp }
+                          ? { bg: OBBEL_SCALE[50], fg: GREEN, Icon: ArrowUp }
                           : r.jenis === "KELUAR"
                             ? { bg: "#FEE2E2", fg: "#D21919", Icon: ArrowDown }
                             : { bg: "#E1EEFB", fg: "#1D63D8", Icon: Equal };
@@ -732,7 +738,7 @@ function StokContent() {
 
               <div className="rounded-2xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E8F5E9" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                     <ArrowUp size={14} style={{ color: GREEN }} />
                   </div>
                   <div>
@@ -768,7 +774,16 @@ function StokContent() {
 export default function StokPage() {
   return (
     <RequirePetugasAuth>
-      <StokContent />
+      {/* useSearchParams wajib dibungkus Suspense di App Router. */}
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-20">
+            <Spinner />
+          </div>
+        }
+      >
+        <StokContent />
+      </Suspense>
     </RequirePetugasAuth>
   );
 }

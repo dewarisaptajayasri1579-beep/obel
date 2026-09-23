@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Keyboard, Truck } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -13,6 +14,8 @@ import { SerahTerimaForm } from "../SerahTerimaForm";
 
 function KirimStokContent() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const prefillBoothId = searchParams.get("boothId") || undefined;
   const [products, setProducts] = useState<Product[] | null>(null);
 
   useEffect(() => {
@@ -68,7 +71,7 @@ function KirimStokContent() {
             <Spinner />
           </div>
         ) : (
-          <SerahTerimaForm products={products} />
+          <SerahTerimaForm products={products} prefillBoothId={prefillBoothId} />
         )}
       </Card>
     </div>
@@ -78,7 +81,16 @@ function KirimStokContent() {
 export default function KirimStokPage() {
   return (
     <RequireAuth>
-      <KirimStokContent />
+      {/* useSearchParams wajib dibungkus Suspense di App Router. */}
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-20">
+            <Spinner />
+          </div>
+        }
+      >
+        <KirimStokContent />
+      </Suspense>
     </RequireAuth>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Minus,
@@ -31,7 +32,7 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 interface CartLine {
@@ -84,6 +85,7 @@ function nominalCepat(total: number): number[] {
 
 function KasirContent() {
   const toast = useToast();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [shift, setShift] = useState<ActiveShift | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -275,6 +277,11 @@ function KasirContent() {
       resetTransaksi();
       loadDrafts();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "SHIFT_NOT_OPEN") {
+        toast.error("Shift Anda sudah tidak aktif. Silakan Check-In ulang.");
+        router.replace("/petugas");
+        return;
+      }
       toast.error(err instanceof ApiError ? err.message : "Gagal menyimpan draft.");
     } finally {
       setSubmitting(false);
@@ -314,6 +321,11 @@ function KasirContent() {
       resetTransaksi();
       loadDrafts();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "SHIFT_NOT_OPEN") {
+        toast.error("Shift Anda sudah tidak aktif. Silakan Check-In ulang.");
+        router.replace("/petugas");
+        return;
+      }
       toast.error(err instanceof ApiError ? err.message : "Gagal memproses pembayaran.");
     } finally {
       setSubmitting(false);
@@ -714,7 +726,7 @@ function KasirContent() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#E4F3E9" }}>
+              <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                 <p className="text-xs font-semibold text-slate-600">Total Pembayaran</p>
                 <p className="font-extrabold text-2xl mt-1" style={{ color: GREEN }}>
                   {formatRupiah(total)}
@@ -737,7 +749,7 @@ function KasirContent() {
                       className="rounded-xl py-3 text-sm font-bold border-2"
                       style={
                         paymentMethod === m
-                          ? { borderColor: GREEN, color: GREEN, backgroundColor: "#E8F5E9" }
+                          ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
                           : { borderColor: "#E2E8F0", color: "#475569" }
                       }
                     >
@@ -776,7 +788,7 @@ function KasirContent() {
                         className="rounded-xl py-2.5 text-xs font-bold border-2"
                         style={
                           nominalTunai === n
-                            ? { borderColor: GREEN, color: GREEN, backgroundColor: "#E8F5E9" }
+                            ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
                             : { borderColor: "#E2E8F0", color: "#475569" }
                         }
                       >

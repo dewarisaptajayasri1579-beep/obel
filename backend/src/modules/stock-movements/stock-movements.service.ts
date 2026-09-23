@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, StockMovementType } from '@prisma/client';
+import { Prisma, StockMovement, StockMovementType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
+import { resolveStockStatus } from '../../common/stock-status';
 import { WAREHOUSE, dampakMutasi, keteranganMutasi, type LokasiStok } from './arah.util';
 
 /// Tab "Mutasi Stok" menghitung SEMUA jenis mutasi; tab "Mutasi Penjualan"
@@ -334,6 +335,114 @@ export class StockMovementsService {
     return { periode: { bulan, tahun }, rows };
   }
 
+  /// Tab "Sebaran Stok" (halaman Produk) — SATU baris per produk, kolom Gudang +
+  /// In Proses (distribusi yang sudah dikirim tapi belum dikonfirmasi terima) +
+  /// tiap Booth, dihitung PER TANGGAL (bukan rentang bulan seperti rekap/ringkas
+  /// di atas) — jawaban atas "stok ada di mana saja hari ini/tanggal X". Saldo
+  /// tiap lokasi dihitung dari SEMUA movement sampai akhir tanggal itu (mirip
+  /// ringkasPerLokasi, tapi cutoff satu hari, bukan satu bulan, dan tanpa pecahan
+  /// masuk/keluar karena cuma saldo akhir yang relevan di sini).
+  async sebaranHarian(tanggalStr: string) {
+    const cocok = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tanggalStr);
+    if (!cocok) {
+      throw new DomainError('TANGGAL_INVALID', 'Format tanggal harus YYYY-MM-DD.', { tanggal: tanggalStr });
+    }
+    const y = Number(cocok[1]);
+    const m = Number(cocok[2]);
+    const d = Number(cocok[3]);
+    // `businessDate` kolom DATE UTC polos (lihat businessDateOf di
+    // distributions.service.ts dkk) — batas akhir hari yang sama, UTC murni,
+    // sama gaya dengan batasPeriode() di atas.
+    const akhir = new Date(Date.UTC(y, m - 1, d + 1));
+
+    const [products, booths, thresholds, movements, inProsesRows, pernahDikirimRows] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { deletedAt: null },
+        select: { id: true, sku: true, name: true, minimumQty: true, criticalQty: true, category: { select: { name: true } } },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.booth.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.boothStockThreshold.findMany(),
+      this.prisma.stockMovement.findMany({ where: { businessDate: { lt: akhir } } }),
+      this.prisma.stockDistributionItem.findMany({
+        where: {
+          distribution: {
+            status: { not: 'CANCELLED' },
+            sentAt: { lt: akhir },
+            OR: [{ receivedAt: null }, { receivedAt: { gte: akhir } }],
+          },
+        },
+        select: { productId: true, qtySent: true },
+      }),
+      // Booth pernah "dibawakan" produk ini (ada distribusi yang benar-benar
+      // dikirim ke sana, bukan dibatalkan) sampai tanggal ini — dipakai
+      // membedakan qty 0 karena memang belum pernah diserahterimakan (abu-abu)
+      // vs qty 0 karena sempat ada tapi sekarang habis (merah/Kritis).
+      this.prisma.stockDistributionItem.findMany({
+        where: { distribution: { status: { not: 'CANCELLED' }, sentAt: { lt: akhir } } },
+        select: { productId: true, distribution: { select: { boothId: true } } },
+      }),
+    ]);
+
+    const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
+    const pernahDikirimSet = new Set(pernahDikirimRows.map((r) => `${r.productId}:${r.distribution.boothId}`));
+
+    const lokasiList: { id: LokasiStok; nama: string }[] = [
+      { id: WAREHOUSE, nama: 'Gudang Pusat' },
+      ...booths.map((b) => ({ id: b.id as LokasiStok, nama: b.name })),
+    ];
+
+    const saldo = new Map<string, number>();
+    const kunci = (productId: string, lokasi: LokasiStok) => `${productId}|${lokasi}`;
+    for (const lok of lokasiList) {
+      for (const m of movements) {
+        const { delta } = dampakMutasi(m, lok.id);
+        if (delta === 0) continue;
+        saldo.set(kunci(m.productId, lok.id), (saldo.get(kunci(m.productId, lok.id)) ?? 0) + delta);
+      }
+    }
+
+    const inProses = new Map<string, number>();
+    for (const i of inProsesRows) {
+      inProses.set(i.productId, (inProses.get(i.productId) ?? 0) + i.qtySent);
+    }
+
+    const rows = products.map((p) => {
+      const gudang = saldo.get(kunci(p.id, WAREHOUSE)) ?? 0;
+      const prosesQty = inProses.get(p.id) ?? 0;
+      const perBooth = booths.map((b) => {
+        const qty = saldo.get(kunci(p.id, b.id)) ?? 0;
+        const threshold = thresholdByKey.get(`${b.id}:${p.id}`);
+        const minimumQty = threshold?.minimumQty ?? p.minimumQty;
+        const criticalQty = threshold?.criticalQty ?? p.criticalQty;
+        return {
+          boothId: b.id,
+          boothName: b.name,
+          qty,
+          status: resolveStockStatus(qty, minimumQty, criticalQty),
+          pernahDikirim: pernahDikirimSet.has(`${p.id}:${b.id}`),
+        };
+      });
+      const total = gudang + prosesQty + perBooth.reduce((s, b) => s + b.qty, 0);
+      return {
+        productId: p.id,
+        sku: p.sku,
+        name: p.name,
+        category: p.category?.name ?? null,
+        gudang,
+        inProses: prosesQty,
+        perBooth,
+        total,
+      };
+    });
+
+    return {
+      tanggal: tanggalStr,
+      booths: booths.map((b) => ({ boothId: b.id, boothName: b.name })),
+      rows,
+    };
+  }
+
   /// Riwayat Stok utk Petugas Booth (`GET /stock-movements/mine`) — daftar
   /// mentah movement yang menyentuh Booth ybs (dari JWT, tidak bisa dipilih
   /// bebas), TIDAK memakai mesin rekap saldo (dampakMutasi dkk) di atas —
@@ -479,6 +588,50 @@ export class StockMovementsService {
   /// ke ShiftSession yang labelnya (Pagi/Malam) ada di ShiftTemplate. Dua-duanya
   /// diresolusi di sini lewat batch query supaya baris Rinci sebanyak apa pun
   /// tetap dua query tambahan, bukan N+1.
+  /// Konteks tambahan buat baris terkait Serah Terima Stok (kirim, terima,
+  /// batal, revisi, koreksi) — Booth tujuan & Petugas yang menerima, supaya
+  /// keterangan di Rekap Mutasi Stok tidak cuma label generik ("Distribusi
+  /// ke Booth") tapi jelas ke Booth mana & Petugas siapa tanpa buka detail
+  /// dokumen (lihat AGENTS.md soal jejak audit).
+  private readonly REFERENCE_TYPE_DISTRIBUSI = new Set([
+    'stock_distribution',
+    'distribution_cancel',
+    'distribution_revision',
+    'distribution_receipt_correction',
+  ]);
+
+  private async resolveKonteksDistribusi(
+    movements: { referenceType: string; referenceId: string }[],
+  ): Promise<Map<string, { boothName: string; receivedByName: string | null }>> {
+    const ids = [
+      ...new Set(
+        movements.filter((m) => this.REFERENCE_TYPE_DISTRIBUSI.has(m.referenceType)).map((m) => m.referenceId),
+      ),
+    ];
+    if (!ids.length) return new Map();
+    const rows = await this.prisma.stockDistribution.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, booth: { select: { name: true } }, receivedBy: { select: { fullName: true } } },
+    });
+    return new Map(rows.map((r) => [r.id, { boothName: r.booth.name, receivedByName: r.receivedBy?.fullName ?? null }]));
+  }
+
+  private lengkapiKeterangan(
+    m: StockMovement,
+    konteksDistribusi: Map<string, { boothName: string; receivedByName: string | null }>,
+  ): string {
+    let keterangan = keteranganMutasi(m);
+    const konteks = konteksDistribusi.get(m.referenceId);
+    if (konteks) {
+      keterangan += ` — Booth ${konteks.boothName}`;
+      if (konteks.receivedByName) keterangan += ` (Petugas ${konteks.receivedByName})`;
+    }
+    if (m.referenceType === 'distribution_receipt_correction' && m.note) {
+      keterangan += `: ${m.note}`;
+    }
+    return keterangan;
+  }
+
   private async resolvePetugasDanShift(
     movements: { createdBy: string; shiftSessionId: string | null }[],
   ): Promise<{ namaPetugas: Map<string, string>; labelShift: Map<string, string> }> {
@@ -551,7 +704,10 @@ export class StockMovementsService {
     let keluar = 0;
     const rows: BarisRinciMutasi[] = [];
 
-    const { namaPetugas, labelShift } = await this.resolvePetugasDanShift(periode);
+    const [{ namaPetugas, labelShift }, konteksDistribusi] = await Promise.all([
+      this.resolvePetugasDanShift(periode),
+      this.resolveKonteksDistribusi(periode),
+    ]);
 
     for (const m of periode) {
       const { delta, perluVerifikasi } = dampakMutasi(m, lokasi);
@@ -565,7 +721,7 @@ export class StockMovementsService {
         id: m.id,
         tanggal: m.businessDate.toISOString(),
         movementNo: m.movementNo,
-        keterangan: keteranganMutasi(m),
+        keterangan: this.lengkapiKeterangan(m, konteksDistribusi),
         petugas: namaPetugas.get(m.createdBy) ?? null,
         shift: m.shiftSessionId ? labelShift.get(m.shiftSessionId) ?? null : null,
         arah: delta > 0 ? 'MASUK' : 'KELUAR',

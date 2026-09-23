@@ -9,7 +9,6 @@ import { APP_CONFIG } from "@/lib/app-config";
 import {
   MAIN_NAV,
   SETTINGS_NAV,
-  DASHBOARD_ITEM,
   detectNavMode,
   getActiveHref,
   type NavItem,
@@ -151,7 +150,7 @@ const NavPanel: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, className = "" }) => {
   const pathname = usePathname() || "/dashboard";
-  const activeHref = getActiveHref([{ items: [DASHBOARD_ITEM] }, ...MAIN_NAV, ...SETTINGS_NAV], pathname);
+  const activeHref = getActiveHref([...MAIN_NAV, ...SETTINGS_NAV], pathname);
 
   const [mode, setMode] = useState<NavMode>(() => detectNavMode(pathname));
   const prevPathnameRef = useRef(pathname);
@@ -171,9 +170,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
   useEffect(() => {
     navRef.current?.scrollTo({ top: 0 });
   }, [mode]);
-
-  const DashboardIcon = DASHBOARD_ITEM.icon!;
-  const isDashboardActive = DASHBOARD_ITEM.href === activeHref;
 
   return (
     <aside
@@ -211,24 +207,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
       </span>
 
       <nav ref={navRef} className="relative flex-1 min-h-0 px-3 py-6 overflow-y-auto">
-        {/* Dashboard — selalu tampil di kedua mode */}
-        <div className="mb-5">
-          <Link
-            href={DASHBOARD_ITEM.href!}
-            title={isCollapsed ? DASHBOARD_ITEM.label : undefined}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
-              isDashboardActive
-                ? "bg-brand-600 text-white shadow-md shadow-black/30"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            } ${isCollapsed ? "justify-center px-0" : ""}`}
-          >
-            <span className={`flex-shrink-0 ${isDashboardActive ? "text-white" : "text-slate-400"}`}>
-              <DashboardIcon className="w-4 h-4" />
-            </span>
-            {!isCollapsed && <span className="truncate">{DASHBOARD_ITEM.label}</span>}
-          </Link>
-        </div>
-
         {/* Tombol kembali — cuma di mode Pengaturan */}
         {mode === "pengaturan" && (
           <div className="mb-4">

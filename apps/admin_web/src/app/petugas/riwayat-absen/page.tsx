@@ -7,11 +7,11 @@ import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
 
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
-  OPEN: { label: "Sedang Aktif", bg: "#E8F5E9", fg: GREEN },
+  OPEN: { label: "Sedang Aktif", bg: OBBEL_SCALE[50], fg: GREEN },
   CLOSING: { label: "Proses Tutup", bg: "#FFF8E1", fg: "#B45309" },
   CLOSED: { label: "Selesai Shift", bg: "#F1F5F9", fg: "#475569" },
   CANCELLED: { label: "Dibatalkan", bg: "#FEE2E2", fg: "#D21919" },

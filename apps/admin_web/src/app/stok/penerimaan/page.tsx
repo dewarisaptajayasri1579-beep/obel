@@ -19,15 +19,19 @@ import {
   Printer,
   Search,
   Trash2,
+  X,
+  XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { PortalMenu } from "@/components/ui/PortalMenu";
+import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type StockReceipt } from "@/lib/api-client";
+import { usePersistedFilter } from "@/lib/use-persisted-filter";
 import { PenerimaanReportPreviewModal } from "./PenerimaanReportPreviewModal";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 
@@ -51,9 +55,11 @@ function PenerimaanContent() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = usePersistedFilter("stok-penerimaan:search", "");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | StockReceipt["status"]>("");
+  const [statusFilterRaw, setStatusFilterRaw] = usePersistedFilter("stok-penerimaan:status", "");
+  const statusFilter = statusFilterRaw as "" | StockReceipt["status"];
+  const setStatusFilter = (v: "" | StockReceipt["status"]) => setStatusFilterRaw(v);
 
   const [unduhExcel, setUnduhExcel] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -116,6 +122,12 @@ function PenerimaanContent() {
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
   const reportFilter = { q: search || undefined, status: statusFilter || undefined };
+  const filterAktif = searchInput.trim() !== "" || statusFilter !== "";
+
+  function resetFilter() {
+    setSearchInput("");
+    setStatusFilter("");
+  }
 
   async function unduhLaporanExcel() {
     setUnduhExcel(true);
@@ -231,20 +243,49 @@ function PenerimaanContent() {
               placeholder="Cari no. bukti atau keterangan..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+                searchInput.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
+              }`}
+            />
+            {searchInput.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                title="Bersihkan pencarian"
+                className="absolute right-2.5 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-fg cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="w-40">
+            <Select
+              options={[
+                { value: "DRAFT", label: "Draft" },
+                { value: "POSTED", label: "Posted" },
+                { value: "REVISED", label: "Revised" },
+              ]}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              placeholder="Semua Status"
+              sizeVariant="sm"
+              className="!h-9"
+              active={statusFilter !== ""}
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="h-9 px-3 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none shadow-2xs"
-          >
-            <option value="">Semua Status</option>
-            <option value="DRAFT">Draft</option>
-            <option value="POSTED">Posted</option>
-            <option value="REVISED">Revised</option>
-          </select>
+          {filterAktif && (
+            <button
+              type="button"
+              onClick={resetFilter}
+              title="Hapus semua filter yang aktif"
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/15 hover:bg-amber-100 dark:hover:bg-amber-900/25 border border-amber-200 dark:border-amber-900/40 text-xs font-semibold text-amber-700 dark:text-amber-400 cursor-pointer transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Reset Filter</span>
+            </button>
+          )}
 
           <div className="flex-1" />
 

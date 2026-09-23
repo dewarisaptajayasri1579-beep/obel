@@ -3,7 +3,7 @@ import { DistributionStatus, Prisma, RestockRequestStatus, ShiftStatus } from '@
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { businessDateKeyJakarta, rangeJakarta } from '../../common/jakarta-date';
+import { businessDateKeyJakarta } from '../../common/jakarta-date';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { DistributionsService } from '../distributions/distributions.service';
@@ -33,6 +33,20 @@ export class StockHandoversService {
     private readonly activityLog: ActivityLogService,
   ) {}
 
+  /// activeAssignments diurutkan openedAt desc (lihat ShiftsService.findActiveAssignments),
+  /// jadi kalau 1 Booth kebetulan punya >1 sesi aktif bertumpuk, insert
+  /// pertama (paling baru) yang wajib menang — bukan last-write-wins dari
+  /// Map(array) biasa yang malah membiarkan sesi lama menimpa sesi baru.
+  private buildActiveStaffByBooth(
+    activeAssignments: Awaited<ReturnType<ShiftsService['findActiveAssignments']>>,
+  ): Map<string, string | null> {
+    const map = new Map<string, string | null>();
+    for (const a of activeAssignments) {
+      if (!map.has(a.boothId)) map.set(a.boothId, a.staffName);
+    }
+    return map;
+  }
+
   private requestInclude() {
     return { booth: true, items: { include: { product: true } }, requestedBy: true } as const;
   }
@@ -43,6 +57,7 @@ export class StockHandoversService {
       items: { include: { product: true } },
       restockRequest: { include: { requestedBy: true } },
       receivedBy: true,
+      sentTo: true,
     } as const;
   }
 
@@ -85,7 +100,11 @@ export class StockHandoversService {
       boothId: d.boothId,
       boothName: d.booth.name,
       staffName:
-        d.restockRequest?.requestedBy.fullName ?? d.receivedBy?.fullName ?? activeStaffByBooth.get(d.boothId) ?? null,
+        d.restockRequest?.requestedBy.fullName ??
+        d.receivedBy?.fullName ??
+        d.sentTo?.fullName ??
+        activeStaffByBooth.get(d.boothId) ??
+        null,
       date: d.sentAt ?? d.createdAt,
       note: d.note,
       discrepancy: d.status === DistributionStatus.DISCREPANCY,
@@ -94,21 +113,39 @@ export class StockHandoversService {
         productName: i.product.name,
         qty: i.qtySent,
         qtyReceived: i.qtyReceived,
+        sellPrice: Number(i.product.sellPrice),
+        discrepancyReasonCode: i.discrepancyReasonCode,
+        discrepancyNote: i.discrepancyNote,
       })),
     };
   }
 
-  /// Jenis (Stok Awal/Re-Stok) SATU distribusi — dihitung dari urutan sentAt
-  /// di antara sibling-nya di Booth+tanggal bisnis yang sama saja (query
-  /// dibatasi ke satu hari satu Booth), BUKAN dari seluruh riwayat distribusi
-  /// yang pernah ada. Dipanggil dari findOne() supaya buka 1 dokumen tidak
-  /// perlu fetch semua distribusi cuma buat label ini.
+  /// Jenis (Kirim Stok Awal/Re-Stok) SATU distribusi — diacu dari sesi
+  /// Check-In Petugas yang menaungi Booth ini saat dikirim (ShiftSession
+  /// openedAt..closedAt), BUKAN awal hari kalender. Alasannya: shift Malam
+  /// yang check-in lewat tengah malam tetap harus dianggap "Awal" untuk
+  /// kiriman pertamanya, walau hari kalendernya sama dengan shift
+  /// sebelumnya. Dipanggil dari findOne() supaya buka 1 dokumen tidak perlu
+  /// fetch semua distribusi cuma buat label ini.
   private async computeJenisFor(d: { id: string; boothId: string; sentAt: Date | null; status: DistributionStatus }) {
     if (!d.sentAt || d.status === DistributionStatus.CANCELLED) return null;
-    const tanggal = businessDateKeyJakarta(d.sentAt);
-    const { awal, akhir } = rangeJakarta(tanggal, tanggal);
+
+    const sesi = await this.prisma.shiftSession.findFirst({
+      where: {
+        boothId: d.boothId,
+        openedAt: { not: null, lte: d.sentAt },
+        OR: [{ closedAt: null }, { closedAt: { gt: d.sentAt } }],
+      },
+      orderBy: { openedAt: 'desc' },
+    });
+    if (!sesi?.openedAt) return null;
+
     const siblings = await this.prisma.stockDistribution.findMany({
-      where: { boothId: d.boothId, sentAt: { gte: awal, lt: akhir }, status: { not: DistributionStatus.CANCELLED } },
+      where: {
+        boothId: d.boothId,
+        sentAt: { gte: sesi.openedAt, ...(sesi.closedAt ? { lt: sesi.closedAt } : {}) },
+        status: { not: DistributionStatus.CANCELLED },
+      },
       orderBy: { sentAt: 'asc' },
       select: { id: true },
     });
@@ -128,7 +165,7 @@ export class StockHandoversService {
     const d = await this.prisma.stockDistribution.findUnique({ where: { id: realId }, include: this.distributionInclude() });
     if (!d) throw new DomainError('NOT_FOUND', 'Serah Terima Stok tidak ditemukan.');
     const [activeAssignments, jenis] = await Promise.all([this.shifts.findActiveAssignments(), this.computeJenisFor(d)]);
-    const activeStaffByBooth = new Map(activeAssignments.map((a) => [a.boothId, a.staffName]));
+    const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
     return this.mapDistributionRow(d, activeStaffByBooth, jenis);
   }
 
@@ -174,59 +211,57 @@ export class StockHandoversService {
     return entries;
   }
 
-  /// Rekap stok yang masih "melayang" (status Diproses/SENT — sudah keluar
-  /// dari Gudang tapi belum dikonfirmasi diterima Petugas), dikelompokkan
-  /// per produk + rincian tujuan Booth-nya, buat panel monitoring Admin.
+  /// Stok yang masih "melayang" (status Diproses/SENT — sudah keluar dari
+  /// Gudang tapi belum dikonfirmasi diterima Petugas), SATU baris PER
+  /// DOKUMEN/transaksi (bukan lagi digabung per produk) — buat panel
+  /// monitoring Admin ditampilkan sebagai card list ringkas per transaksi
+  /// (Booth & Petugas tujuan), detail produknya baru dimuat saat di-expand.
+  /// Item per dokumen tetap dikelompokkan Kategori (abjad, "Tanpa Kategori"
+  /// di akhir) lalu Nama Produk (abjad).
   async findInTransitSummary() {
     const [distributions, activeAssignments] = await Promise.all([
       this.prisma.stockDistribution.findMany({
         where: { status: DistributionStatus.SENT },
-        include: { items: { include: { product: true } }, booth: true, restockRequest: { include: { requestedBy: true } } },
+        include: {
+          items: { include: { product: { include: { category: true } } } },
+          booth: true,
+          restockRequest: { include: { requestedBy: true } },
+          sentTo: true,
+        },
+        orderBy: { sentAt: 'desc' },
       }),
       this.shifts.findActiveAssignments(),
     ]);
-    const activeStaffByBooth = new Map(activeAssignments.map((a) => [a.boothId, a.staffName]));
+    const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
 
-    const byProduct = new Map<
-      string,
-      {
-        productId: string;
-        productName: string;
-        totalQty: number;
-        destinations: Map<string, { boothId: string; boothName: string; staffName: string | null; qty: number }>;
-      }
-    >();
-
-    for (const d of distributions) {
-      const staffName = d.restockRequest?.requestedBy.fullName ?? activeStaffByBooth.get(d.boothId) ?? null;
-      for (const item of d.items) {
-        const row = byProduct.get(item.productId) ?? {
+    return distributions.map((d) => {
+      const staffName =
+        d.restockRequest?.requestedBy.fullName ?? d.sentTo?.fullName ?? activeStaffByBooth.get(d.boothId) ?? null;
+      const items = d.items
+        .map((item) => ({
           productId: item.productId,
           productName: item.product.name,
-          totalQty: 0,
-          destinations: new Map<string, { boothId: string; boothName: string; staffName: string | null; qty: number }>(),
-        };
-        row.totalQty += item.qtySent;
-        const dest = row.destinations.get(d.boothId) ?? {
-          boothId: d.boothId,
-          boothName: d.booth.name,
-          staffName,
-          qty: 0,
-        };
-        dest.qty += item.qtySent;
-        row.destinations.set(d.boothId, dest);
-        byProduct.set(item.productId, row);
-      }
-    }
-
-    return Array.from(byProduct.values())
-      .map((r) => ({
-        productId: r.productId,
-        productName: r.productName,
-        totalQty: r.totalQty,
-        destinations: Array.from(r.destinations.values()).sort((a, b) => b.qty - a.qty),
-      }))
-      .sort((a, b) => b.totalQty - a.totalQty);
+          productCategory: item.product.category?.name ?? null,
+          qty: item.qtySent,
+        }))
+        .sort((a, b) => {
+          const kategoriA = a.productCategory ?? "￿";
+          const kategoriB = b.productCategory ?? "￿";
+          const kategoriCmp = kategoriA.localeCompare(kategoriB, "id");
+          if (kategoriCmp !== 0) return kategoriCmp;
+          return a.productName.localeCompare(b.productName, "id");
+        });
+      return {
+        distributionId: d.id,
+        distributionNo: d.distributionNo,
+        boothId: d.boothId,
+        boothName: d.booth.name,
+        staffName,
+        sentAt: d.sentAt,
+        totalQty: items.reduce((sum, i) => sum + i.qty, 0),
+        items,
+      };
+    });
   }
 
   /// Dipakai laporan PDF/Excel (StockHandoverReportService) yang memang
@@ -250,7 +285,7 @@ export class StockHandoversService {
       this.shifts.findActiveAssignments(),
     ]);
 
-    const activeStaffByBooth = new Map(activeAssignments.map((a) => [a.boothId, a.staffName]));
+    const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
     const jenisById = this.computeJenisBatch(distributions);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
@@ -377,7 +412,7 @@ export class StockHandoversService {
       this.shifts.findActiveAssignments(),
     ]);
 
-    const activeStaffByBooth = new Map(activeAssignments.map((a) => [a.boothId, a.staffName]));
+    const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
     const jenisById = this.computeJenisBatch(distributions);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
@@ -414,6 +449,7 @@ export class StockHandoversService {
         boothId: activeSession.boothId,
         items: dto.items,
         note: dto.note,
+        sentToId: dto.staffId,
       },
       actorId,
       actorName,

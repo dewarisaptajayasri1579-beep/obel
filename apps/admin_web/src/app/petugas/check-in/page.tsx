@@ -85,7 +85,7 @@ export default function CheckInPage() {
 
   if (authLoading || loadingInit) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F9F6]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F9F6] max-w-md mx-auto">
         <Spinner />
       </div>
     );
@@ -93,7 +93,7 @@ export default function CheckInPage() {
 
   if (!assignment) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9F6] px-6 text-center gap-3">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9F6] max-w-md mx-auto px-6 text-center gap-3">
         <p className="font-bold text-slate-800">Anda belum ditugaskan ke Booth manapun.</p>
         <p className="text-sm text-slate-500">Hubungi Admin untuk mengatur penugasan Booth/Shift Anda.</p>
       </div>
@@ -101,7 +101,7 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F9F6] pb-28">
+    <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto pb-28">
       <div style={{ backgroundColor: GREEN }} className="px-5 pt-6 pb-5">
         <h1 className="text-white font-extrabold text-xl">Proses Check-In</h1>
         <p className="text-white/80 text-sm mt-1">Lengkapi absen sebelum mulai bekerja.</p>
@@ -170,12 +170,12 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 p-4">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-200 p-4">
         <button
           type="button"
           onClick={handleCheckIn}
           disabled={!canSubmit || submitting}
-          className="w-full max-w-md mx-auto flex items-center justify-center rounded-xl py-3.5 font-extrabold text-white disabled:opacity-50"
+          className="w-full flex items-center justify-center rounded-xl py-3.5 font-extrabold text-white disabled:opacity-50"
           style={{ backgroundColor: GREEN }}
         >
           {submitting ? <Spinner size="sm" color="white" /> : "KONFIRMASI CHECK IN"}

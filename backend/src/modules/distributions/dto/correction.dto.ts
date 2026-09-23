@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -19,6 +20,29 @@ export class DistributionItemQtyDto {
   @IsInt()
   @Min(0)
   qty!: number;
+}
+
+/// Tindak lanjut Admin per baris produk yang selisih saat Koreksi Penerimaan
+/// (lihat distributions.service.ts correctReceipt()):
+/// - RUSAK: qty tetap dikurangi dari stok, ditandai utk Laporan Stok Rusak.
+/// - SALAH_HITUNG: qty dikembalikan/dikoreksi, tidak lagi dianggap kerugian.
+/// - GANTI_RUGI_PETUGAS: dicatat sebagai StaffLiability dibebankan ke
+///   Petugas yang menerima (distribution.receivedById), belum ada alur
+///   pelunasan.
+/// - LAINNYA: tidak ada aksi stok/liability otomatis, cuma catatan bebas
+///   (tindakLanjutNote) yang masuk activity log — buat kasus di luar 3 di
+///   atas.
+export type TindakLanjutSelisih = 'RUSAK' | 'SALAH_HITUNG' | 'GANTI_RUGI_PETUGAS' | 'LAINNYA';
+const TINDAK_LANJUT_VALUES: TindakLanjutSelisih[] = ['RUSAK', 'SALAH_HITUNG', 'GANTI_RUGI_PETUGAS', 'LAINNYA'];
+
+export class CorrectReceiptItemDto extends DistributionItemQtyDto {
+  @IsOptional()
+  @IsIn(TINDAK_LANJUT_VALUES)
+  tindakLanjut?: TindakLanjutSelisih;
+
+  @IsOptional()
+  @IsString()
+  tindakLanjutNote?: string;
 }
 
 export class CancelDistributionDto {
@@ -58,8 +82,8 @@ export class CorrectReceiptDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => DistributionItemQtyDto)
-  items!: DistributionItemQtyDto[];
+  @Type(() => CorrectReceiptItemDto)
+  items!: CorrectReceiptItemDto[];
 
   @IsEnum(ReasonCode)
   reasonCode!: ReasonCode;

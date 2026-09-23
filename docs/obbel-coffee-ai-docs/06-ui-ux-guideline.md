@@ -72,6 +72,9 @@ Aksi irreversible/important seperti closing perlu confirmation; sale normal jang
 - Dashboard tidak lebih dari 4–6 KPI utama di first viewport.
 - Quick filter default; advanced filter dibuka saat dibutuhkan.
 - Drawer detail lebih disukai daripada pindah halaman untuk inspeksi singkat.
+- **Indikator filter aktif**: setiap search input/`Select` filter pada daftar transaksi WAJIB menandai secara visual saat nilainya bukan default (bukan "Semua"/kosong) — border berubah amber + titik indikator kecil (`Select` prop `active`), search input juga border amber + tombol clear (×). Tombol "Reset Filter" muncul otomatis begitu ada filter aktif untuk mengembalikan semuanya ke default sekali klik. Tujuannya supaya user yang melihat data sedikit/kosong langsung sadar itu akibat filter, bukan data memang kosong. Referensi implementasi: `apps/admin_web/src/components/ui/Select.tsx` (prop `active`) dan `apps/admin_web/src/app/stok/penerimaan/page.tsx`. Pola ini wajib dipakai di SEMUA halaman daftar transaksi baru, bukan cuma yang sudah ada.
+- **Filter tidak boleh hilang saat pindah menu**: semua state filter (search, status, dropdown) pada daftar transaksi WAJIB disimpan lewat `usePersistedFilter` (`apps/admin_web/src/lib/use-persisted-filter.ts`, localStorage per storageKey) — bukan `useState` polos, karena Next.js App Router meng-unmount halaman total saat ganti route sehingga `useState` biasa balik ke default begitu user kembali ke menu itu.
+- **Filter Booth & Petugas tersinkron lintas menu Transaksi Booth**: khusus filter Booth dan Petugas di grup menu "Transaksi Booth" (Kasir, Terima Stok, Check In-Check Out), WAJIB pakai storageKey BERSAMA lewat konstanta `TRANSAKSI_BOOTH_FILTER_KEYS` (di file yang sama) — supaya begitu user pilih Booth/Petugas di satu menu, menu lain di grup itu otomatis ikut menampilkan filter yang sama. Filter lain (status, periode, tab, search) tetap independen per halaman.
 
 ## 7. Owner Android
 - Executive/read-only feel.

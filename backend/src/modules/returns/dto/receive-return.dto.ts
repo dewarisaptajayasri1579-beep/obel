@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, Min, ValidateNested, IsUUID } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested, IsUUID } from 'class-validator';
 
 export class ReceiveReturnItemDto {
   @IsUUID()
@@ -16,4 +16,10 @@ export class ReceiveReturnDto {
   @ValidateNested({ each: true })
   @Type(() => ReceiveReturnItemDto)
   items!: ReceiveReturnItemDto[];
+
+  /// Wajib diisi kalau ada item dengan qtyReceived != qtySubmitted (lihat
+  /// ReturnsService.receive).
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

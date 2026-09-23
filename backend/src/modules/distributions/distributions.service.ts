@@ -3,7 +3,7 @@ import { DistributionStatus, Prisma, StockMovementType, UserRole } from '@prisma
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
@@ -23,6 +23,16 @@ function businessDateOf(date: Date): Date {
 const KODE_UNIQUE_VIOLATION = 'P2002';
 const MAKS_PERCOBAAN_NOMOR = 5;
 
+/// Label keterangan movement ADJUSTMENT per Tindak Lanjut Koreksi Penerimaan
+/// — supaya "Koreksi penerimaan distribusi" di Rekap Mutasi Stok langsung
+/// kelihatan alasannya tanpa buka detail dokumen.
+const TINDAK_LANJUT_KETERANGAN: Record<string, string> = {
+  RUSAK: 'Rusak',
+  SALAH_HITUNG: 'Salah Hitung',
+  GANTI_RUGI_PETUGAS: 'Ganti Rugi Petugas',
+  LAINNYA: 'Lainnya',
+};
+
 @Injectable()
 export class DistributionsService {
   constructor(
@@ -40,27 +50,24 @@ export class DistributionsService {
       where: { distributionNo: { startsWith: 'DIST-' } },
       select: { distributionNo: true },
     });
-    const tertinggi = semua.reduce((maks, d) => {
-      const cocok = /^DIST-(\d{6})$/.exec(d.distributionNo);
-      return cocok ? Math.max(maks, Number(cocok[1])) : maks;
-    }, 0);
-    if (tertinggi >= 999999) {
-      throw new DomainError('DISTRIBUTION_NO_EXHAUSTED', 'Nomor Serah Terima Stok sudah mencapai batas 999999.');
-    }
-    return `DIST-${String(tertinggi + 1).padStart(6, '0')}`;
+    return nomorSekuensialBerikutnya(
+      semua.map((d) => d.distributionNo),
+      'DIST',
+    );
   }
 
-  findAll() {
-    return this.prisma.stockDistribution.findMany({
-      include: { booth: true, items: { include: { product: true } } },
+  async findAll() {
+    const distributions = await this.prisma.stockDistribution.findMany({
+      include: { booth: true, receivedBy: true, items: { include: { product: { include: { category: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
+    return distributions.map(this.toResponse);
   }
 
   async findPendingForBooth(boothId: string) {
     const distributions = await this.prisma.stockDistribution.findMany({
       where: { boothId, status: DistributionStatus.SENT },
-      include: { booth: true, items: { include: { product: true } } },
+      include: { booth: true, receivedBy: true, items: { include: { product: { include: { category: true } } } } },
       orderBy: { sentAt: 'asc' },
     });
     return distributions.map(this.toResponse);
@@ -72,7 +79,7 @@ export class DistributionsService {
   async findAllForBooth(boothId: string) {
     const distributions = await this.prisma.stockDistribution.findMany({
       where: { boothId },
-      include: { booth: true, items: { include: { product: true } } },
+      include: { booth: true, receivedBy: true, items: { include: { product: { include: { category: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
     return distributions.map(this.toResponse);
@@ -126,6 +133,28 @@ export class DistributionsService {
                 requested: item.qty,
               });
             }
+
+            // Ledger Gudang-keluar dicatat DI SINI (qty dikirim penuh, saat
+            // warehouseStock benar-benar berkurang) — bukan cuma di receive()
+            // yang cuma mencatat qty yang BENAR-BENAR diterima Petugas.
+            // Sebelum ini, item yang qtyReceived-nya 0 (semua rusak) sama
+            // sekali tidak punya baris movement, jadi Rekap Mutasi Stok
+            // Gudang diam-diam tidak pernah menyusut untuk baris itu padahal
+            // stoknya sudah pasti berkurang (lihat arah.util.ts WAREHOUSE_TO_BOOTH
+            // — baris tanpa toBoothId dianggap murni Gudang-keluar).
+            await tx.stockMovement.create({
+              data: {
+                movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
+                movementType: StockMovementType.WAREHOUSE_TO_BOOTH,
+                productId: item.productId,
+                qty: item.qty,
+                referenceType: 'stock_distribution',
+                referenceId: distributionId,
+                businessDate: businessDateOf(sentAt),
+                occurredAt: sentAt,
+                createdBy: actorId,
+              },
+            });
           }
 
           const distributionNo = await this.nomorDistribusiBerikutnya(tx);
@@ -139,6 +168,7 @@ export class DistributionsService {
               idempotencyKey: dto.idempotencyKey,
               sentAt,
               createdById: actorId,
+              sentToId: dto.sentToId,
               note: dto.note,
               items: {
                 createMany: {
@@ -186,6 +216,7 @@ export class DistributionsService {
     }
 
     const qtyByProduct = new Map(dto.items.map((i) => [i.productId, i.actualQty]));
+    const reasonByProduct = new Map(dto.items.map((i) => [i.productId, { reasonCode: i.reasonCode, reasonNote: i.reasonNote }]));
     const receivedAt = new Date();
     const businessDate = businessDateOf(receivedAt);
 
@@ -194,10 +225,15 @@ export class DistributionsService {
 
       for (const item of distribution.items) {
         const actualQty = qtyByProduct.get(item.productId) ?? item.qtySent;
+        const reason = actualQty !== item.qtySent ? reasonByProduct.get(item.productId) : undefined;
 
         await tx.stockDistributionItem.update({
           where: { id: item.id },
-          data: { qtyReceived: actualQty },
+          data: {
+            qtyReceived: actualQty,
+            discrepancyReasonCode: reason?.reasonCode ?? null,
+            discrepancyNote: reason?.reasonNote ?? null,
+          },
         });
 
         if (actualQty > 0) {
@@ -209,7 +245,7 @@ export class DistributionsService {
 
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.WAREHOUSE_TO_BOOTH,
               productId: item.productId,
               qty: actualQty,
@@ -229,12 +265,25 @@ export class DistributionsService {
         (item) => (qtyByProduct.get(item.productId) ?? item.qtySent) !== item.qtySent,
       );
 
+      // Catatan Petugas (alasan selisih per produk) disimpan di DUA tempat:
+      // activity log (riwayat lengkap) DAN `note` dokumen ini (supaya langsung
+      // kelihatan di list/detail Admin tanpa perlu buka tab Riwayat Aktivitas
+      // dulu — lihat keluhan "tidak ada keterangan selisih" di sisi Admin).
+      const catatanSelisih = hasDiscrepancy && dto.note ? dto.note : undefined;
+
       await tx.stockDistribution.update({
         where: { id: distribution.id },
         data: {
           status: hasDiscrepancy ? DistributionStatus.DISCREPANCY : DistributionStatus.RECEIVED,
           receivedAt,
           receivedById: user.sub,
+          ...(catatanSelisih
+            ? {
+                note: distribution.note
+                  ? `${distribution.note} | Catatan Petugas (selisih): ${catatanSelisih}`
+                  : `Catatan Petugas (selisih): ${catatanSelisih}`,
+              }
+            : {}),
         },
       });
 
@@ -244,7 +293,9 @@ export class DistributionsService {
         action: hasDiscrepancy ? 'RECEIVED_WITH_DISCREPANCY' : 'RECEIVED',
         actorId: user.sub,
         actorName: user.username,
-        note: hasDiscrepancy ? 'Diterima dengan selisih qty.' : 'Diterima sesuai qty dikirim.',
+        note:
+          (hasDiscrepancy ? 'Diterima dengan selisih qty.' : 'Diterima sesuai qty dikirim.') +
+          (catatanSelisih ? ` Catatan Petugas: ${catatanSelisih}` : ''),
       });
     });
 
@@ -281,7 +332,7 @@ export class DistributionsService {
         });
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.VOID_REVERSAL,
             productId: item.productId,
             qty: item.qtySent,
@@ -360,10 +411,13 @@ export class DistributionsService {
     const newQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
     const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
 
-    const newDistributionId = randomUUID();
     const now = new Date();
+    let newDistributionId = '';
 
     try {
+      for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      newDistributionId = randomUUID();
+      try {
       await this.prisma.$transaction(async (tx) => {
       for (const productId of allProductIds) {
         const oldQty = oldQtyByProduct.get(productId) ?? 0;
@@ -391,7 +445,7 @@ export class DistributionsService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: delta > 0 ? StockMovementType.WAREHOUSE_TO_BOOTH : StockMovementType.VOID_REVERSAL,
             productId,
             qty: Math.abs(delta),
@@ -412,7 +466,7 @@ export class DistributionsService {
       await tx.stockDistribution.create({
         data: {
           id: newDistributionId,
-          distributionNo: generateDocNo('DIST'),
+          distributionNo: await this.nomorDistribusiBerikutnya(tx),
           boothId: distribution.boothId,
           status: DistributionStatus.SENT,
           idempotencyKey: dto.idempotencyKey,
@@ -458,6 +512,13 @@ export class DistributionsService {
         note: `Direvisi menjadi dokumen baru (v${distribution.versionNo + 1}). ${dto.reasonNote ?? dto.reasonCode}`,
       });
       });
+      break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (bentrokNomor && percobaan < MAKS_PERCOBAAN_NOMOR - 1) continue;
+        throw err;
+      }
+      }
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
         const reconciliationCase = await this.reconciliationCases.create({
@@ -500,6 +561,8 @@ export class DistributionsService {
     this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
 
     const correctedQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
+    const tindakLanjutByProduct = new Map(dto.items.map((i) => [i.productId, i.tindakLanjut]));
+    const tindakLanjutNoteByProduct = new Map(dto.items.map((i) => [i.productId, i.tindakLanjutNote]));
     const now = new Date();
     const deltas: { productId: string; delta: number }[] = [];
 
@@ -509,6 +572,17 @@ export class DistributionsService {
       const recordedQty = item.qtyReceived ?? item.qtySent;
       const delta = correctedQty - recordedQty;
       if (delta !== 0) deltas.push({ productId: item.productId, delta });
+    }
+
+    // Ganti Rugi Petugas dibebankan ke Petugas yang mengonfirmasi terima —
+    // tanpa itu tidak ada yang bisa ditagih, jadi tolak di depan sebelum
+    // transaksi jalan (bukan partial-apply lalu gagal di tengah).
+    const adaGantiRugi = dto.items.some((i) => i.tindakLanjut === 'GANTI_RUGI_PETUGAS');
+    if (adaGantiRugi && !distribution.receivedById) {
+      throw new DomainError(
+        'NO_RECEIVER',
+        'Tidak bisa mencatat Ganti Rugi Petugas — dokumen ini belum punya Petugas yang menerima.',
+      );
     }
 
     try {
@@ -530,9 +604,10 @@ export class DistributionsService {
             }
           }
 
+          const tindakLanjutBaris = tindakLanjutByProduct.get(productId);
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.ADJUSTMENT,
               productId,
               qty: Math.abs(delta),
@@ -543,6 +618,7 @@ export class DistributionsService {
               businessDate: businessDateOf(now),
               occurredAt: now,
               createdBy: user.sub,
+              note: tindakLanjutBaris ? TINDAK_LANJUT_KETERANGAN[tindakLanjutBaris] : (dto.reasonNote ?? dto.reasonCode),
             },
           });
         }
@@ -554,6 +630,47 @@ export class DistributionsService {
           });
         }
 
+        const liabilities: { productId: string; qty: number; totalAmount: string }[] = [];
+        const catatanLainnya: string[] = [];
+        for (const item of distribution.items) {
+          const tindakLanjut = tindakLanjutByProduct.get(item.productId);
+          if (!tindakLanjut) continue;
+          const itemNote = tindakLanjutNoteByProduct.get(item.productId);
+
+          if (tindakLanjut === 'RUSAK') {
+            await tx.stockDistributionItem.update({
+              where: { id: item.id },
+              data: { discrepancyReasonCode: 'RUSAK' },
+            });
+          } else if (tindakLanjut === 'SALAH_HITUNG') {
+            await tx.stockDistributionItem.update({
+              where: { id: item.id },
+              data: { discrepancyReasonCode: null },
+            });
+          } else if (tindakLanjut === 'GANTI_RUGI_PETUGAS') {
+            const correctedQty = correctedQtyByProduct.get(item.productId) ?? (item.qtyReceived ?? item.qtySent);
+            const qtyRugi = item.qtySent - correctedQty;
+            if (qtyRugi <= 0) continue;
+            const unitPrice = item.product.sellPrice;
+            const totalAmount = unitPrice * BigInt(qtyRugi);
+            await tx.staffLiability.create({
+              data: {
+                distributionId: distribution.id,
+                productId: item.productId,
+                staffId: distribution.receivedById!,
+                qty: qtyRugi,
+                unitPrice,
+                totalAmount,
+                note: itemNote ?? dto.reasonNote,
+                createdById: user.sub,
+              },
+            });
+            liabilities.push({ productId: item.productId, qty: qtyRugi, totalAmount: totalAmount.toString() });
+          } else if (tindakLanjut === 'LAINNYA' && itemNote) {
+            catatanLainnya.push(`${item.product.name}: ${itemNote}`);
+          }
+        }
+
         await this.corrections.record(tx, {
           entityType: 'stock_distribution',
           entityId: distribution.id,
@@ -562,18 +679,23 @@ export class DistributionsService {
           originalVersionId: distribution.id,
           reasonCode: dto.reasonCode,
           reasonNote: dto.reasonNote,
-          impactSnapshot: { deltas },
+          impactSnapshot: { deltas, liabilities },
           createdById: user.sub,
           idempotencyKey: dto.idempotencyKey,
         });
 
+        const catatanGantiRugi =
+          liabilities.length > 0
+            ? ` Ganti Rugi Petugas: ${liabilities.length} produk, total Rp${liabilities.reduce((s, l) => s + BigInt(l.totalAmount), 0n).toString()}.`
+            : '';
+        const catatanLainnyaGabungan = catatanLainnya.length > 0 ? ` Lainnya: ${catatanLainnya.join('; ')}.` : '';
         await this.activityLog.record(tx, {
           entityType: 'stock_distribution',
           entityId: distribution.id,
           action: 'RECEIPT_CORRECTED',
           actorId: user.sub,
           actorName: user.username,
-          note: dto.reasonNote ?? dto.reasonCode,
+          note: (dto.reasonNote ?? dto.reasonCode) + catatanGantiRugi + catatanLainnyaGabungan,
         });
       });
     } catch (err) {
@@ -600,7 +722,7 @@ export class DistributionsService {
   private loadWithRelations(id: string) {
     return this.prisma.stockDistribution.findUnique({
       where: { id },
-      include: { booth: true, items: { include: { product: true } } },
+      include: { booth: true, receivedBy: true, items: { include: { product: { include: { category: true } } } } },
     });
   }
 
@@ -613,11 +735,14 @@ export class DistributionsService {
       boothName: distribution.booth.name,
       sentAt: distribution.sentAt,
       receivedAt: distribution.receivedAt,
+      receivedById: distribution.receivedById,
+      receivedByName: distribution.receivedBy?.fullName ?? null,
       note: distribution.note,
       items: distribution.items.map((item) => ({
         id: item.id,
         productId: item.productId,
         productName: item.product.name,
+        productCategory: item.product.category?.name ?? null,
         sellPrice: Number(item.product.sellPrice),
         qtySent: item.qtySent,
         qtyReceived: item.qtyReceived,

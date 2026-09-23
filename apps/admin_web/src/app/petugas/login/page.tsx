@@ -7,7 +7,7 @@ import { User, Lock, Eye, EyeOff, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api-client";
 import { Spinner } from "@/components/ui/Spinner";
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 
 const PETUGAS_GREEN = OBBEL.primaryDark;
 
@@ -41,7 +41,7 @@ export default function PetugasLoginPage() {
         background: `
           radial-gradient(120% 80% at 15% 0%, rgba(255,255,255,0.16) 0%, transparent 55%),
           radial-gradient(90% 70% at 100% 10%, rgba(255,255,255,0.10) 0%, transparent 50%),
-          linear-gradient(160deg, ${OBBEL.primaryMedium} 0%, ${PETUGAS_GREEN} 55%, #073E26 100%)
+          linear-gradient(160deg, ${OBBEL.primaryMedium} 0%, ${PETUGAS_GREEN} 55%, ${OBBEL_SCALE[800]} 100%)
         `,
       }}
     >

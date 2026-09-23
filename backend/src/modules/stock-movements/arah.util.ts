@@ -31,10 +31,15 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
   const qty = m.qty;
 
   switch (m.movementType) {
-    // Gudang → Booth. Baris dengan toBoothId menyentuh dua sisi; baris tanpa
-    // booth sama sekali (revisi distribusi) hanya menyentuh Gudang.
+    // Gudang → Booth dicatat sebagai DUA baris terpisah, bukan satu baris
+    // yang menyentuh dua sisi: baris tanpa toBoothId (ditulis saat distribusi
+    // dikirim, qty = qty dikirim penuh) murni Gudang-keluar; baris dengan
+    // toBoothId (ditulis saat Petugas konfirmasi terima, qty = qty yang
+    // BENAR-BENAR diterima) murni Booth-masuk. Dipisah karena qty dikirim
+    // vs qty diterima bisa beda (ada yang rusak/kurang di jalan) — kalau
+    // digabung jadi satu baris, salah satu sisi ledgernya pasti salah.
     case StockMovementType.WAREHOUSE_TO_BOOTH:
-      if (diGudang) return { delta: -qty, perluVerifikasi: false };
+      if (diGudang) return m.toBoothId ? TIDAK_MENYENTUH : { delta: -qty, perluVerifikasi: false };
       if (m.toBoothId === lokasi) return { delta: qty, perluVerifikasi: false };
       return TIDAK_MENYENTUH;
 
