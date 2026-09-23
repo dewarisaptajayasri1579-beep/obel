@@ -75,6 +75,7 @@ export class BoothsService {
         latitude: dto.latitude,
         longitude: dto.longitude,
         status: dto.status,
+        qrisImageUrl: dto.qrisImageUrl,
       },
     });
     return this.toResponse(booth);

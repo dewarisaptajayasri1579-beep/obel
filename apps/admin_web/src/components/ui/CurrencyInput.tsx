@@ -17,12 +17,12 @@ export interface CurrencyInputProps {
   id?: string;
 }
 
-function formatThousands(n: number): string {
+export function formatThousands(n: number): string {
   if (!Number.isFinite(n) || n === 0) return "";
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-function parseDigits(raw: string): number {
+export function parseDigits(raw: string): number {
   const digits = raw.replace(/[^0-9]/g, "");
   return digits ? Number(digits) : 0;
 }

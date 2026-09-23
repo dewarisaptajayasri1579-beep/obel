@@ -28,4 +28,8 @@ export class UpdateBoothDto {
   @IsOptional()
   @IsEnum(BoothStatus)
   status?: BoothStatus;
+
+  @IsOptional()
+  @IsString()
+  qrisImageUrl?: string;
 }

@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { combineJakartaDateAndTime, startOfTodayJakarta } from '../../common/jakarta-date';
+import { combineJakartaDateAndTime, startOfTodayJakarta, batasBulanJakarta } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CheckInDto } from './dto/check-in.dto';
@@ -17,6 +17,22 @@ const UNIQUE_VIOLATION = 'P2002';
 
 function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+const LOCATION_WARNING_RADIUS_METERS = 300;
+const EARTH_RADIUS_METERS = 6_371_000;
+
+/// Jarak antara dua koordinat (haversine), dipakai murni utk peringatan
+/// non-blocking — akurasi GPS device tidak bisa dipercaya utk hard block
+/// (lihat komentar checkInLatitude/dst di schema.prisma).
+function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
+  return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(h));
 }
 
 @Injectable()
@@ -48,6 +64,24 @@ export class ShiftsService {
     // booth-scoped lain langsung jalan tanpa staff harus login ulang.
     const accessToken = user.boothId !== shift.boothId ? await this.reissueToken(user, shift.boothId) : undefined;
     return this.toActiveShiftResponse(shift, accessToken);
+  }
+
+  /// Daftar Petugas yang sedang Aktif (sudah Check-In, belum Check-Out) —
+  /// dipakai picker "Petugas" di Serah Terima Stok (Admin pilih Petugas,
+  /// Booth ikut otomatis dari sini, bukan dipilih manual).
+  async findActiveAssignments() {
+    const sessions = await this.prisma.shiftSession.findMany({
+      where: { status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
+      include: { booth: true, staff: { select: SAFE_PROFILE_SELECT } },
+      orderBy: { openedAt: 'desc' },
+    });
+    return sessions.map((s) => ({
+      shiftSessionId: s.id,
+      staffId: s.staffId,
+      staffName: s.staff.fullName,
+      boothId: s.boothId,
+      boothName: s.booth.name,
+    }));
   }
 
   /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
@@ -110,6 +144,9 @@ export class ShiftsService {
           scheduledStartAt,
           scheduledEndAt,
           openedAt,
+          checkInLatitude: dto.latitude,
+          checkInLongitude: dto.longitude,
+          checkInPhotoUrl: dto.photoUrl,
         },
         include: { booth: true, shiftTemplate: true },
       });
@@ -123,7 +160,25 @@ export class ShiftsService {
       return this.toActiveShiftResponse(winner, await this.reissueToken(user, winner.boothId));
     }
 
-    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
+    const locationWarning = this.computeLocationWarning(dto.latitude, dto.longitude, booth);
+    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId), locationWarning);
+  }
+
+  /// Soft-check lokasi Check-In/Check-Out terhadap Booth.latitude/longitude —
+  /// TIDAK memblokir absen (akurasi GPS device tidak bisa dipercaya utk hard
+  /// block), cuma dikembalikan sebagai peringatan non-blocking di response.
+  private computeLocationWarning(
+    latitude: number,
+    longitude: number,
+    booth: { name: string; latitude: unknown; longitude: unknown },
+  ): string | undefined {
+    if (booth.latitude == null || booth.longitude == null) return undefined;
+    const distance = distanceMeters(
+      { lat: latitude, lng: longitude },
+      { lat: Number(booth.latitude), lng: Number(booth.longitude) },
+    );
+    if (distance <= LOCATION_WARNING_RADIUS_METERS) return undefined;
+    return `Lokasi Anda sekitar ${Math.round(distance)}m dari Booth "${booth.name}". Pastikan Anda berada di lokasi yang benar.`;
   }
 
   /// JWT `boothId` dipakai banyak endpoint booth-scoped (catalog,
@@ -152,6 +207,7 @@ export class ShiftsService {
       scheduledEndAt: Date;
     },
     accessToken?: string,
+    locationWarning?: string,
   ) {
     return {
       shiftSessionId: shift.id,
@@ -161,6 +217,7 @@ export class ShiftsService {
       scheduledStartAt: shift.scheduledStartAt,
       scheduledEndAt: shift.scheduledEndAt,
       ...(accessToken ? { accessToken } : {}),
+      ...(locationWarning ? { locationWarning } : {}),
     };
   }
 
@@ -231,6 +288,7 @@ export class ShiftsService {
   /// movement ADJUSTMENT (BR-012) dan shift ditutup.
   async confirmClosing(shiftSessionId: string, dto: ConfirmClosingDto, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
+    const booth = await this.prisma.booth.findUniqueOrThrow({ where: { id: shift.boothId } });
 
     const count = await this.prisma.shiftStockCount.findUnique({
       where: { shiftSessionId },
@@ -316,7 +374,13 @@ export class ShiftsService {
 
       await tx.shiftSession.update({
         where: { id: shiftSessionId },
-        data: { status: ShiftStatus.CLOSED, closedAt },
+        data: {
+          status: ShiftStatus.CLOSED,
+          closedAt,
+          checkOutLatitude: dto.checkOutLatitude,
+          checkOutLongitude: dto.checkOutLongitude,
+          checkOutPhotoUrl: dto.checkOutPhotoUrl,
+        },
       });
     });
 
@@ -324,7 +388,136 @@ export class ShiftsService {
       where: { shiftSessionId },
       include: { items: { include: { product: true } } },
     });
-    return this.toClosingResponse(final!);
+    const locationWarning = this.computeLocationWarning(dto.checkOutLatitude, dto.checkOutLongitude, booth);
+    return { ...this.toClosingResponse(final!), ...(locationWarning ? { locationWarning } : {}) };
+  }
+
+  /// Riwayat Absen — daftar ShiftSession milik staff yang login pada satu
+  /// bulan (default bulan berjalan Asia/Jakarta), + agregat "Total Hadir
+  /// Bulan Ini" utk kartu ringkasan di layar Riwayat Absen.
+  async getMyHistory(user: JwtPayload, month?: string) {
+    const now = new Date();
+    const jakartaNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const [tahun, bulan] = month
+      ? month.split('-').map(Number)
+      : [jakartaNow.getUTCFullYear(), jakartaNow.getUTCMonth() + 1];
+    const { awal, akhir } = batasBulanJakarta(bulan, tahun);
+
+    const shifts = await this.prisma.shiftSession.findMany({
+      where: { staffId: user.sub, businessDate: { gte: awal, lt: akhir } },
+      include: { booth: true },
+      orderBy: { businessDate: 'desc' },
+    });
+
+    const isCurrentMonth = tahun === jakartaNow.getUTCFullYear() && bulan === jakartaNow.getUTCMonth() + 1;
+    const akhirHariBerjalan = isCurrentMonth
+      ? jakartaNow.getUTCDate()
+      : Math.round((akhir.getTime() - awal.getTime()) / (24 * 60 * 60 * 1000));
+
+    return {
+      totalHadir: shifts.filter((s) => s.status !== ShiftStatus.CANCELLED && s.status !== ShiftStatus.SCHEDULED).length,
+      totalHariKerja: akhirHariBerjalan,
+      items: shifts.map((s) => ({
+        id: s.id,
+        businessDate: s.businessDate,
+        status: s.status,
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        boothName: s.booth.name,
+      })),
+    };
+  }
+
+  /// "Laporan Kembali" — ringkasan stok (dari StockMovement ber-shiftSessionId
+  /// ini) + kas Tunai/QRIS (dari Sale ber-shiftSessionId ini). Tidak ada
+  /// snapshot stok-awal eksplisit saat Check-In, jadi stokAwal DITURUNKAN:
+  /// qtyOnHand saat ini dikurangi net efek movement shift ini (restock masuk,
+  /// terjual/retur keluar, adjustment bertanda) mengembalikan nilai sebelum
+  /// shift dimulai.
+  async getShiftReport(shiftSessionId: string, user: JwtPayload) {
+    const shift = await this.loadOwnedShift(shiftSessionId, user);
+    const [booth, shiftTemplate, movements, boothStocks, sales] = await Promise.all([
+      this.prisma.booth.findUniqueOrThrow({ where: { id: shift.boothId } }),
+      this.prisma.shiftTemplate.findUniqueOrThrow({ where: { id: shift.shiftTemplateId } }),
+      this.prisma.stockMovement.findMany({ where: { shiftSessionId }, include: { product: true } }),
+      this.prisma.boothStock.findMany({ where: { boothId: shift.boothId } }),
+      this.prisma.sale.findMany({
+        where: { shiftSessionId, status: 'PAID' },
+        include: { payments: { where: { status: 'POSTED' } } },
+      }),
+    ]);
+
+    const qtyOnHandByProduct = new Map(boothStocks.map((s) => [s.productId, s.qtyOnHand]));
+
+    type Acc = { productName: string; restock: number; terjual: number; retur: number; adjustmentNet: number };
+    const byProduct = new Map<string, Acc>();
+    const acc = (productId: string, productName: string): Acc => {
+      let entry = byProduct.get(productId);
+      if (!entry) {
+        entry = { productName, restock: 0, terjual: 0, retur: 0, adjustmentNet: 0 };
+        byProduct.set(productId, entry);
+      }
+      return entry;
+    };
+
+    for (const m of movements) {
+      const entry = acc(m.productId, m.product.name);
+      const masuk = m.toBoothId === shift.boothId;
+      switch (m.movementType) {
+        case StockMovementType.RESTOCK:
+        case StockMovementType.WAREHOUSE_TO_BOOTH:
+          if (masuk) entry.restock += m.qty;
+          break;
+        case StockMovementType.SALE:
+          entry.terjual += m.qty;
+          break;
+        case StockMovementType.RETURN_TO_WAREHOUSE:
+          entry.retur += m.qty;
+          break;
+        case StockMovementType.ADJUSTMENT:
+        case StockMovementType.VOID_REVERSAL:
+          entry.adjustmentNet += masuk ? m.qty : -m.qty;
+          break;
+      }
+    }
+
+    const items = Array.from(byProduct.entries()).map(([productId, v]) => {
+      const sisaSistem = qtyOnHandByProduct.get(productId) ?? 0;
+      const stokAwal = sisaSistem - v.restock + v.terjual + v.retur - v.adjustmentNet;
+      return {
+        productId,
+        productName: v.productName,
+        stokAwal,
+        restock: v.restock,
+        terjual: v.terjual,
+        retur: v.retur,
+        sisaSistem,
+      };
+    });
+
+    // Dihitung dari baris Payment (bukan Sale.paymentMethod langsung) —
+    // sale Split py bisa punya DUA baris Payment (Tunai + QRIS) yang harus
+    // masuk ke dua sisi breakdown, bukan cuma satu sisi seperti kalau
+    // dibaca dari Sale.paymentMethod ("SPLIT") yang tidak masuk kategori
+    // manapun.
+    let kasTunai = 0;
+    let kasQris = 0;
+    for (const s of sales) {
+      for (const p of s.payments) {
+        if (p.method === 'CASH') kasTunai += Number(p.amount);
+        else if (p.method === 'QRIS') kasQris += Number(p.amount);
+      }
+    }
+
+    return {
+      boothName: booth.name,
+      shiftTemplateName: shiftTemplate.name,
+      businessDate: shift.businessDate,
+      items,
+      totalPenjualan: kasTunai + kasQris,
+      kasTunai,
+      kasQris,
+    };
   }
 
   /// TX-07 — Impact Preview untuk Shift Correction. Reassignment Booth

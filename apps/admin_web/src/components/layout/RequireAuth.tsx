@@ -20,12 +20,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (loading) return;
+    if (!session) {
       router.replace("/login");
+      return;
+    }
+    // BOOTH_STAFF tidak boleh melihat shell Admin (Master Data, User, dst) —
+    // pengalamannya ada di /petugas (lihat RequirePetugasAuth.tsx).
+    if (session.profile.role === "BOOTH_STAFF") {
+      router.replace("/petugas");
     }
   }, [loading, session, router]);
 
-  if (loading || !session) {
+  if (loading || !session || session.profile.role === "BOOTH_STAFF") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner />

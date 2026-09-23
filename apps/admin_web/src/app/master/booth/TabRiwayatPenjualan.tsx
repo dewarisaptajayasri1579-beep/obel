@@ -53,6 +53,16 @@ export function TabRiwayatPenjualan({ booths }: { booths: Booth[] }) {
   const [periode, setPeriode] = useState(periodeBerjalanJakarta());
   const [boothId, setBoothId] = useState("");
 
+  // Diisi dari ?boothId= di URL — dipakai tombol "Lihat Riwayat" di kartu
+  // Booth Aktif (/monitoring/booth-aktif) supaya tab ini langsung terbuka
+  // tersaring ke Booth yang diklik, bukan "Semua Booth". Pola sama seperti
+  // BoothTabs.tsx (baca URL di useEffect, bukan initializer useState) supaya
+  // tidak beda antara render SSR dan client pertama (window belum ada di SSR).
+  useEffect(() => {
+    const dariUrl = new URLSearchParams(window.location.search).get("boothId");
+    if (dariUrl) setBoothId(dariUrl);
+  }, []);
+
   const [data, setData] = useState<RiwayatPenjualanBoothResponse | null>(null);
   const [memuat, setMemuat] = useState(false);
 

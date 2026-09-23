@@ -52,3 +52,16 @@ export function batasBulanJakarta(bulan: number, tahun: number): { awal: Date; a
     akhir: new Date(akhirWallClock - JAKARTA_OFFSET_MS),
   };
 }
+
+/// Batas rentang tanggal bebas (inklusif) Asia/Jakarta dari string
+/// "YYYY-MM-DD" — dipakai filter periode Dashboard (Hari Ini/Minggu Ini/
+/// Bulan Ini/Custom) yang butuh rentang arbitrer, beda dari
+/// `batasBulanJakarta` yang selalu satu bulan kalender penuh.
+export function rangeJakarta(startDateStr: string, endDateStr: string): { awal: Date; akhir: Date } {
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  const [ey, em, ed] = endDateStr.split('-').map(Number);
+  return {
+    awal: new Date(Date.UTC(sy, sm - 1, sd) - JAKARTA_OFFSET_MS),
+    akhir: new Date(Date.UTC(ey, em - 1, ed + 1) - JAKARTA_OFFSET_MS),
+  };
+}

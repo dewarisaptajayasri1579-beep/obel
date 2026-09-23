@@ -119,12 +119,19 @@ export class NotificationsService {
     for (const s of boothStocks) {
       const th = thresholdByProduct.get(s.productId);
       const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty);
-      if (status === 'Kritis' || status === 'Habis') {
+      // Menipis IKUT disertakan (dulu cuma Kritis/Habis) — dipakai badge
+      // realtime di kartu "Stok" Beranda Petugas (app/petugas/page.tsx),
+      // status-nya disisipkan di `id` (`lowstock:<status>:...`) supaya
+      // frontend tidak perlu menebak dari teks `title`.
+      if (status === 'Menipis' || status === 'Kritis' || status === 'Habis') {
         items.push({
-          id: `lowstock:${boothId}:${s.productId}`,
-          title: status === 'Habis' ? 'Stok Habis' : 'Stok Kritis',
-          message: `${s.product.name} tersisa ${s.qtyOnHand}. Segera ajukan restock.`,
-          type: status === 'Habis' ? 'error' : 'warning',
+          id: `lowstock:${status}:${boothId}:${s.productId}`,
+          title: `Stok ${status}`,
+          message:
+            status === 'Menipis'
+              ? `${s.product.name} tersisa ${s.qtyOnHand}. Perlu dipantau.`
+              : `${s.product.name} tersisa ${s.qtyOnHand}. Segera ajukan restock.`,
+          type: status === 'Habis' ? 'error' : status === 'Kritis' ? 'warning' : 'info',
           readAt: null,
           createdAt: now,
         });

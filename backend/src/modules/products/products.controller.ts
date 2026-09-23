@@ -41,9 +41,20 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll() {
     return this.productsService.findAll();
+  }
+
+  /// Rute statis HARUS didaftarkan sebelum ':id' kalau ada nanti — belum
+  /// ada ':id' di controller ini, tapi konsisten dgn pola modul lain.
+  @Get('terlaris-mine')
+  @Roles(UserRole.BOOTH_STAFF)
+  terlarisMine(@CurrentUser() user: JwtPayload) {
+    if (!user.boothId) {
+      throw new BadRequestException('User belum memiliki assignment booth.');
+    }
+    return this.productsService.terlarisUntukBooth(user.boothId);
   }
 
   @Get('categories')

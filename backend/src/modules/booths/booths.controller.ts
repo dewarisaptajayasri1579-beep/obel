@@ -1,4 +1,25 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  FileTypeValidator,
+  Get,
+  MaxFileSizeValidator,
+  Param,
+  ParseFilePipe,
+  Patch,
+  Post,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { randomUUID } from 'crypto';
+import { diskStorage } from 'multer';
+import { mkdirSync } from 'fs';
+import { extname, join } from 'path';
+import type { Request } from 'express';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +27,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateBoothDto } from './dto/create-booth.dto';
 import { UpdateBoothDto } from './dto/update-booth.dto';
 import { BoothsService } from './booths.service';
+
+const boothUploadDir = join(process.cwd(), 'uploads', 'booths');
+mkdirSync(boothUploadDir, { recursive: true });
 
 @Controller('booths')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,6 +46,45 @@ export class BoothsController {
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateBoothDto) {
     return this.boothsService.create(dto);
+  }
+
+  @Post('upload-qris')
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: boothUploadDir,
+        filename: (_request, file, callback) => {
+          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
+          callback(new BadRequestException('Kode QRIS harus berupa JPG, PNG, WEBP, atau GIF.'), false);
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  uploadQris(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({
+            fileType: /^image\/(jpeg|png|webp|gif)$/,
+            skipMagicNumbersValidation: true,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Req() request: Request,
+  ) {
+    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
+    return { qrisImageUrl: `${publicBaseUrl}/uploads/booths/${file.filename}` };
   }
 
   @Patch(':id')

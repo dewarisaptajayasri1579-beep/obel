@@ -30,10 +30,19 @@ export class DistributionsController {
     return this.distributionsService.findPendingForBooth(user.boothId);
   }
 
+  @Get('mine')
+  @Roles(UserRole.BOOTH_STAFF)
+  findMine(@CurrentUser() user: JwtPayload) {
+    if (!user.boothId) {
+      throw new BadRequestException('User belum memiliki assignment booth.');
+    }
+    return this.distributionsService.findAllForBooth(user.boothId);
+  }
+
   @Post()
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateDistributionDto, @CurrentUser() user: JwtPayload) {
-    return this.distributionsService.create(dto, user.sub);
+    return this.distributionsService.create(dto, user.sub, user.username);
   }
 
   @Post(':id/receive')

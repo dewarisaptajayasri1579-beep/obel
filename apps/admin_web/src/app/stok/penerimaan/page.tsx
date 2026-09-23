@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock,
   CheckCircle2,
@@ -28,6 +31,8 @@ import { api, ApiError, type StockReceipt } from "@/lib/api-client";
 import { PenerimaanReportPreviewModal } from "./PenerimaanReportPreviewModal";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 
+const LIMIT = 20;
+
 const STATUS_LABEL: Record<StockReceipt["status"], { label: string; kelas: string }> = {
   DRAFT: { label: "Draft", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
   POSTED: { label: "Posted", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
@@ -42,8 +47,14 @@ function tanggalJakarta(iso: string) {
 function PenerimaanContent() {
   const toast = useToast();
   const [receipts, setReceipts] = useState<StockReceipt[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | StockReceipt["status"]>("");
+
   const [unduhExcel, setUnduhExcel] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notaTarget, setNotaTarget] = useState<StockReceipt | null>(null);
@@ -51,6 +62,9 @@ function PenerimaanContent() {
   const [menghapus, setMenghapus] = useState(false);
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const [metrics, setMetrics] = useState({ draft: 0, posted: 0, revised: 0 });
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -60,38 +74,48 @@ function PenerimaanContent() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Debounce pencarian 400ms supaya tidak fetch server tiap ketikan.
   useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    setLoading(true);
     api
-      .getStockReceipts()
-      .then(setReceipts)
+      .getStockReceipts({ page, limit: LIMIT, search: search || undefined, status: statusFilter || undefined })
+      .then((res) => {
+        setReceipts(res.rows);
+        setTotal(res.total);
+      })
       .catch((err) => {
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Tambah Stok Gudang.");
         setReceipts([]);
-      });
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, statusFilter]);
+
+  // Kartu ringkasan per status — panggilan ringan terpisah (limit:1, cuma
+  // butuh `total`-nya), bukan dari `receipts` yang sekarang cuma satu
+  // halaman.
+  useEffect(() => {
+    Promise.all([
+      api.getStockReceipts({ limit: 1, status: "DRAFT" }),
+      api.getStockReceipts({ limit: 1, status: "POSTED" }),
+      api.getStockReceipts({ limit: 1, status: "REVISED" }),
+    ])
+      .then(([draft, posted, revised]) => setMetrics({ draft: draft.total, posted: posted.total, revised: revised.total }))
+      .catch(() => {});
   }, []);
 
-  const filtered = useMemo(() => {
-    if (!receipts) return [];
-    const q = search.trim().toLowerCase();
-    return receipts.filter((r) => {
-      const cocokTeks = !q || r.receiptNo.toLowerCase().includes(q) || (r.note ?? "").toLowerCase().includes(q);
-      const cocokStatus = !statusFilter || r.status === statusFilter;
-      return cocokTeks && cocokStatus;
-    });
-  }, [receipts, search, statusFilter]);
-
-  const metrics = useMemo(
-    () => ({
-      total: receipts?.length ?? 0,
-      draft: receipts?.filter((r) => r.status === "DRAFT").length ?? 0,
-      posted: receipts?.filter((r) => r.status === "POSTED").length ?? 0,
-      revised: receipts?.filter((r) => r.status === "REVISED").length ?? 0,
-    }),
-    [receipts],
-  );
-
-  const reportFilter = useMemo(() => ({ q: search.trim() || undefined, status: statusFilter || undefined }), [search, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const reportFilter = { q: search || undefined, status: statusFilter || undefined };
 
   async function unduhLaporanExcel() {
     setUnduhExcel(true);
@@ -117,6 +141,7 @@ function PenerimaanContent() {
       await api.deleteStockReceipt(hapusTarget.id);
       toast.success(`Draft ${hapusTarget.receiptNo} dihapus.`);
       setReceipts((semua) => semua?.filter((r) => r.id !== hapusTarget.id) ?? semua);
+      setTotal((t) => Math.max(0, t - 1));
       setHapusTarget(null);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal menghapus draft.");
@@ -158,8 +183,8 @@ function PenerimaanContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 dark:text-fg-muted">Total Dokumen</p>
-            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight mt-0.5">{metrics.total}</p>
-            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">dokumen</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight mt-0.5">{total}</p>
+            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">sesuai filter</p>
           </div>
         </div>
 
@@ -204,8 +229,8 @@ function PenerimaanContent() {
             <input
               type="text"
               placeholder="Cari no. bukti atau keterangan..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
             />
           </div>
@@ -250,7 +275,12 @@ function PenerimaanContent() {
             <Spinner />
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line">
+          <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-surface/60 flex items-center justify-center z-10">
+                <Spinner size="sm" />
+              </div>
+            )}
             <table className="w-full text-xs text-left">
               <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
                 <tr>
@@ -264,17 +294,29 @@ function PenerimaanContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
-                {filtered.map((r) => {
+                {receipts.map((r) => {
                   const totalQty = r.items.reduce((s, i) => s + i.qtyReceived, 0);
                   const status = STATUS_LABEL[r.status];
+                  const terbuka = expandedId === r.id;
                   return (
-                    <tr key={r.id} className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors">
+                    <Fragment key={r.id}>
+                    <tr
+                      onClick={() => setExpandedId(terbuka ? null : r.id)}
+                      className={`cursor-pointer hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors ${terbuka ? "bg-brand-50/30 dark:bg-surface-hover/50" : ""}`}
+                    >
                       <td className="py-3 px-3 font-mono font-bold">
-                        <Link href={`/stok/penerimaan/${r.id}`} className="text-[var(--brand-700)] dark:text-brand-400 hover:underline">
-                          {r.receiptNo}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${terbuka ? "rotate-180" : ""}`} />
+                          <Link
+                            href={`/stok/penerimaan/${r.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                          >
+                            {r.receiptNo}
+                          </Link>
+                        </div>
                         {r.versionNo > 1 && (
-                          <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-fg-muted">v{r.versionNo}</span>
+                          <span className="ml-5 text-[10px] font-normal text-slate-400 dark:text-fg-muted">v{r.versionNo}</span>
                         )}
                       </td>
                       <td className="py-3 px-3 text-slate-600 dark:text-fg-secondary whitespace-nowrap">
@@ -296,7 +338,10 @@ function PenerimaanContent() {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setNotaTarget(r)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotaTarget(r);
+                            }}
                             title="Pratinjau & cetak nota dokumen ini"
                             className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
                           >
@@ -371,18 +416,81 @@ function PenerimaanContent() {
                         </div>
                       </td>
                     </tr>
+
+                    {terbuka && (
+                      <tr className="bg-slate-50/60 dark:bg-surface-hover/30">
+                        <td colSpan={7} className="p-0">
+                          <div className="p-4">
+                            <div className="overflow-x-auto rounded-lg border border-slate-200/70 dark:border-line bg-white dark:bg-surface">
+                              <table className="w-full text-xs">
+                                <thead className="bg-slate-100/70 dark:bg-surface-hover text-[11px] font-bold text-slate-600 dark:text-fg-secondary">
+                                  <tr>
+                                    <th className="py-2 px-3 text-left">Produk</th>
+                                    <th className="py-2 px-3 text-right">Qty Diterima</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-line">
+                                  {r.items.map((item) => (
+                                    <tr key={item.productId}>
+                                      <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{item.product.name}</td>
+                                      <td className="py-2 px-3 text-right tabular-nums font-semibold">{item.qtyReceived}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <Link
+                              href={`/stok/penerimaan/${r.id}`}
+                              className="inline-block mt-3 text-xs font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                            >
+                              Buka detail lengkap →
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
 
-                {filtered.length === 0 && (
+                {receipts.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
-                      {receipts.length === 0 ? "Belum ada dokumen Tambah Stok Gudang." : "Tidak ada yang cocok dengan pencarian."}
+                      {total === 0 ? "Belum ada dokumen Tambah Stok Gudang." : "Memuat..."}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="flex items-center justify-between gap-3 mt-3.5 flex-wrap">
+            <p className="text-[11px] text-slate-500 dark:text-fg-muted">
+              Menampilkan {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, total)} dari {total} dokumen
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+                className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-surface-hover cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-semibold text-slate-700 dark:text-fg-secondary px-2">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || loading}
+                className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-surface-hover cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

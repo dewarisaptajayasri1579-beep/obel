@@ -5,7 +5,6 @@ import {
   ShoppingCart,
   Truck,
   PackagePlus,
-  PackageSearch,
   Undo2,
   Receipt,
   Database,
@@ -18,6 +17,7 @@ import {
   BookOpen,
   Building2,
   UserRound,
+  Radar,
 } from "lucide-react";
 
 export interface NavItem {
@@ -53,6 +53,17 @@ export const DASHBOARD_ITEM: NavItem = {
 
 export const MAIN_NAV: NavGroup[] = [
   {
+    group: "MONITORING",
+    items: [
+      {
+        label: "Booth Aktif",
+        href: "/monitoring/booth-aktif",
+        icon: Radar,
+        bottomBar: true,
+      },
+    ],
+  },
+  {
     group: "TRANSAKSI",
     items: [
       {
@@ -66,15 +77,9 @@ export const MAIN_NAV: NavGroup[] = [
             bottomBar: true,
           },
           {
-            label: "Distribusi Stok",
-            href: "/distribusi",
+            label: "Serah Terima Stok",
+            href: "/serah-terima-stok",
             icon: Truck,
-            bottomBar: true,
-          },
-          {
-            label: "Restock Booth",
-            href: "/restock",
-            icon: PackageSearch,
             bottomBar: true,
           },
           {
@@ -83,9 +88,15 @@ export const MAIN_NAV: NavGroup[] = [
             icon: Undo2,
             bottomBar: false,
           },
+        ],
+      },
+      {
+        label: "Transaksi Booth",
+        icon: Store,
+        children: [
           {
-            label: "Penjualan",
-            href: "/penjualan",
+            label: "Kasir",
+            href: "/transaksi-kasir",
             icon: Receipt,
             bottomBar: true,
           },

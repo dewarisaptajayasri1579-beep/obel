@@ -57,7 +57,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, userName, userRo
         </main>
 
         <footer className="no-print hidden lg:flex flex-col items-center gap-1 py-4 px-6 text-center text-xs text-slate-500 dark:text-fg-muted font-semibold border-t border-slate-200/60 dark:border-line z-10">
-          <MotivationalQuote />
+          <MotivationalQuote role={userRole} />
           <p>&copy; {new Date().getFullYear()} {APP_CONFIG.name} — {APP_CONFIG.tagline}.</p>
         </footer>
       </div>

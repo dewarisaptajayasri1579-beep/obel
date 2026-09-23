@@ -334,6 +334,146 @@ export class StockMovementsService {
     return { periode: { bulan, tahun }, rows };
   }
 
+  /// Riwayat Stok utk Petugas Booth (`GET /stock-movements/mine`) — daftar
+  /// mentah movement yang menyentuh Booth ybs (dari JWT, tidak bisa dipilih
+  /// bebas), TIDAK memakai mesin rekap saldo (dampakMutasi dkk) di atas —
+  /// ini cuma feed riwayat, bukan kartu stok bersaldo.
+  async mutasiUntukBooth(boothId: string, params?: { dari?: Date; sampai?: Date }): Promise<
+    {
+      id: string;
+      movementNo: string;
+      movementType: StockMovementType;
+      productId: string;
+      productName: string;
+      qty: number;
+      direction: 'IN' | 'OUT';
+      occurredAt: Date;
+      note: string | null;
+    }[]
+  > {
+    const movements = await this.prisma.stockMovement.findMany({
+      where: {
+        OR: [{ fromBoothId: boothId }, { toBoothId: boothId }],
+        ...(params?.dari || params?.sampai
+          ? { occurredAt: { gte: params?.dari, lte: params?.sampai } }
+          : {}),
+      },
+      include: { product: true },
+      orderBy: { occurredAt: 'desc' },
+    });
+
+    return movements.map((m) => ({
+      id: m.id,
+      movementNo: m.movementNo,
+      movementType: m.movementType,
+      productId: m.productId,
+      productName: m.product.name,
+      qty: m.qty,
+      direction: m.toBoothId === boothId ? 'IN' : 'OUT',
+      occurredAt: m.occurredAt,
+      note: m.note,
+    }));
+  }
+
+  /// Layar "Riwayat Stok" (tab ke-3 Ajukan Restock) Petugas Booth — ledger
+  /// SATU produk dgn saldo berjalan, dikunci ke Booth dari JWT + rentang
+  /// TANGGAL bebas (bukan bulan kalender kayak `rinci()` Admin, mockup-nya
+  /// pakai preset "7 hari terakhir" dst). Pakai mesin arah yang SAMA
+  /// (dampakMutasi/keteranganMutasi) — tidak ada rumus saldo kedua yg beda.
+  async rinciUntukBooth(params: {
+    boothId: string;
+    productId: string;
+    dari: Date;
+    sampai: Date;
+  }): Promise<{
+    product: { id: string; name: string };
+    periode: { dari: string; sampai: string };
+    ringkasan: { stokAwal: number; masuk: number; keluar: number; stokAkhir: number };
+    rows: {
+      id: string;
+      tanggal: string;
+      movementNo: string;
+      jenis: 'MASUK' | 'KELUAR' | 'PENYESUAIAN';
+      qty: number;
+      stokAkhir: number;
+      keterangan: string;
+    }[];
+  }> {
+    const { boothId, productId } = params;
+    const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true } });
+    if (!product) throw new DomainError('NOT_FOUND', 'Produk tidak ditemukan.', { productId });
+
+    // Dinormalkan ke granularitas HARI (bukan timestamp persis) — `businessDate`
+    // adalah kolom DATE polos jam 00:00; menerima timestamp apa adanya dari
+    // client bisa memotong hari pertama periode kalau jam-nya bukan 00:00.
+    // Batas atas EKSKLUSIF hari setelah `sampai`, supaya tanggal `sampai`
+    // sendiri ikut penuh.
+    const dari = new Date(Date.UTC(params.dari.getUTCFullYear(), params.dari.getUTCMonth(), params.dari.getUTCDate()));
+    const sampai = new Date(
+      Date.UTC(params.sampai.getUTCFullYear(), params.sampai.getUTCMonth(), params.sampai.getUTCDate() + 1),
+    );
+
+    const filterBooth: Prisma.StockMovementWhereInput = { OR: [{ fromBoothId: boothId }, { toBoothId: boothId }] };
+
+    const [sebelum, periode] = await Promise.all([
+      this.prisma.stockMovement.findMany({ where: { ...filterBooth, productId, businessDate: { lt: dari } } }),
+      this.prisma.stockMovement.findMany({
+        where: { ...filterBooth, productId, businessDate: { gte: dari, lt: sampai } },
+        orderBy: [{ businessDate: 'asc' }, { occurredAt: 'asc' }],
+      }),
+    ]);
+
+    let saldo = 0;
+    for (const m of sebelum) {
+      saldo += dampakMutasi(m, boothId).delta;
+    }
+    const stokAwal = saldo;
+
+    let masuk = 0;
+    let keluar = 0;
+    const rows: {
+      id: string;
+      tanggal: string;
+      movementNo: string;
+      jenis: 'MASUK' | 'KELUAR' | 'PENYESUAIAN';
+      qty: number;
+      stokAkhir: number;
+      keterangan: string;
+    }[] = [];
+
+    for (const m of periode) {
+      const { delta } = dampakMutasi(m, boothId);
+      if (delta === 0) continue;
+      saldo += delta;
+      if (delta > 0) masuk += delta;
+      else keluar += -delta;
+
+      const jenis: 'MASUK' | 'KELUAR' | 'PENYESUAIAN' =
+        m.movementType === StockMovementType.ADJUSTMENT || m.movementType === StockMovementType.VOID_REVERSAL
+          ? 'PENYESUAIAN'
+          : delta > 0
+            ? 'MASUK'
+            : 'KELUAR';
+
+      rows.push({
+        id: m.id,
+        tanggal: m.occurredAt.toISOString(),
+        movementNo: m.movementNo,
+        jenis,
+        qty: delta,
+        stokAkhir: saldo,
+        keterangan: keteranganMutasi(m),
+      });
+    }
+
+    return {
+      product,
+      periode: { dari: dari.toISOString(), sampai: sampai.toISOString() },
+      ringkasan: { stokAwal, masuk, keluar, stokAkhir: saldo },
+      rows,
+    };
+  }
+
   /// `StockMovement.createdBy` cuma menyimpan UUID mentah (tidak ada relasi
   /// Prisma ke Profile — lihat schema.prisma), dan `shiftSessionId` menunjuk
   /// ke ShiftSession yang labelnya (Pagi/Malam) ada di ShiftTemplate. Dua-duanya

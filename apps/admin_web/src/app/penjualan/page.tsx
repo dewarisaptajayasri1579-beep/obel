@@ -92,7 +92,7 @@ function PenjualanContent() {
 
   async function load() {
     try {
-      setSales(await api.getSales());
+      setSales((await api.getSales({ limit: 200 })).rows);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Penjualan.");
     }

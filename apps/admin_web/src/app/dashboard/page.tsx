@@ -14,6 +14,9 @@ import { LineChartCard, BarChartCard, PieChartCard } from "@/components/ui/chart
 import { api, ApiError, type AdminDashboard, type ReportsSummary } from "@/lib/api-client";
 import { Truck, Receipt, AlertTriangle, Store, Undo2, RefreshCw, Download } from "lucide-react";
 import { DashboardTabs } from "./DashboardTabs";
+import { SalesReportPanel } from "./SalesReportPanel";
+import { PeriodFilterBar } from "./PeriodFilterBar";
+import { usePeriodFilter } from "./usePeriodFilter";
 
 function formatRupiah(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
@@ -23,6 +26,7 @@ function RingkasanTab() {
   const { session } = useAuth();
   const toast = useToast();
   const [data, setData] = useState<AdminDashboard | null>(null);
+  const periodFilter = usePeriodFilter();
 
   useEffect(() => {
     api
@@ -42,6 +46,8 @@ function RingkasanTab() {
           Ringkasan operasional Obbel Coffee & Milk hari ini.
         </p>
       </div>
+
+      <PeriodFilterBar {...periodFilter} />
 
       {!data ? (
         <div className="flex justify-center py-12">
@@ -72,6 +78,8 @@ function RingkasanTab() {
             <StatTile label="Restock Pending" value={data.pendingRestock} icon={RefreshCw} color="purple" />
             <StatTile label="Return Pending" value={data.pendingReturns} icon={Undo2} color="amber" />
           </div>
+
+          <SalesReportPanel start={periodFilter.start} end={periodFilter.end} />
         </>
       )}
     </div>

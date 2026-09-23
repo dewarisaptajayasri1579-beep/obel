@@ -1,8 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { JwtPayload } from '../auth/jwt-payload.interface';
+import { DomainError } from '../../common/domain-error';
 import { StockMovementsService, type JenisMutasi } from './stock-movements.service';
 import { WAREHOUSE, type LokasiStok } from './arah.util';
 
@@ -32,6 +35,32 @@ export class StockMovementsController {
 
   private resolveJenis(jenis?: string): JenisMutasi {
     return jenis === 'PENJUALAN' ? 'PENJUALAN' : 'SEMUA';
+  }
+
+  @Get('mine')
+  @Roles(UserRole.BOOTH_STAFF)
+  mine(@CurrentUser() user: JwtPayload, @Query('from') from?: string, @Query('to') to?: string) {
+    if (!user.boothId) {
+      throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
+    }
+    return this.service.mutasiUntukBooth(user.boothId, {
+      dari: from ? new Date(from) : undefined,
+      sampai: to ? new Date(to) : undefined,
+    });
+  }
+
+  @Get('rinci-mine')
+  @Roles(UserRole.BOOTH_STAFF)
+  rinciMine(
+    @CurrentUser() user: JwtPayload,
+    @Query('productId') productId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!user.boothId) {
+      throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
+    }
+    return this.service.rinciUntukBooth({ boothId: user.boothId, productId, dari: new Date(from), sampai: new Date(to) });
   }
 
   @Get('rekap')

@@ -36,24 +36,24 @@ export class RestockRequestsController {
     if (!user.boothId) {
       throw new BadRequestException('User belum memiliki assignment booth.');
     }
-    return this.restockRequestsService.create(dto, user.boothId, user.sub);
+    return this.restockRequestsService.create(dto, user.boothId, user.sub, user.username);
   }
 
   @Post(':id/revise')
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   revise(@Param('id') id: string, @Body() dto: CreateRestockRequestDto, @CurrentUser() user: JwtPayload) {
-    return this.restockRequestsService.reviseRequestedItems(id, dto, user.sub);
+    return this.restockRequestsService.reviseRequestedItems(id, dto, user.sub, user.username);
   }
 
   @Post(':id/approve')
   @Roles(UserRole.ADMIN)
   approve(@Param('id') id: string, @Body() dto: ApproveRestockRequestDto, @CurrentUser() user: JwtPayload) {
-    return this.restockRequestsService.approve(id, dto, user.sub);
+    return this.restockRequestsService.approve(id, dto, user.sub, user.username);
   }
 
   @Post(':id/reject')
   @Roles(UserRole.ADMIN)
   reject(@Param('id') id: string, @Body() dto: RejectRestockRequestDto, @CurrentUser() user: JwtPayload) {
-    return this.restockRequestsService.reject(id, dto, user.sub);
+    return this.restockRequestsService.reject(id, dto, user.sub, user.username);
   }
 }

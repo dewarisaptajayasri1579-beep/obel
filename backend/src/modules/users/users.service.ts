@@ -5,6 +5,7 @@ import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 
 const SELECT_SAFE_FIELDS = { ...SAFE_PROFILE_SELECT, createdAt: true } as const;
 
@@ -34,6 +35,26 @@ export class UsersService {
         role: dto.role,
         defaultBoothId: dto.defaultBoothId,
       },
+      select: SELECT_SAFE_FIELDS,
+    });
+  }
+
+  async findMe(id: string) {
+    const existing = await this.prisma.profile.findUnique({ where: { id }, select: SELECT_SAFE_FIELDS });
+    if (!existing) {
+      throw new NotFoundException('User tidak ditemukan.');
+    }
+    return existing;
+  }
+
+  async updateMe(id: string, dto: UpdateMyProfileDto) {
+    const existing = await this.prisma.profile.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('User tidak ditemukan.');
+    }
+    return this.prisma.profile.update({
+      where: { id },
+      data: { fullName: dto.fullName },
       select: SELECT_SAFE_FIELDS,
     });
   }

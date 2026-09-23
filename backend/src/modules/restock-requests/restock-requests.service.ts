@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
+import { ActivityLogService } from '../../common/activity-log.service';
 import { DistributionsService } from '../distributions/distributions.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ApproveRestockRequestDto } from './dto/approve-restock-request.dto';
@@ -16,6 +17,7 @@ export class RestockRequestsService {
     private readonly prisma: PrismaService,
     private readonly distributionsService: DistributionsService,
     private readonly corrections: CorrectionsService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   findAll() {
@@ -43,7 +45,7 @@ export class RestockRequestsService {
 
   /// Booth Staff meminta restock — belum ada efek stok sampai Admin approve
   /// (BR-008/BR-009 di 08-business-rules.md).
-  async create(dto: CreateRestockRequestDto, boothId: string, staffId: string) {
+  async create(dto: CreateRestockRequestDto, boothId: string, staffId: string, staffName: string) {
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
     const productById = new Map(products.map((p) => [p.id, p]));
@@ -56,7 +58,7 @@ export class RestockRequestsService {
       }
     }
 
-    return this.prisma.restockRequest.create({
+    const request = await this.prisma.restockRequest.create({
       data: {
         requestNo: generateDocNo('RSTK'),
         boothId,
@@ -69,12 +71,23 @@ export class RestockRequestsService {
       },
       include: { items: { include: { product: true } } },
     });
+
+    await this.activityLog.record(this.prisma, {
+      entityType: 'restock_request',
+      entityId: request.id,
+      action: 'REQUESTED',
+      actorId: staffId,
+      actorName: staffName,
+      note: `Diajukan, ${dto.items.length} baris.`,
+    });
+
+    return request;
   }
 
   /// Approve = langsung kirim (menghasilkan StockDistribution) sesuai
   /// BR-009: qty approved tidak boleh melebihi warehouse available — dicek
   /// otomatis oleh DistributionsService.create via INSUFFICIENT_STOCK.
-  async approve(id: string, dto: ApproveRestockRequestDto, actorId: string) {
+  async approve(id: string, dto: ApproveRestockRequestDto, actorId: string, actorName: string) {
     const request = await this.prisma.restockRequest.findUnique({ where: { id } });
     if (!request) {
       throw new DomainError('NOT_FOUND', 'Permintaan restock tidak ditemukan.');
@@ -91,9 +104,10 @@ export class RestockRequestsService {
         note: `Restock untuk ${request.requestNo}`,
       },
       actorId,
+      actorName,
     );
 
-    return this.prisma.restockRequest.update({
+    const updated = await this.prisma.restockRequest.update({
       where: { id },
       data: {
         status: RestockRequestStatus.APPROVED,
@@ -102,12 +116,23 @@ export class RestockRequestsService {
       },
       include: { items: { include: { product: true } }, distribution: true },
     });
+
+    await this.activityLog.record(this.prisma, {
+      entityType: 'restock_request',
+      entityId: id,
+      action: 'APPROVED',
+      actorId,
+      actorName,
+      note: `Disetujui & dikirim sebagai ${distribution.distributionNo}.`,
+    });
+
+    return updated;
   }
 
   /// TX-05 — Revisi qty selama masih REQUESTED. Belum ada efek stok
   /// (BR-008), jadi ini edit langsung, bukan reversal/replacement seperti
   /// dokumen yang sudah SENT.
-  async reviseRequestedItems(id: string, dto: CreateRestockRequestDto, actorId: string) {
+  async reviseRequestedItems(id: string, dto: CreateRestockRequestDto, actorId: string, actorName: string) {
     const request = await this.prisma.restockRequest.findUnique({ where: { id } });
     if (!request) {
       throw new DomainError('NOT_FOUND', 'Permintaan restock tidak ditemukan.');
@@ -155,6 +180,15 @@ export class RestockRequestsService {
         createdById: actorId,
         idempotencyKey: randomUUID(),
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'restock_request',
+        entityId: id,
+        action: 'UPDATE',
+        actorId,
+        actorName,
+        note: 'Qty pengajuan direvisi sebelum disetujui.',
+      });
     });
 
     return this.prisma.restockRequest.findUnique({
@@ -163,7 +197,7 @@ export class RestockRequestsService {
     });
   }
 
-  async reject(id: string, dto: RejectRestockRequestDto, actorId: string) {
+  async reject(id: string, dto: RejectRestockRequestDto, actorId: string, actorName: string) {
     const request = await this.prisma.restockRequest.findUnique({ where: { id } });
     if (!request) {
       throw new DomainError('NOT_FOUND', 'Permintaan restock tidak ditemukan.');
@@ -194,6 +228,15 @@ export class RestockRequestsService {
         },
       }),
     ]);
+
+    await this.activityLog.record(this.prisma, {
+      entityType: 'restock_request',
+      entityId: id,
+      action: 'REJECTED',
+      actorId,
+      actorName,
+      note: dto.reason,
+    });
 
     return updated;
   }

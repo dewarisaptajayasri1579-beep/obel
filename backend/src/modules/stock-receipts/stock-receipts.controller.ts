@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { StockReceiptStatus, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,8 +21,18 @@ export class StockReceiptsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  findAll() {
-    return this.service.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: StockReceiptStatus,
+  ) {
+    return this.service.findAll({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search || undefined,
+      status: status || undefined,
+    });
   }
 
   @Get(':id')

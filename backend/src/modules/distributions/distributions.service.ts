@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { DistributionStatus, StockMovementType, UserRole } from '@prisma/client';
+import { DistributionStatus, Prisma, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
+import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -16,13 +17,38 @@ function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
+/// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama
+/// (sama pola dgn StockReceiptsService.nomorBerikutnya).
+const KODE_UNIQUE_VIOLATION = 'P2002';
+const MAKS_PERCOBAAN_NOMOR = 5;
+
 @Injectable()
 export class DistributionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
     private readonly reconciliationCases: ReconciliationCasesService,
+    private readonly activityLog: ActivityLogService,
   ) {}
+
+  /// Nomor Serah Terima Stok sederhana: `DIST-000001` naik satu per distribusi,
+  /// diambil dari nomor TERBESAR yang sudah ada — pola sama dengan
+  /// StockReceiptsService.nomorBerikutnya ("Tambah Stok Gudang").
+  private async nomorDistribusiBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.stockDistribution.findMany({
+      where: { distributionNo: { startsWith: 'DIST-' } },
+      select: { distributionNo: true },
+    });
+    const tertinggi = semua.reduce((maks, d) => {
+      const cocok = /^DIST-(\d{6})$/.exec(d.distributionNo);
+      return cocok ? Math.max(maks, Number(cocok[1])) : maks;
+    }, 0);
+    if (tertinggi >= 999999) {
+      throw new DomainError('DISTRIBUTION_NO_EXHAUSTED', 'Nomor Serah Terima Stok sudah mencapai batas 999999.');
+    }
+    return `DIST-${String(tertinggi + 1).padStart(6, '0')}`;
+  }
 
   findAll() {
     return this.prisma.stockDistribution.findMany({
@@ -40,10 +66,22 @@ export class DistributionsService {
     return distributions.map(this.toResponse);
   }
 
+  /// Layar "Terima Stok" Petugas Booth (tab Semua/Menunggu/Selesai) — beda
+  /// dari findPendingForBooth() yang cuma SENT, ini SEMUA status supaya tab
+  /// "Selesai" (RECEIVED/DISCREPANCY) ikut punya isi, bukan selalu kosong.
+  async findAllForBooth(boothId: string) {
+    const distributions = await this.prisma.stockDistribution.findMany({
+      where: { boothId },
+      include: { booth: true, items: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return distributions.map(this.toResponse);
+  }
+
   /// Kirim distribusi (Admin). Digabung create+SENT dalam satu langkah untuk
   /// MVP, sesuai rekomendasi BR-003: "deduct Gudang saat SENT". Atomik dan
   /// idempotent (BR-017) seperti create_paid_sale.
-  async create(dto: CreateDistributionDto, actorId: string) {
+  async create(dto: CreateDistributionDto, actorId: string, actorName: string) {
     const existing = await this.prisma.stockDistribution.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
     });
@@ -71,41 +109,60 @@ export class DistributionsService {
     const distributionId = randomUUID();
     const sentAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of dto.items) {
-        const decremented = await tx.warehouseStock.updateMany({
-          where: { productId: item.productId, qtyOnHand: { gte: item.qty } },
-          data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
-        });
-        if (decremented.count !== 1) {
-          const current = await tx.warehouseStock.findUnique({ where: { productId: item.productId } });
-          const product = productById.get(item.productId)!;
-          throw new DomainError('INSUFFICIENT_STOCK', `Stok Gudang ${product.name} tidak cukup.`, {
-            productId: item.productId,
-            available: current?.qtyOnHand ?? 0,
-            requested: item.qty,
-          });
-        }
-      }
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          for (const item of dto.items) {
+            const decremented = await tx.warehouseStock.updateMany({
+              where: { productId: item.productId, qtyOnHand: { gte: item.qty } },
+              data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
+            });
+            if (decremented.count !== 1) {
+              const current = await tx.warehouseStock.findUnique({ where: { productId: item.productId } });
+              const product = productById.get(item.productId)!;
+              throw new DomainError('INSUFFICIENT_STOCK', `Stok Gudang ${product.name} tidak cukup.`, {
+                productId: item.productId,
+                available: current?.qtyOnHand ?? 0,
+                requested: item.qty,
+              });
+            }
+          }
 
-      await tx.stockDistribution.create({
-        data: {
-          id: distributionId,
-          distributionNo: generateDocNo('DIST'),
-          boothId: dto.boothId,
-          status: DistributionStatus.SENT,
-          idempotencyKey: dto.idempotencyKey,
-          sentAt,
-          createdById: actorId,
-          note: dto.note,
-          items: {
-            createMany: {
-              data: dto.items.map((item) => ({ productId: item.productId, qtySent: item.qty })),
+          const distributionNo = await this.nomorDistribusiBerikutnya(tx);
+
+          await tx.stockDistribution.create({
+            data: {
+              id: distributionId,
+              distributionNo,
+              boothId: dto.boothId,
+              status: DistributionStatus.SENT,
+              idempotencyKey: dto.idempotencyKey,
+              sentAt,
+              createdById: actorId,
+              note: dto.note,
+              items: {
+                createMany: {
+                  data: dto.items.map((item) => ({ productId: item.productId, qtySent: item.qty })),
+                },
+              },
             },
-          },
-        },
-      });
-    });
+          });
+
+          await this.activityLog.record(tx, {
+            entityType: 'stock_distribution',
+            entityId: distributionId,
+            action: 'SENT',
+            actorId,
+            actorName,
+            note: `Dikirim ke Booth ${booth.name}, ${dto.items.length} baris.`,
+          });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toResponse((await this.loadWithRelations(distributionId))!);
   }
@@ -180,6 +237,15 @@ export class DistributionsService {
           receivedById: user.sub,
         },
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: hasDiscrepancy ? 'RECEIVED_WITH_DISCREPANCY' : 'RECEIVED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: hasDiscrepancy ? 'Diterima dengan selisih qty.' : 'Diterima sesuai qty dikirim.',
+      });
     });
 
     return this.toResponse((await this.loadWithRelations(distributionId))!);
@@ -244,6 +310,15 @@ export class DistributionsService {
         impactSnapshot: { warehouseRestored: distribution.items.map((i) => ({ productId: i.productId, qty: i.qtySent })) },
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: 'CANCELLED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: dto.reasonNote ?? dto.reasonCode,
       });
     });
 
@@ -373,6 +448,15 @@ export class DistributionsService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'stock_distribution',
+        entityId: distribution.id,
+        action: 'REVISED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `Direvisi menjadi dokumen baru (v${distribution.versionNo + 1}). ${dto.reasonNote ?? dto.reasonCode}`,
+      });
       });
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
@@ -481,6 +565,15 @@ export class DistributionsService {
           impactSnapshot: { deltas },
           createdById: user.sub,
           idempotencyKey: dto.idempotencyKey,
+        });
+
+        await this.activityLog.record(tx, {
+          entityType: 'stock_distribution',
+          entityId: distribution.id,
+          action: 'RECEIPT_CORRECTED',
+          actorId: user.sub,
+          actorName: user.username,
+          note: dto.reasonNote ?? dto.reasonCode,
         });
       });
     } catch (err) {

@@ -8,5 +8,6 @@ import { RestockRequestsService } from './restock-requests.service';
   imports: [DistributionsModule, CorrectionsModule],
   controllers: [RestockRequestsController],
   providers: [RestockRequestsService],
+  exports: [RestockRequestsService],
 })
 export class RestockRequestsModule {}
