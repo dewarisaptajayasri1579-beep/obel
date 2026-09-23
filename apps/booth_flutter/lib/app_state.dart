@@ -75,12 +75,11 @@ class AppState extends ChangeNotifier {
   }
 
   int get transactionCount => _todaysPaidSales.length;
-  int get omzetToday =>
-      _todaysPaidSales.fold(0, (sum, s) => sum + s.total);
+  int get omzetToday => _todaysPaidSales.fold(0, (sum, s) => sum + s.total);
   int get cupSoldToday => _todaysPaidSales.fold(
-        0,
-        (sum, s) => sum + s.items.fold(0, (a, item) => a + item.qty),
-      );
+    0,
+    (sum, s) => sum + s.items.fold(0, (a, item) => a + item.qty),
+  );
   int get averagePerTransaction =>
       transactionCount == 0 ? 0 : (omzetToday / transactionCount).round();
 
@@ -239,6 +238,15 @@ class AppState extends ChangeNotifier {
   /// default dari BoothShiftAssignment kalau `boothId` tidak dikirim.
   /// Setelah berhasil, ShiftSession-nya OPEN — muat ulang katalog/stok/dll
   /// persis seperti alur login yang sudah punya shift aktif.
+  ///
+  /// Kapture GPS + upload foto selfie (AttendanceCaptureCard/
+  /// uploadAttendancePhoto) SEMENTARA di-skip — dicurigai jadi sumber
+  /// "Koneksi ke server timeout" berulang di device tertentu (belum
+  /// diverifikasi apakah upload multipart-nya, atau geolocator-nya, yang
+  /// macet). `photoUrl` sekarang cuma placeholder server-side valid, bukan
+  /// foto sungguhan. Re-enable setelah root cause ketemu — lihat
+  /// AttendanceCaptureCard di attendance_capture.dart, masih utuh, tinggal
+  /// disambung lagi.
   Future<void> checkIn({String? boothId}) async {
     if (_token == null) {
       throw ApiException(
@@ -246,7 +254,13 @@ class AppState extends ChangeNotifier {
         'Sesi login berakhir, silakan login ulang.',
       );
     }
-    final shift = await _api.checkIn(_token!, boothId: boothId);
+    final shift = await _api.checkIn(
+      _token!,
+      boothId: boothId,
+      latitude: 0,
+      longitude: 0,
+      photoUrl: 'disabled-temporarily',
+    );
     final newToken = shift['accessToken'] as String?;
     if (newToken != null) _token = newToken;
     _applyActiveShift(shift);
@@ -359,11 +373,13 @@ class AppState extends ChangeNotifier {
       return imageUrl;
     }
 
-    return imageUri.replace(
-      scheme: apiUri.scheme,
-      host: apiUri.host,
-      port: apiUri.hasPort ? apiUri.port : null,
-    ).toString();
+    return imageUri
+        .replace(
+          scheme: apiUri.scheme,
+          host: apiUri.host,
+          port: apiUri.hasPort ? apiUri.port : null,
+        )
+        .toString();
   }
 
   Future<void> refreshSales() async {
@@ -569,9 +585,14 @@ class AppState extends ChangeNotifier {
   }
 
   /// Memanggil POST /shifts/:id/closing/confirm. Server yang menyesuaikan
-  /// booth_stocks ke actual & menutup shift (BR-011/BR-012).
+  /// booth_stocks ke actual & menutup shift (BR-011/BR-012). Sama seperti
+  /// checkIn(), GPS + upload foto Absen Pulang SEMENTARA di-skip — lihat
+  /// catatan di checkIn().
   Future<void> confirmShiftClosing(List<ClosingCountItem> items) async {
     if (_token == null || shiftSessionId == null) return;
+    const checkOutLatitude = 0.0;
+    const checkOutLongitude = 0.0;
+    const checkOutPhotoUrl = 'disabled-temporarily';
     await _api.confirmShiftClosing(
       _token!,
       shiftSessionId!,
@@ -584,6 +605,9 @@ class AppState extends ChangeNotifier {
             },
           )
           .toList(),
+      checkOutLatitude: checkOutLatitude,
+      checkOutLongitude: checkOutLongitude,
+      checkOutPhotoUrl: checkOutPhotoUrl,
     );
   }
 
@@ -636,7 +660,11 @@ class CompletedSale {
 }
 
 class SaleHistoryItem {
-  SaleHistoryItem({this.productId, required this.productName, required this.qty});
+  SaleHistoryItem({
+    this.productId,
+    required this.productName,
+    required this.qty,
+  });
 
   final String? productId;
   final String productName;

@@ -59,17 +59,14 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
 
     if (items == null) return;
 
-    final discrepant =
-        items.where((i) => i.discrepancy != 0).toList();
+    final discrepant = items.where((i) => i.discrepancy != 0).toList();
 
     final proceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(
           'Konfirmasi Closing',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -78,15 +75,11 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (discrepant.isEmpty)
-                const Text(
-                  'Semua stok sesuai expected. Tidak ada selisih.',
-                )
+                const Text('Semua stok sesuai expected. Tidak ada selisih.')
               else ...[
                 const Text(
                   'Selisih ditemukan:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 for (final item in discrepant)
@@ -122,23 +115,18 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     final appState = context.read<AppState>();
 
     try {
+      // GPS/foto capture Absen Pulang di-skip sementara, lihat catatan di
+      // AppState.confirmShiftClosing().
       await appState.confirmShiftClosing(items);
 
       if (!mounted) return;
 
       appState.logout();
 
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/login',
-        (route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Shift berhasil ditutup. Sampai jumpa!',
-          ),
-        ),
+        const SnackBar(content: Text('Shift berhasil ditutup. Sampai jumpa!')),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -201,9 +189,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                 Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: ObbelTheme.textLight,
-                  ),
+                  style: const TextStyle(color: ObbelTheme.textLight),
                 ),
               ],
             ),
@@ -215,9 +201,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     final items = _items;
 
     if (items == null) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     return SafeArea(
@@ -257,10 +241,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
             size: 24,
           ),
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(
-            minWidth: 40,
-            minHeight: 40,
-          ),
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
         ),
         const SizedBox(width: 8),
         const Expanded(
@@ -278,10 +259,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
               SizedBox(height: 3),
               Text(
                 'Hitung sisa cup fisik sebelum tutup shift',
-                style: TextStyle(
-                  color: ObbelTheme.textLight,
-                  fontSize: 12.5,
-                ),
+                style: TextStyle(color: ObbelTheme.textLight, fontSize: 12.5),
               ),
             ],
           ),
@@ -300,9 +278,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: hasDiscrepancy
-              ? Colors.red.shade100
-              : Colors.grey.shade200,
+          color: hasDiscrepancy ? Colors.red.shade100 : Colors.grey.shade200,
         ),
         boxShadow: [
           BoxShadow(
@@ -373,10 +349,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
   Widget _buildStatusBadge(ClosingCountItem item) {
     if (item.discrepancy == 0) {
       return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 11,
-          vertical: 7,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
           color: const Color(0xFFD5F7E8),
           borderRadius: BorderRadius.circular(18),
@@ -384,11 +357,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.check,
-              size: 15,
-              color: Color(0xFF08764C),
-            ),
+            Icon(Icons.check, size: 15, color: Color(0xFF08764C)),
             SizedBox(width: 4),
             Text(
               'Cocok',
@@ -404,25 +373,16 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.red.shade100,
-        ),
+        border: Border.all(color: Colors.red.shade100),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.warning_rounded,
-            size: 14,
-            color: Colors.red.shade600,
-          ),
+          Icon(Icons.warning_rounded, size: 14, color: Colors.red.shade600),
           const SizedBox(width: 4),
           Text(
             item.discrepancy > 0
@@ -446,9 +406,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFB),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE7EBEF),
-        ),
+        border: Border.all(color: const Color(0xFFE7EBEF)),
       ),
       child: Row(
         children: [
@@ -514,14 +472,10 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
       width: 42,
       height: 42,
       child: Material(
-        color: outlined
-            ? Colors.white
-            : ObbelTheme.primaryDark,
+        color: outlined ? Colors.white : ObbelTheme.primaryDark,
         shape: CircleBorder(
           side: outlined
-              ? BorderSide(
-                  color: Colors.grey.shade300,
-                )
+              ? BorderSide(color: Colors.grey.shade300)
               : BorderSide.none,
         ),
         child: InkWell(
@@ -529,9 +483,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
           onTap: onPressed,
           child: Icon(
             icon,
-            color: outlined
-                ? const Color(0xFF5D6675)
-                : Colors.white,
+            color: outlined ? const Color(0xFF5D6675) : Colors.white,
             size: 21,
           ),
         ),
@@ -539,29 +491,18 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     );
   }
 
-  Widget _buildDiscrepancySection(
-    ClosingCountItem item,
-    bool isLess,
-  ) {
+  Widget _buildDiscrepancySection(ClosingCountItem item, bool isLess) {
     return Container(
       padding: const EdgeInsets.only(top: 12),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: Colors.red.shade100,
-          ),
-        ),
+        border: Border(top: BorderSide(color: Colors.red.shade100)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.warning_rounded,
-                size: 16,
-                color: Colors.red.shade600,
-              ),
+              Icon(Icons.warning_rounded, size: 16, color: Colors.red.shade600),
               const SizedBox(width: 6),
               Text(
                 'WAJIB PILIH ALASAN SELISIH',
@@ -590,21 +531,14 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
             runSpacing: 7,
             children: [
               for (final reason in _reasonOptions)
-                _buildReasonButton(
-                  item,
-                  reason,
-                ),
+                _buildReasonButton(item, reason),
             ],
           ),
           if (item.reasonCode != null) ...[
             const SizedBox(height: 9),
             Row(
               children: [
-                Icon(
-                  Icons.edit_note,
-                  size: 16,
-                  color: ObbelTheme.primaryDark,
-                ),
+                Icon(Icons.edit_note, size: 16, color: ObbelTheme.primaryDark),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
@@ -624,10 +558,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
     );
   }
 
-  Widget _buildReasonButton(
-    ClosingCountItem item,
-    String reason,
-  ) {
+  Widget _buildReasonButton(ClosingCountItem item, String reason) {
     final selected = item.reasonCode == reason;
 
     IconData icon;
@@ -654,19 +585,12 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? Colors.red.shade50
-              : const Color(0xFFF8FAFB),
+          color: selected ? Colors.red.shade50 : const Color(0xFFF8FAFB),
           borderRadius: BorderRadius.circular(11),
           border: Border.all(
-            color: selected
-                ? Colors.red.shade400
-                : const Color(0xFFE0E5EA),
+            color: selected ? Colors.red.shade400 : const Color(0xFFE0E5EA),
             width: selected ? 1.2 : 1,
           ),
         ),
@@ -676,21 +600,15 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
             Icon(
               icon,
               size: 15,
-              color: selected
-                  ? Colors.red.shade600
-                  : const Color(0xFF596273),
+              color: selected ? Colors.red.shade600 : const Color(0xFF596273),
             ),
             const SizedBox(width: 6),
             Text(
               reason,
               style: TextStyle(
-                color: selected
-                    ? Colors.red.shade600
-                    : const Color(0xFF596273),
+                color: selected ? Colors.red.shade600 : const Color(0xFF596273),
                 fontSize: 12,
-                fontWeight: selected
-                    ? FontWeight.w800
-                    : FontWeight.w600,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
               ),
             ),
           ],
@@ -700,19 +618,14 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
   }
 
   Widget _buildReturnSummary(List<ClosingCountItem> items) {
-    final total = items.fold<int>(
-      0,
-      (sum, item) => sum + item.actualQty,
-    );
+    final total = items.fold<int>(0, (sum, item) => sum + item.actualQty);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFEAF5F1),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFD6EBE3),
-        ),
+        border: Border.all(color: const Color(0xFFD6EBE3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -744,9 +657,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFFB8EBD3),
-                  ),
+                  border: Border.all(color: const Color(0xFFB8EBD3)),
                 ),
                 child: const Text(
                   'SOP',
@@ -815,10 +726,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          Container(
-            height: 1,
-            color: const Color(0xFFCBE9DC),
-          ),
+          Container(height: 1, color: const Color(0xFFCBE9DC)),
           const SizedBox(height: 13),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -851,11 +759,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Color(0xFFE5E7EB),
-          ),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
       ),
       child: SafeArea(
         top: false,
@@ -865,9 +769,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: (_canConfirm && !_confirming)
-                    ? _confirm
-                    : null,
+                onPressed: (_canConfirm && !_confirming) ? _confirm : null,
                 icon: _confirming
                     ? const SizedBox(
                         width: 19,
@@ -877,10 +779,7 @@ class _ClosingCountScreenState extends State<ClosingCountScreen> {
                           strokeWidth: 2.3,
                         ),
                       )
-                    : const Icon(
-                        Icons.lock_outline,
-                        size: 20,
-                      ),
+                    : const Icon(Icons.lock_outline, size: 20),
                 label: Text(
                   _confirming
                       ? 'Memproses...'
