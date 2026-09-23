@@ -14,6 +14,7 @@ import { DomainError } from '../../common/domain-error';
 import { generateDocNo } from '../../common/doc-no';
 import { effectiveByGroup } from '../../common/effective-version';
 import { batasBulanJakarta, businessDateKeyJakarta } from '../../common/jakarta-date';
+import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -39,13 +40,47 @@ function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
+/// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama
+/// (sama pola dgn StockReceiptsService.nomorBerikutnya).
+const KODE_UNIQUE_VIOLATION = 'P2002';
+const MAKS_PERCOBAAN_NOMOR = 5;
+
+/// Dipakai di catatan `activity_logs` (bukan response API — response tetap
+/// angka polos) supaya baris Riwayat Aktivitas gampang dibaca manusia.
+function formatRupiah(n: bigint | number): string {
+  return `Rp${n.toLocaleString('id-ID')}`;
+}
+
 @Injectable()
 export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly corrections: CorrectionsService,
     private readonly reconciliationCases: ReconciliationCasesService,
+    private readonly activityLog: ActivityLogService,
   ) {}
+
+  /// Nomor invoice sederhana: `OBL-000001` naik satu per Sale, diambil dari
+  /// nomor TERBESAR yang sudah ada — pola sama dengan
+  /// StockReceiptsService.nomorBerikutnya ("Tambah Stok Gudang").
+  private async nomorSaleBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.sale.findMany({
+      where: { saleNo: { startsWith: 'OBL-' } },
+      select: { saleNo: true },
+    });
+
+    const tertinggi = semua.reduce((maks, s) => {
+      const cocok = /^OBL-(\d{6})$/.exec(s.saleNo);
+      return cocok ? Math.max(maks, Number(cocok[1])) : maks;
+    }, 0);
+
+    if (tertinggi >= 999999) {
+      throw new DomainError('SALE_NO_EXHAUSTED', 'Nomor invoice Penjualan sudah mencapai batas 999999.');
+    }
+
+    return `OBL-${String(tertinggi + 1).padStart(6, '0')}`;
+  }
 
   /// Mirrors create_paid_sale from
   /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §3 and enforces
@@ -90,13 +125,19 @@ export class SalesService {
     }
 
     const saleId = randomUUID();
-    const saleNo = generateDocNo('OBL');
     const paidAt = new Date();
     const businessDate = new Date(
       Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth(), paidAt.getUTCDate()),
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    // Retry loop membungkus TRANSAKSI (bukan cuma pembuatan nomornya) —
+    // kalau constraint unik saleNo bentrok (dua Kasir submit nyaris
+    // bersamaan), seluruh percobaan (termasuk potongan stok) di-rollback lalu
+    // diulang dengan nomor baru, sama pola dgn StockReceiptsService.create.
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+      const saleNo = await this.nomorSaleBerikutnya(tx);
       let subtotal = 0n;
       const saleItemsData: Prisma.SaleItemCreateManyInput[] = [];
       const movementsData: Prisma.StockMovementCreateManyInput[] = [];
@@ -182,7 +223,22 @@ export class SalesService {
         data: plan.rows.map((r) => ({ saleId, method: r.method, amount: r.amount, paidAt })),
       });
       await tx.stockMovement.createMany({ data: movementsData });
-    });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: saleId,
+        action: 'PAID',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `${saleNo} dibayar langsung — ${formatRupiah(total)}.`,
+      });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toSaleResponse(saleId);
   }
@@ -264,7 +320,6 @@ export class SalesService {
     }
 
     const saleId = randomUUID();
-    const saleNo = generateDocNo('OBL');
 
     let subtotal = 0n;
     const saleItemsData: Prisma.SaleItemCreateManyInput[] = [];
@@ -285,24 +340,43 @@ export class SalesService {
 
     const { discount, total } = this.applyDiscount(subtotal, dto.discount);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.sale.create({
-        data: {
-          id: saleId,
-          saleNo,
-          idempotencyKey: dto.idempotencyKey,
-          boothId: shift.boothId,
-          shiftSessionId: shift.id,
-          staffId: user.sub,
-          status: SaleStatus.PENDING,
-          subtotal,
-          discount,
-          total,
-          paymentMethod: null,
-        },
-      });
-      await tx.saleItem.createMany({ data: saleItemsData });
-    });
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const saleNo = await this.nomorSaleBerikutnya(tx);
+
+          await tx.sale.create({
+            data: {
+              id: saleId,
+              saleNo,
+              idempotencyKey: dto.idempotencyKey,
+              boothId: shift.boothId,
+              shiftSessionId: shift.id,
+              staffId: user.sub,
+              status: SaleStatus.PENDING,
+              subtotal,
+              discount,
+              total,
+              paymentMethod: null,
+            },
+          });
+          await tx.saleItem.createMany({ data: saleItemsData });
+
+          await this.activityLog.record(tx, {
+            entityType: 'sale',
+            entityId: saleId,
+            action: 'CREATE',
+            actorId: user.sub,
+            actorName: user.username,
+            note: `${saleNo} disimpan sebagai draft — ${formatRupiah(total)}, belum dibayar.`,
+          });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toDraftResponse(saleId);
   }
@@ -387,6 +461,15 @@ export class SalesService {
       await tx.payment.createMany({
         data: plan.rows.map((r) => ({ saleId: sale.id, method: r.method, amount: r.amount, paidAt })),
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        action: 'PAID',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `${sale.saleNo} dibayar (${plan.saleMethod}) — ${formatRupiah(sale.total)}.`,
+      });
     });
 
     return this.toSaleResponse(sale.id);
@@ -420,27 +503,83 @@ export class SalesService {
   /// lama yang sudah direvisi disembunyikan dari list ini (tetap terlihat
   /// di Riwayat & Koreksi Data), sesuai "effective sale versions"
   /// (docs/24-data-consistency-correction-reversal.md §14).
-  async findAll(user?: JwtPayload) {
-    const sales = await this.prisma.sale.findMany({
-      where: {
-        status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] },
-        ...(user?.role === UserRole.BOOTH_STAFF && user.boothId
-          ? { boothId: user.boothId }
-          : {}),
-      },
-      include: { booth: true, staff: true, items: true },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+  /// List Transaksi Booth - Kasir, dipaginasi di server (bukan ambil semua
+  /// lalu difilter di klien — lihat percakapan soal performa saat data
+  /// banyak). Sale yang sudah direvisi TIDAK pernah statusnya berubah jadi
+  /// selain PAID/VOIDED (beda dari StockReceipt yang punya status REVISED
+  /// eksplisit) — satu-satunya penanda "versi lama yang sudah digantikan"
+  /// adalah `revisionOfId` di versi BARUNYA. Makanya versi efektifnya
+  /// dihitung dengan cara "buang semua id yang muncul sebagai revisionOfId
+  /// sale lain", BUKAN `effectiveByGroup()` (yang cuma benar kalau seluruh
+  /// riwayat satu grup kebetulan ada di satu halaman/window yang sama —
+  /// tidak valid lagi begitu query-nya dipaginasi).
+  async findAll(
+    user?: JwtPayload,
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: SaleStatus;
+      boothId?: string;
+      staffId?: string;
+      dari?: Date;
+      sampai?: Date;
+    },
+  ) {
+    const page = Math.max(1, params?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
 
-    return effectiveByGroup(sales)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 200)
-      .map((s) => ({
+    const revisedAway = await this.prisma.sale.findMany({
+      where: { revisionOfId: { not: null } },
+      select: { revisionOfId: true },
+    });
+    const revisedAwayIds = revisedAway.map((r) => r.revisionOfId).filter((id): id is string => !!id);
+
+    const where: Prisma.SaleWhereInput = {
+      status: params?.status ?? { in: [SaleStatus.PAID, SaleStatus.VOIDED] },
+      ...(revisedAwayIds.length ? { id: { notIn: revisedAwayIds } } : {}),
+      ...(user?.role === UserRole.BOOTH_STAFF && user.boothId
+        ? { boothId: user.boothId }
+        : params?.boothId
+          ? { boothId: params.boothId }
+          : {}),
+      ...(params?.staffId ? { staffId: params.staffId } : {}),
+      ...(params?.dari || params?.sampai
+        ? {
+            createdAt: {
+              ...(params?.dari ? { gte: params.dari } : {}),
+              ...(params?.sampai ? { lte: params.sampai } : {}),
+            },
+          }
+        : {}),
+      ...(params?.search
+        ? {
+            OR: [
+              { saleNo: { contains: params.search, mode: 'insensitive' } },
+              { staff: { fullName: { contains: params.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, sales] = await Promise.all([
+      this.prisma.sale.count({ where }),
+      this.prisma.sale.findMany({
+        where,
+        include: { booth: true, staff: true, items: true, shiftSession: { include: { shiftTemplate: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      rows: sales.map((s) => ({
         id: s.id,
         saleNo: s.saleNo,
         boothName: s.booth.name,
         staffName: s.staff.fullName,
+        shiftLabel: s.shiftSession.shiftTemplate.name,
         status: s.status,
         total: Number(s.total),
         cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
@@ -453,7 +592,11 @@ export class SalesService {
         createdAt: s.createdAt,
         versionNo: s.versionNo,
         isRevised: s.versionNo > 1,
-      }));
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   /// Tab "Riwayat Penjualan" di halaman Booth — daftar transaksi sebulan
@@ -539,26 +682,60 @@ export class SalesService {
   async findOne(id: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
-      include: { booth: true, staff: true, items: true, payments: true },
+      include: {
+        booth: true,
+        staff: true,
+        items: true,
+        payments: true,
+        shiftSession: { include: { shiftTemplate: true } },
+      },
     });
     if (!sale) {
       throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
     }
-    const activePayment = sale.payments.find((p) => p.status === PaymentStatus.POSTED) ?? null;
+    const postedPayments = sale.payments.filter((p) => p.status === PaymentStatus.POSTED);
+    // >1 baris posted = Split — activePayment tunggal cuma dipakai kalau
+    // pas satu (jangan salah tampil CASH padahal sale-nya Split, lihat
+    // percakapan yang menemukan ini).
+    const paymentMethodDisplay: PaymentMethod =
+      postedPayments.length > 1 ? PaymentMethod.SPLIT : postedPayments[0]?.method ?? sale.paymentMethod ?? PaymentMethod.CASH;
+    const revisionOf = sale.revisionOfId
+      ? await this.prisma.sale.findUnique({ where: { id: sale.revisionOfId }, select: { saleNo: true } })
+      : null;
     return {
       id: sale.id,
       saleNo: sale.saleNo,
+      boothId: sale.boothId,
       boothName: sale.booth.name,
       staffName: sale.staff.fullName,
+      shiftLabel: sale.shiftSession.shiftTemplate.name,
       status: sale.status,
+      subtotal: Number(sale.subtotal),
+      discount: Number(sale.discount),
       total: Number(sale.total),
-      paymentMethod: activePayment?.method ?? sale.paymentMethod,
+      paymentMethod: paymentMethodDisplay,
       versionNo: sale.versionNo,
+      revisionOfSaleNo: revisionOf?.saleNo ?? null,
+      paidAt: sale.paidAt,
+      voidedAt: sale.voidedAt,
+      voidReason: sale.voidReason,
+      createdAt: sale.createdAt,
+      latitude: sale.latitude === null ? null : Number(sale.latitude),
+      longitude: sale.longitude === null ? null : Number(sale.longitude),
+      locationCapturedAt: sale.locationCapturedAt,
+      payments: sale.payments.map((p) => ({
+        id: p.id,
+        method: p.method,
+        amount: Number(p.amount),
+        status: p.status,
+        paidAt: p.paidAt,
+      })),
       items: sale.items.map((i) => ({
         productId: i.productId,
         productName: i.productNameSnapshot,
         unitPrice: Number(i.unitPrice),
         qty: i.qty,
+        lineTotal: Number(i.lineTotal),
       })),
     };
   }
@@ -633,6 +810,15 @@ export class SalesService {
         impactSnapshot: impact,
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        action: 'VOID',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `${sale.saleNo} dibatalkan — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
       });
     });
 
@@ -772,6 +958,15 @@ export class SalesService {
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: newSaleId,
+        action: 'POST_REVISION',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `Revisi dari ${sale.saleNo} — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
+      });
       });
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
@@ -832,6 +1027,15 @@ export class SalesService {
         impactSnapshot: { from: activePayment?.method ?? sale.paymentMethod, to: dto.method },
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        action: 'PAYMENT_METHOD_CHANGED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `${sale.saleNo}: metode bayar ${activePayment?.method ?? sale.paymentMethod} → ${dto.method}.`,
       });
     });
 
@@ -943,6 +1147,15 @@ export class SalesService {
           idempotencyKey: dto.idempotencyKey,
           items: { createMany: { data: refundItemsData } },
         },
+      });
+
+      await this.activityLog.record(tx, {
+        entityType: 'sale',
+        entityId: sale.id,
+        action: 'REFUND',
+        actorId: user.sub,
+        actorName: user.username,
+        note: `Refund ${formatRupiah(amount)} (${dto.condition === 'REFUND_WITH_STOCK_RETURN' ? 'stok kembali' : 'uang saja'}) — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
       });
     });
 

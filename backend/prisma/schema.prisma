@@ -384,6 +384,7 @@ model StockReceipt {
   @@index([status])
   @@index([receiptDate])
   @@index([transactionGroupId])
+  @@index([createdAt])
   @@map("stock_receipts")
 }
 
@@ -682,6 +683,7 @@ model StockDistribution {
 
   @@index([boothId, status])
   @@index([status])
+  @@index([createdAt])
   @@map("stock_distributions")
 }
 
@@ -720,6 +722,7 @@ model RestockRequest {
 
   @@index([boothId, status])
   @@index([status])
+  @@index([createdAt])
   @@map("restock_requests")
 }
 

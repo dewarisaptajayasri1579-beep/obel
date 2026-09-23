@@ -127,20 +127,20 @@ function HomeContent() {
 
   const stokMasukBaru = notifications.filter((n) => n.id.startsWith("distribution:")).length;
 
-  // Badge "Kritis"/"Menipis" di kartu Stok — status disisipkan backend di
-  // `id` (`lowstock:<status>:...`, lihat NotificationsService.getForBooth),
-  // ambil yang PALING parah kalau ada beberapa produk sekaligus. Sama feed
-  // WebSocket dgn lonceng notifikasi di atas, jadi otomatis realtime juga
-  // tanpa koneksi socket tambahan.
-  const statusStokTerparah = (() => {
-    const statusList = notifications
-      .filter((n) => n.id.startsWith("lowstock:"))
-      .map((n) => n.id.split(":")[1]);
-    if (statusList.includes("Habis")) return "Habis";
-    if (statusList.includes("Kritis")) return "Kritis";
-    if (statusList.includes("Menipis")) return "Menipis";
-    return null;
+  // Badge di kartu Stok — dihitung PER STATUS (berapa varian Habis, berapa
+  // Kritis, berapa Menipis), bukan cuma label status terparah. Status
+  // disisipkan backend di `id` (`lowstock:<status>:<boothId>:<productId>`,
+  // lihat NotificationsService.getForBooth). Sama feed WebSocket dgn
+  // lonceng notifikasi di atas, jadi otomatis realtime tanpa koneksi
+  // socket tambahan.
+  const jumlahStokBermasalah = (() => {
+    const habis = notifications.filter((n) => n.id.startsWith("lowstock:Habis:")).length;
+    const kritis = notifications.filter((n) => n.id.startsWith("lowstock:Kritis:")).length;
+    const menipis = notifications.filter((n) => n.id.startsWith("lowstock:Menipis:")).length;
+    return { habis, kritis, menipis };
   })();
+  const adaStokBermasalah = jumlahStokBermasalah.habis + jumlahStokBermasalah.kritis + jumlahStokBermasalah.menipis > 0;
+  const statusStokTerparah = jumlahStokBermasalah.habis > 0 ? "Habis" : jumlahStokBermasalah.kritis > 0 ? "Kritis" : "Menipis";
   const STOK_BADGE_COLOR: Record<string, string> = {
     Habis: OBBEL.accentRed,
     Kritis: OBBEL.accentOrange,
@@ -247,12 +247,14 @@ function HomeContent() {
                     BARU · {stokMasukBaru}
                   </span>
                 )}
-                {item.href === "/petugas/stok" && statusStokTerparah && (
+                {item.href === "/petugas/stok" && adaStokBermasalah && (
                   <span
                     className="absolute top-3 left-3.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white tracking-wide z-10"
                     style={{ backgroundColor: STOK_BADGE_COLOR[statusStokTerparah] }}
                   >
                     {statusStokTerparah}
+                    {(jumlahStokBermasalah.habis || jumlahStokBermasalah.kritis || jumlahStokBermasalah.menipis) > 0 &&
+                      ` · ${{ Habis: jumlahStokBermasalah.habis, Kritis: jumlahStokBermasalah.kritis, Menipis: jumlahStokBermasalah.menipis }[statusStokTerparah]}`}
                   </span>
                 )}
                 <div className="w-7 h-7 rounded-full bg-white/70 flex items-center justify-center absolute top-3.5 right-3.5">
@@ -263,7 +265,18 @@ function HomeContent() {
                 </div>
                 <div className="relative">
                   <p className="font-bold text-sm text-slate-900">{item.label}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">{item.desc}</p>
+                  {item.href === "/petugas/stok" && adaStokBermasalah ? (
+                    <p className="text-[11px] mt-0.5 font-semibold" style={{ color: OBBEL.accentRed }}>
+                      {[
+                        jumlahStokBermasalah.habis > 0 ? `${jumlahStokBermasalah.habis} habis` : null,
+                        jumlahStokBermasalah.menipis > 0 ? `${jumlahStokBermasalah.menipis} menipis` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 mt-0.5 font-medium">{item.desc}</p>
+                  )}
                 </div>
               </Link>
             );

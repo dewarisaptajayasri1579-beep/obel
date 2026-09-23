@@ -1,10 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { DistributionStatus, RestockRequestStatus, ReturnStatus, SaleStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { startOfDayJakarta, startOfTodayJakarta } from '../../common/jakarta-date';
+import { businessDateKeyJakarta, rangeJakarta, startOfDayJakarta, startOfTodayJakarta } from '../../common/jakarta-date';
 import { resolveStockStatus, StockStatus } from '../../common/stock-status';
 import { effectiveByGroup } from '../../common/effective-version';
+import { dampakMutasi } from '../stock-movements/arah.util';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
+
+/// Parameter "Petugas Diam" (getStockNeglectReport) — belum ada aturan resmi
+/// di 08-business-rules.md, jadi dua angka ini SENGAJA didokumentasikan di
+/// sini sebagai satu-satunya sumber kebenarannya, gampang ditemukan &
+/// disesuaikan kalau Admin minta angka lain:
+/// - Insiden Menipis/Kritis/Habis baru dianggap "signifikan" (bukan blip
+///   sesaat yang otomatis pulih) kalau bertahan >= angka ini.
+const NEGLECT_MIN_DURATION_HOURS = 4;
+/// - Request dianggap "respons" terhadap satu insiden kalau diajukan kapan
+///   saja SELAMA insiden berlangsung, ATAU sampai angka ini SEBELUM insiden
+///   mulai (Petugas yang sudah minta duluan sebelum benar-benar menipis
+///   tidak boleh ikut ditandai "diam").
+const NEGLECT_LOOKBACK_HOURS = 12;
 
 const TOP_STOCK_PRODUCTS_LIMIT = 5;
 
@@ -190,5 +204,274 @@ export class DashboardService {
         })),
       };
     });
+  }
+
+  /// Panel filter periode (Hari Ini/Minggu Ini/Bulan Ini/Custom) di Dashboard
+  /// — 3 tabel: penjualan per Booth, produk terlaris, dan penjualan per
+  /// Petugas (per shift). `start`/`end` "YYYY-MM-DD" Asia/Jakarta, inklusif.
+  async getSalesReport(start: string, end: string) {
+    const { awal, akhir } = rangeJakarta(start, end);
+
+    const salesRaw = await this.prisma.sale.findMany({
+      where: { status: SaleStatus.PAID, paidAt: { gte: awal, lt: akhir } },
+      include: {
+        items: true,
+        refunds: true,
+        booth: true,
+        staff: true,
+        shiftSession: { include: { shiftTemplate: true } },
+      },
+    });
+
+    // TX-14 & DC-003: hanya versi efektif yang dihitung, refund menurunkan
+    // net omzet tapi tidak menurunkan cup terjual (sama seperti
+    // getAdminDashboard/getBoothAktif di atas).
+    const sales = effectiveByGroup(salesRaw);
+
+    const byProductMap = new Map<string, { productId: string; productName: string; cupSold: number }>();
+    const byBoothMap = new Map<string, { boothId: string; boothName: string; cupSold: number; omzet: number }>();
+    const byStaffShiftMap = new Map<
+      string,
+      { staffId: string; staffName: string; boothId: string; boothName: string; tanggal: string; shift: string; cupSold: number; omzet: number }
+    >();
+
+    for (const sale of sales) {
+      const netOmzet = Number(sale.total) - sale.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
+      const cupSold = sale.items.reduce((sum, i) => sum + i.qty, 0);
+
+      for (const item of sale.items) {
+        const cur = byProductMap.get(item.productId) ?? {
+          productId: item.productId,
+          productName: item.productNameSnapshot,
+          cupSold: 0,
+        };
+        cur.cupSold += item.qty;
+        byProductMap.set(item.productId, cur);
+      }
+
+      const booth = byBoothMap.get(sale.boothId) ?? {
+        boothId: sale.boothId,
+        boothName: sale.booth.name,
+        cupSold: 0,
+        omzet: 0,
+      };
+      booth.cupSold += cupSold;
+      booth.omzet += netOmzet;
+      byBoothMap.set(sale.boothId, booth);
+
+      const tanggal = businessDateKeyJakarta(sale.paidAt!);
+      const shiftName = sale.shiftSession.shiftTemplate.name;
+      const staffShiftKey = `${sale.staffId}__${sale.boothId}__${tanggal}__${shiftName}`;
+      const staffShift = byStaffShiftMap.get(staffShiftKey) ?? {
+        staffId: sale.staffId,
+        staffName: sale.staff.fullName,
+        boothId: sale.boothId,
+        boothName: sale.booth.name,
+        tanggal,
+        shift: shiftName,
+        cupSold: 0,
+        omzet: 0,
+      };
+      staffShift.cupSold += cupSold;
+      staffShift.omzet += netOmzet;
+      byStaffShiftMap.set(staffShiftKey, staffShift);
+    }
+
+    return {
+      byProduct: [...byProductMap.values()].sort((a, b) => b.cupSold - a.cupSold),
+      byBooth: [...byBoothMap.values()].sort((a, b) => b.omzet - a.omzet),
+      byStaffShift: [...byStaffShiftMap.values()].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.omzet - a.omzet),
+    };
+  }
+
+  /// "Petugas mana yang sering kehabisan/menipis tapi tidak minta Restock" —
+  /// menyusuri ulang ledger `StockMovement` per Booth+Produk untuk menemukan
+  /// insiden Menipis/Kritis/Habis, lalu tandai insiden yang TIDAK direspons
+  /// RestockRequest selama insiden itu berlangsung (parameter lihat konstanta
+  /// NEGLECT_* di atas). Diatribusikan ke Petugas yang shift-nya sedang
+  /// terbuka saat insiden mulai.
+  async getStockNeglectReport(start: string, end: string) {
+    const { awal, akhir } = rangeJakarta(start, end);
+    const graceMs = NEGLECT_MIN_DURATION_HOURS * 60 * 60 * 1000;
+    const lookbackMs = NEGLECT_LOOKBACK_HOURS * 60 * 60 * 1000;
+
+    const [boothStocks, thresholds, products, booths, movements, shiftSessions, restockRequests] = await Promise.all([
+      this.prisma.boothStock.findMany(),
+      this.prisma.boothStockThreshold.findMany(),
+      this.prisma.product.findMany(),
+      this.prisma.booth.findMany(),
+      this.prisma.stockMovement.findMany({
+        where: {
+          occurredAt: { lt: akhir },
+          OR: [{ fromBoothId: { not: null } }, { toBoothId: { not: null } }],
+        },
+        orderBy: { occurredAt: 'asc' },
+      }),
+      this.prisma.shiftSession.findMany({
+        where: { openedAt: { not: null, lt: akhir } },
+        include: { staff: true },
+        orderBy: { openedAt: 'asc' },
+      }),
+      this.prisma.restockRequest.findMany({
+        where: { createdAt: { lt: akhir } },
+        include: { items: true },
+      }),
+    ]);
+
+    const productById = new Map(products.map((p) => [p.id, p]));
+    const boothById = new Map(booths.map((b) => [b.id, b]));
+    const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
+
+    // Request diajukan kapan saja per (booth,produk) — dipakai cek "ada
+    // respons?" per insiden tanpa query ulang per insiden.
+    const requestTimesByPair = new Map<string, Date[]>();
+    for (const req of restockRequests) {
+      for (const item of req.items) {
+        const key = `${req.boothId}:${item.productId}`;
+        const arr = requestTimesByPair.get(key) ?? [];
+        arr.push(req.createdAt);
+        requestTimesByPair.set(key, arr);
+      }
+    }
+
+    const shiftsByBooth = new Map<string, typeof shiftSessions>();
+    for (const s of shiftSessions) {
+      const arr = shiftsByBooth.get(s.boothId) ?? [];
+      arr.push(s);
+      shiftsByBooth.set(s.boothId, arr);
+    }
+    function shiftPadaWaktu(boothId: string, t: Date) {
+      const arr = shiftsByBooth.get(boothId) ?? [];
+      // Sudah terurut openedAt asc — ambil kandidat terakhir yang openedAt<=t
+      // dan belum ditutup (atau ditutup setelah t).
+      let found: (typeof arr)[number] | null = null;
+      for (const s of arr) {
+        if (!s.openedAt || s.openedAt.getTime() > t.getTime()) continue;
+        if (s.closedAt && s.closedAt.getTime() < t.getTime()) continue;
+        found = s;
+      }
+      return found;
+    }
+
+    interface PairState {
+      boothId: string;
+      productId: string;
+      minimumQty: number;
+      criticalQty: number;
+      balance: number;
+      status: StockStatus;
+      incidentStart: Date | null;
+    }
+
+    const pairs = new Map<string, PairState>();
+    for (const bs of boothStocks) {
+      const key = `${bs.boothId}:${bs.productId}`;
+      const threshold = thresholdByKey.get(key);
+      const product = productById.get(bs.productId);
+      if (!product) continue;
+      pairs.set(key, {
+        boothId: bs.boothId,
+        productId: bs.productId,
+        minimumQty: threshold?.minimumQty ?? product.minimumQty,
+        criticalQty: threshold?.criticalQty ?? product.criticalQty,
+        balance: 0,
+        status: 'Aman',
+        incidentStart: null,
+      });
+    }
+
+    interface Insiden {
+      boothId: string;
+      productId: string;
+      start: Date;
+      end: Date;
+      ongoing: boolean;
+    }
+    const insidenList: Insiden[] = [];
+
+    for (const m of movements) {
+      const kandidat = [m.fromBoothId, m.toBoothId].filter((b): b is string => !!b);
+      for (const boothId of kandidat) {
+        const key = `${boothId}:${m.productId}`;
+        const state = pairs.get(key);
+        if (!state) continue;
+        const { delta } = dampakMutasi(m, boothId);
+        if (delta === 0) continue;
+
+        state.balance += delta;
+        const statusBaru = resolveStockStatus(state.balance, state.minimumQty, state.criticalQty);
+
+        if (m.occurredAt.getTime() >= awal.getTime()) {
+          if (state.status === 'Aman' && statusBaru !== 'Aman' && !state.incidentStart) {
+            state.incidentStart = m.occurredAt;
+          } else if (state.status !== 'Aman' && statusBaru === 'Aman' && state.incidentStart) {
+            insidenList.push({ boothId, productId: m.productId, start: state.incidentStart, end: m.occurredAt, ongoing: false });
+            state.incidentStart = null;
+          }
+        }
+        state.status = statusBaru;
+      }
+    }
+    // Insiden yang masih berlangsung sampai akhir periode filter.
+    for (const state of pairs.values()) {
+      if (state.incidentStart) {
+        insidenList.push({ boothId: state.boothId, productId: state.productId, start: state.incidentStart, end: akhir, ongoing: true });
+      }
+    }
+
+    interface BarisDiam {
+      staffId: string;
+      staffName: string;
+      boothId: string;
+      boothName: string;
+      jumlahInsiden: number;
+      totalJamDiam: number;
+      produk: Map<string, string>;
+    }
+    const byStaffMap = new Map<string, BarisDiam>();
+
+    for (const insiden of insidenList) {
+      const durasiMs = insiden.end.getTime() - insiden.start.getTime();
+      if (durasiMs < graceMs) continue; // blip sesaat, bukan "diam"
+
+      const key = `${insiden.boothId}:${insiden.productId}`;
+      const requestTimes = requestTimesByPair.get(key) ?? [];
+      const direspons = requestTimes.some(
+        (t) => t.getTime() >= insiden.start.getTime() - lookbackMs && t.getTime() <= insiden.end.getTime(),
+      );
+      if (direspons) continue;
+
+      const shift = shiftPadaWaktu(insiden.boothId, insiden.start);
+      if (!shift) continue; // tidak ada Petugas yang bisa dikaitkan (tidak ada shift terbuka)
+
+      const booth = boothById.get(insiden.boothId);
+      const product = productById.get(insiden.productId);
+      const staffKey = `${shift.staffId}:${insiden.boothId}`;
+      const row = byStaffMap.get(staffKey) ?? {
+        staffId: shift.staffId,
+        staffName: shift.staff.fullName,
+        boothId: insiden.boothId,
+        boothName: booth?.name ?? '-',
+        jumlahInsiden: 0,
+        totalJamDiam: 0,
+        produk: new Map<string, string>(),
+      };
+      row.jumlahInsiden += 1;
+      row.totalJamDiam += durasiMs / (60 * 60 * 1000);
+      if (product) row.produk.set(product.id, product.name);
+      byStaffMap.set(staffKey, row);
+    }
+
+    return [...byStaffMap.values()]
+      .map((r) => ({
+        staffId: r.staffId,
+        staffName: r.staffName,
+        boothId: r.boothId,
+        boothName: r.boothName,
+        jumlahInsiden: r.jumlahInsiden,
+        totalJamDiam: Math.round(r.totalJamDiam * 10) / 10,
+        produk: [...r.produk.values()],
+      }))
+      .sort((a, b) => b.jumlahInsiden - a.jumlahInsiden || b.totalJamDiam - a.totalJamDiam);
   }
 }

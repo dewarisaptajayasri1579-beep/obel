@@ -50,7 +50,7 @@ export class StockHandoverReportService {
   ) {}
 
   private async ambilBaris(filter: FilterLaporanSerahTerima) {
-    const rows = await this.stockHandovers.findAll();
+    const rows = await this.stockHandovers.findAllForReport();
     const q = filter.q?.toLowerCase();
     return rows.filter((r) => {
       const cocokTeks = !q || r.docNo.toLowerCase().includes(q) || (r.staffName ?? '').toLowerCase().includes(q);

@@ -88,9 +88,15 @@ export const MAIN_NAV: NavGroup[] = [
             icon: Undo2,
             bottomBar: false,
           },
+        ],
+      },
+      {
+        label: "Transaksi Booth",
+        icon: Store,
+        children: [
           {
-            label: "Penjualan",
-            href: "/penjualan",
+            label: "Kasir",
+            href: "/transaksi-kasir",
             icon: Receipt,
             bottomBar: true,
           },

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { MapContainer, Marker, TileLayer, Tooltip } from "react-leaflet";
+import { useEffect, useMemo } from "react";
+import { MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { BoothAktifCard } from "@/lib/api-client";
 import { kategoriBooth, type KategoriKartu } from "./kategori";
@@ -41,6 +41,25 @@ function buatIkon(kategori: KategoriKartu): L.DivIcon {
 
 const PUSAT_FALLBACK: [number, number] = [-7.5361, 110.6021]; // Boyolali
 
+/// Zoom tetap ({zoom=15}) bikin titik yang jauh dari rata-rata koordinat
+/// terpotong keluar layar. Komponen ini menyesuaikan `fitBounds` tiap kali
+/// daftar titik berubah, supaya SEMUA marker selalu masuk area yang
+/// terlihat — baik saat baru dibuka maupun saat datanya live-update.
+function FitBounds({ points }: { points: [number, number][] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], 16);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 16 });
+  }, [points, map]);
+
+  return null;
+}
+
 export function BoothMapView({
   booths,
   selectedId,
@@ -69,6 +88,7 @@ export function BoothMapView({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <FitBounds points={dengankoordinat.map((b): [number, number] => [b.latitude, b.longitude])} />
         {dengankoordinat.map((booth) => (
           <Marker
             key={booth.boothId}

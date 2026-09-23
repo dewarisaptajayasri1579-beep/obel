@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { SaleStatus, UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,16 +13,39 @@ import { ReviseSaleDto, RevisePaymentDto } from './dto/revise-sale.dto';
 import { VoidSaleDto } from './dto/void-sale.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { SalesService } from './sales.service';
+import { ActivityLogService } from '../../common/activity-log.service';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(
+    private readonly salesService: SalesService,
+    private readonly activityLog: ActivityLogService,
+  ) {}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
-  findAll(@CurrentUser() user: JwtPayload) {
-    return this.salesService.findAll(user);
+  findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: SaleStatus,
+    @Query('boothId') boothId?: string,
+    @Query('staffId') staffId?: string,
+    @Query('dari') dari?: string,
+    @Query('sampai') sampai?: string,
+  ) {
+    return this.salesService.findAll(user, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search || undefined,
+      status: status || undefined,
+      boothId: boothId || undefined,
+      staffId: staffId || undefined,
+      dari: dari ? new Date(dari) : undefined,
+      sampai: sampai ? new Date(sampai) : undefined,
+    });
   }
 
   @Post()
@@ -82,6 +105,12 @@ export class SalesController {
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);
+  }
+
+  @Get(':id/activity-log')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  activityLogFor(@Param('id') id: string) {
+    return this.activityLog.findForEntity('sale', id);
   }
 
   @Post(':id/preview-void')

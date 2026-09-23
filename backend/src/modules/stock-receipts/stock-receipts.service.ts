@@ -67,11 +67,39 @@ export class StockReceiptsService {
     };
   }
 
-  findAll() {
-    return this.prisma.stockReceipt.findMany({
-      include: this.include(),
-      orderBy: { createdAt: 'desc' },
-    });
+  /// Dipaginasi di server (dulu ambil SEMUA dokumen tanpa batas sama sekali
+  /// — lihat percakapan soal performa saat data banyak). Beda dari Sale:
+  /// StockReceipt punya status REVISED eksplisit, jadi tidak perlu logika
+  /// "buang versi lama" terpisah seperti SalesService.findAll — filter
+  /// status biasa sudah cukup kalau memang mau menyembunyikannya.
+  async findAll(params?: { page?: number; limit?: number; search?: string; status?: StockReceiptStatus }) {
+    const page = Math.max(1, params?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
+
+    const where: Prisma.StockReceiptWhereInput = {
+      ...(params?.status ? { status: params.status } : {}),
+      ...(params?.search
+        ? {
+            OR: [
+              { receiptNo: { contains: params.search, mode: 'insensitive' } },
+              { note: { contains: params.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, rows] = await Promise.all([
+      this.prisma.stockReceipt.count({ where }),
+      this.prisma.stockReceipt.findMany({
+        where,
+        include: this.include(),
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return { rows, total, page, limit };
   }
 
   async findOne(id: string) {

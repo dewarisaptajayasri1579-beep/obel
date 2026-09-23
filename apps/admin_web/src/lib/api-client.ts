@@ -18,6 +18,25 @@ export class ApiError extends Error {
 const ADMIN_SESSION_STORAGE_KEY = "obbel-admin-session"
 const PETUGAS_SESSION_STORAGE_KEY = "obbel-petugas-session"
 
+/// Bentuk response daftar yang dipaginasi di server — dipakai Transaksi
+/// Kasir, Tambah Stok Gudang, Serah Terima Stok (lihat percakapan soal
+/// performa: ketiganya dulu ambil SEMUA baris sekaligus tanpa batas).
+export interface Paginated<T> {
+  rows: T[]
+  total: number
+  page: number
+  limit: number
+}
+
+function toQueryString(params: Record<string, string | number | undefined>): string {
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") qs.set(key, String(value))
+  }
+  const s = qs.toString()
+  return s ? `?${s}` : ""
+}
+
 /// Admin dan Web Petugas Booth (/petugas/*) SENGAJA punya slot sesi
 /// localStorage terpisah (lihat auth-context.tsx `areaKeyFor`) — supaya dua
 /// role bisa login bersamaan di browser yang sama tanpa saling menimpa.
@@ -475,6 +494,51 @@ export interface AdminDashboard {
   reconciliationCasesOpen: number
 }
 
+/// Panel filter periode Dashboard (Hari Ini/Minggu Ini/Bulan Ini/Custom) —
+/// 3 tabel: penjualan per Booth, produk terlaris, penjualan per Petugas.
+export interface SalesReportByProduct {
+  productId: string
+  productName: string
+  cupSold: number
+}
+
+export interface SalesReportByBooth {
+  boothId: string
+  boothName: string
+  cupSold: number
+  omzet: number
+}
+
+export interface SalesReportByStaffShift {
+  staffId: string
+  staffName: string
+  boothId: string
+  boothName: string
+  tanggal: string
+  shift: string
+  cupSold: number
+  omzet: number
+}
+
+export interface SalesReport {
+  byProduct: SalesReportByProduct[]
+  byBooth: SalesReportByBooth[]
+  byStaffShift: SalesReportByStaffShift[]
+}
+
+/// "Petugas mana yang sering kehabisan/menipis tapi tidak minta Restock" —
+/// lihat dashboard.service.ts getStockNeglectReport untuk definisi parameter
+/// (insiden signifikan >= 4 jam, tanpa RestockRequest selama insiden).
+export interface StockNeglectRow {
+  staffId: string
+  staffName: string
+  boothId: string
+  boothName: string
+  jumlahInsiden: number
+  totalJamDiam: number
+  produk: string[]
+}
+
 export interface BoothAktifCard {
   boothId: string
   boothCode: string
@@ -506,15 +570,27 @@ export interface BoothStockRow {
   status: "Aman" | "Menipis" | "Kritis" | "Habis"
 }
 
+export type SalePaymentMethod = "CASH" | "QRIS" | "SPLIT"
+
+export interface FilterLaporanKasir {
+  q?: string
+  status?: "PENDING" | "PAID" | "VOIDED"
+  boothName?: string
+  staffName?: string
+  periodeAwal?: string
+}
+
 export interface SaleListItem {
   id: string
   saleNo: string
   boothName: string
   staffName: string
+  shiftLabel: string
   status: "PENDING" | "PAID" | "VOIDED"
   total: number
   cupCount: number
-  paymentMethod: "CASH" | "QRIS"
+  paymentMethod: SalePaymentMethod
+  items: { productName: string; qty: number }[]
   paidAt: string | null
   createdAt: string
   versionNo?: number
@@ -526,17 +602,39 @@ export interface SaleDetailItem {
   productName: string
   unitPrice: number
   qty: number
+  lineTotal: number
+}
+
+export interface SalePaymentRow {
+  id: string
+  method: SalePaymentMethod
+  amount: number
+  status: "POSTED" | "REVERSED" | "SUPERSEDED"
+  paidAt: string
 }
 
 export interface SaleDetail {
   id: string
   saleNo: string
+  boothId: string
   boothName: string
   staffName: string
+  shiftLabel: string
   status: "PENDING" | "PAID" | "VOIDED"
+  subtotal: number
+  discount: number
   total: number
-  paymentMethod: "CASH" | "QRIS"
+  paymentMethod: SalePaymentMethod
   versionNo: number
+  revisionOfSaleNo: string | null
+  paidAt: string | null
+  voidedAt: string | null
+  voidReason: string | null
+  createdAt: string
+  latitude: number | null
+  longitude: number | null
+  locationCapturedAt: string | null
+  payments: SalePaymentRow[]
   items: SaleDetailItem[]
 }
 
@@ -1026,7 +1124,13 @@ export const api = {
   rejectRestockRequest: (id: string, reason: string) =>
     request<RestockRequest>(`/restock-requests/${id}/reject`, { method: "POST", body: { reason } }),
 
-  getStockHandovers: () => request<StockHandover[]>("/stock-handovers"),
+  getStockHandovers: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: StockHandover["status"]
+    boothId?: string
+  }) => request<Paginated<StockHandover>>(`/stock-handovers${toQueryString(params ?? {})}`),
   getStockHandoverInTransit: () => request<StockHandoverInTransitItem[]>("/stock-handovers/in-transit"),
   getStockHandover: (id: string) => request<StockHandover>(`/stock-handovers/${id}`),
   getStockHandoverActivityLog: (id: string) => request<ActivityLogEntry[]>(`/stock-handovers/${id}/activity-log`),
@@ -1090,12 +1194,44 @@ export const api = {
   ) => request<StockReturn>(`/returns/${id}/correct-receipt`, { method: "POST", body: input }),
 
   getAdminDashboard: () => request<AdminDashboard>("/dashboard/admin"),
+  getSalesReport: (start: string, end: string) =>
+    request<SalesReport>(`/dashboard/sales-report?start=${start}&end=${end}`),
+  getStockNeglectReport: (start: string, end: string) =>
+    request<StockNeglectRow[]>(`/dashboard/stock-neglect-report?start=${start}&end=${end}`),
   getBoothAktif: () => request<BoothAktifCard[]>("/dashboard/booth-aktif"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   exportReportsCsv: () => fetchCsvBlob("/reports/export"),
   getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
-  getSales: () => request<SaleListItem[]>("/sales"),
+  getSales: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: SaleListItem["status"]
+    boothId?: string
+    staffId?: string
+    dari?: string
+    sampai?: string
+  }) => request<Paginated<SaleListItem>>(`/sales${toQueryString(params ?? {})}`),
   getSaleDetail: (id: string) => request<SaleDetail>(`/sales/${id}`),
+
+  getKasirReport: async (format: "pdf" | "excel", filter: FilterLaporanKasir = {}) => {
+    const params = new URLSearchParams()
+    if (filter.q) params.set("q", filter.q)
+    if (filter.status) params.set("status", filter.status)
+    if (filter.boothName) params.set("boothName", filter.boothName)
+    if (filter.staffName) params.set("staffName", filter.staffName)
+    if (filter.periodeAwal) params.set("periodeAwal", filter.periodeAwal)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/sales/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+  getSaleActivityLog: (id: string) => request<ActivityLogEntry[]>(`/sales/${id}/activity-log`),
   previewVoidSale: (id: string) => request<SaleCorrectionImpact>(`/sales/${id}/preview-void`, { method: "POST" }),
   voidSale: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request(`/sales/${id}/void`, { method: "POST", body: input }),
@@ -1183,7 +1319,8 @@ export const api = {
   getStockRingkas: (params: { bulan: number; tahun: number }) =>
     request<RingkasStokResponse>(`/stock-movements/ringkas?bulan=${params.bulan}&tahun=${params.tahun}`),
 
-  getStockReceipts: () => request<StockReceipt[]>("/stock-receipts"),
+  getStockReceipts: (params?: { page?: number; limit?: number; search?: string; status?: StockReceipt["status"] }) =>
+    request<Paginated<StockReceipt>>(`/stock-receipts${toQueryString(params ?? {})}`),
   getStockReceipt: (id: string) => request<StockReceipt>(`/stock-receipts/${id}`),
   createStockReceipt: (input: {
     idempotencyKey: string

@@ -26,8 +26,8 @@ function RiwayatPenjualanContent() {
 
   useEffect(() => {
     api
-      .getSales()
-      .then((rows) => setSales(rows.filter((s) => s.status === "PAID")))
+      .getSales({ status: "PAID", limit: 100 })
+      .then((res) => setSales(res.rows))
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat riwayat penjualan."))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DistributionStatus, StockMovementType, UserRole } from '@prisma/client';
+import { DistributionStatus, Prisma, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
@@ -17,6 +17,12 @@ function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
+/// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama
+/// (sama pola dgn StockReceiptsService.nomorBerikutnya).
+const KODE_UNIQUE_VIOLATION = 'P2002';
+const MAKS_PERCOBAAN_NOMOR = 5;
+
 @Injectable()
 export class DistributionsService {
   constructor(
@@ -25,6 +31,24 @@ export class DistributionsService {
     private readonly reconciliationCases: ReconciliationCasesService,
     private readonly activityLog: ActivityLogService,
   ) {}
+
+  /// Nomor Serah Terima Stok sederhana: `DIST-000001` naik satu per distribusi,
+  /// diambil dari nomor TERBESAR yang sudah ada — pola sama dengan
+  /// StockReceiptsService.nomorBerikutnya ("Tambah Stok Gudang").
+  private async nomorDistribusiBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.stockDistribution.findMany({
+      where: { distributionNo: { startsWith: 'DIST-' } },
+      select: { distributionNo: true },
+    });
+    const tertinggi = semua.reduce((maks, d) => {
+      const cocok = /^DIST-(\d{6})$/.exec(d.distributionNo);
+      return cocok ? Math.max(maks, Number(cocok[1])) : maks;
+    }, 0);
+    if (tertinggi >= 999999) {
+      throw new DomainError('DISTRIBUTION_NO_EXHAUSTED', 'Nomor Serah Terima Stok sudah mencapai batas 999999.');
+    }
+    return `DIST-${String(tertinggi + 1).padStart(6, '0')}`;
+  }
 
   findAll() {
     return this.prisma.stockDistribution.findMany({
@@ -85,50 +109,60 @@ export class DistributionsService {
     const distributionId = randomUUID();
     const sentAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of dto.items) {
-        const decremented = await tx.warehouseStock.updateMany({
-          where: { productId: item.productId, qtyOnHand: { gte: item.qty } },
-          data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
-        });
-        if (decremented.count !== 1) {
-          const current = await tx.warehouseStock.findUnique({ where: { productId: item.productId } });
-          const product = productById.get(item.productId)!;
-          throw new DomainError('INSUFFICIENT_STOCK', `Stok Gudang ${product.name} tidak cukup.`, {
-            productId: item.productId,
-            available: current?.qtyOnHand ?? 0,
-            requested: item.qty,
-          });
-        }
-      }
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          for (const item of dto.items) {
+            const decremented = await tx.warehouseStock.updateMany({
+              where: { productId: item.productId, qtyOnHand: { gte: item.qty } },
+              data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
+            });
+            if (decremented.count !== 1) {
+              const current = await tx.warehouseStock.findUnique({ where: { productId: item.productId } });
+              const product = productById.get(item.productId)!;
+              throw new DomainError('INSUFFICIENT_STOCK', `Stok Gudang ${product.name} tidak cukup.`, {
+                productId: item.productId,
+                available: current?.qtyOnHand ?? 0,
+                requested: item.qty,
+              });
+            }
+          }
 
-      await tx.stockDistribution.create({
-        data: {
-          id: distributionId,
-          distributionNo: generateDocNo('DIST'),
-          boothId: dto.boothId,
-          status: DistributionStatus.SENT,
-          idempotencyKey: dto.idempotencyKey,
-          sentAt,
-          createdById: actorId,
-          note: dto.note,
-          items: {
-            createMany: {
-              data: dto.items.map((item) => ({ productId: item.productId, qtySent: item.qty })),
+          const distributionNo = await this.nomorDistribusiBerikutnya(tx);
+
+          await tx.stockDistribution.create({
+            data: {
+              id: distributionId,
+              distributionNo,
+              boothId: dto.boothId,
+              status: DistributionStatus.SENT,
+              idempotencyKey: dto.idempotencyKey,
+              sentAt,
+              createdById: actorId,
+              note: dto.note,
+              items: {
+                createMany: {
+                  data: dto.items.map((item) => ({ productId: item.productId, qtySent: item.qty })),
+                },
+              },
             },
-          },
-        },
-      });
+          });
 
-      await this.activityLog.record(tx, {
-        entityType: 'stock_distribution',
-        entityId: distributionId,
-        action: 'SENT',
-        actorId,
-        actorName,
-        note: `Dikirim ke Booth ${booth.name}, ${dto.items.length} baris.`,
-      });
-    });
+          await this.activityLog.record(tx, {
+            entityType: 'stock_distribution',
+            entityId: distributionId,
+            action: 'SENT',
+            actorId,
+            actorName,
+            note: `Dikirim ke Booth ${booth.name}, ${dto.items.length} baris.`,
+          });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toResponse((await this.loadWithRelations(distributionId))!);
   }

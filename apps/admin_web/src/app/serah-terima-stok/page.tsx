@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Eye,
   FileSpreadsheet,
@@ -36,6 +38,7 @@ const STATUS_LABEL: Record<StockHandover["status"], { label: string; kelas: stri
 
 const JENIS_LABEL: Record<string, string> = { STOK_AWAL: "Stok Awal", RE_STOK: "Re-Stok" };
 const SUMBER_LABEL: Record<string, string> = { PETUGAS: "Petugas", ADMIN: "Admin" };
+const LIMIT = 20;
 
 function tanggalJakarta(iso: string) {
   return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(iso));
@@ -44,8 +47,13 @@ function tanggalJakarta(iso: string) {
 function SerahTerimaStokContent() {
   const toast = useToast();
   const [rows, setRows] = useState<StockHandover[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+
   const [inTransit, setInTransit] = useState<StockHandoverInTransitItem[] | null>(null);
   const [showInTransit, setShowInTransit] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | StockHandover["status"]>("");
   const [unduhExcel, setUnduhExcel] = useState(false);
@@ -53,6 +61,9 @@ function SerahTerimaStokContent() {
   const [notaTarget, setNotaTarget] = useState<StockHandover | null>(null);
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const [metrics, setMetrics] = useState({ diajukan: 0, diproses: 0, diterima: 0 });
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -64,40 +75,54 @@ function SerahTerimaStokContent() {
 
   useEffect(() => {
     api
-      .getStockHandovers()
-      .then(setRows)
-      .catch((err) => {
-        toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Serah Terima Stok.");
-        setRows([]);
-      });
-    api
       .getStockHandoverInTransit()
       .then(setInTransit)
       .catch(() => setInTransit([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(() => {
-    if (!rows) return [];
-    const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      const cocokTeks = !q || r.docNo.toLowerCase().includes(q) || (r.staffName ?? "").toLowerCase().includes(q);
-      const cocokStatus = !statusFilter || r.status === statusFilter;
-      return cocokTeks && cocokStatus;
-    });
-  }, [rows, search, statusFilter]);
+  // Kartu ringkasan per status — panggilan ringan terpisah (limit:1), bukan
+  // dari `rows` yang sekarang cuma satu halaman.
+  useEffect(() => {
+    Promise.all([
+      api.getStockHandovers({ limit: 1, status: "DIAJUKAN" }),
+      api.getStockHandovers({ limit: 1, status: "DIPROSES" }),
+      api.getStockHandovers({ limit: 1, status: "DITERIMA" }),
+    ])
+      .then(([diajukan, diproses, diterima]) =>
+        setMetrics({ diajukan: diajukan.total, diproses: diproses.total, diterima: diterima.total }),
+      )
+      .catch(() => {});
+  }, []);
 
-  const metrics = useMemo(
-    () => ({
-      total: rows?.length ?? 0,
-      diajukan: rows?.filter((r) => r.status === "DIAJUKAN").length ?? 0,
-      diproses: rows?.filter((r) => r.status === "DIPROSES").length ?? 0,
-      diterima: rows?.filter((r) => r.status === "DITERIMA").length ?? 0,
-    }),
-    [rows],
-  );
+  // Debounce pencarian 400ms supaya tidak fetch server tiap ketikan.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const reportFilter = useMemo(() => ({ q: search.trim() || undefined, status: statusFilter || undefined }), [search, statusFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    setLoading(true);
+    api
+      .getStockHandovers({ page, limit: LIMIT, search: search || undefined, status: statusFilter || undefined })
+      .then((res) => {
+        setRows(res.rows);
+        setTotal(res.total);
+      })
+      .catch((err) => {
+        toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Serah Terima Stok.");
+        setRows([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const reportFilter = { q: search || undefined, status: statusFilter || undefined };
 
   async function unduhLaporanExcel() {
     setUnduhExcel(true);
@@ -149,8 +174,8 @@ function SerahTerimaStokContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 dark:text-fg-muted">Total Dokumen</p>
-            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight mt-0.5">{metrics.total}</p>
-            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">dokumen</p>
+            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight mt-0.5">{total}</p>
+            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">sesuai filter</p>
           </div>
         </div>
 
@@ -250,8 +275,8 @@ function SerahTerimaStokContent() {
             <input
               type="text"
               placeholder="Cari no. dokumen atau petugas..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
             />
           </div>
@@ -298,7 +323,12 @@ function SerahTerimaStokContent() {
             <Spinner />
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line">
+          <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-surface/60 flex items-center justify-center z-10">
+                <Spinner size="sm" />
+              </div>
+            )}
             <table className="w-full text-xs text-left">
               <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
                 <tr>
@@ -313,14 +343,26 @@ function SerahTerimaStokContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
-                {filtered.map((r) => {
+                {rows.map((r) => {
                   const status = STATUS_LABEL[r.status];
+                  const terbuka = expandedId === r.id;
                   return (
-                    <tr key={r.id} className="hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors">
+                    <Fragment key={r.id}>
+                    <tr
+                      onClick={() => setExpandedId(terbuka ? null : r.id)}
+                      className={`cursor-pointer hover:bg-brand-50/20 dark:hover:bg-surface-hover/40 transition-colors ${terbuka ? "bg-brand-50/30 dark:bg-surface-hover/50" : ""}`}
+                    >
                       <td className="py-3 px-3 font-mono font-bold">
-                        <Link href={`/serah-terima-stok/${r.id}`} className="text-[var(--brand-700)] dark:text-brand-400 hover:underline">
-                          {r.docNo}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${terbuka ? "rotate-180" : ""}`} />
+                          <Link
+                            href={`/serah-terima-stok/${r.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                          >
+                            {r.docNo}
+                          </Link>
+                        </div>
                       </td>
                       <td className="py-3 px-3 text-slate-600 dark:text-fg-secondary whitespace-nowrap">
                         {tanggalJakarta(r.date)}
@@ -338,7 +380,10 @@ function SerahTerimaStokContent() {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setNotaTarget(r)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotaTarget(r);
+                            }}
                             title="Pratinjau & cetak nota dokumen ini"
                             className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
                           >
@@ -396,18 +441,86 @@ function SerahTerimaStokContent() {
                         </div>
                       </td>
                     </tr>
+
+                    {terbuka && (
+                      <tr className="bg-slate-50/60 dark:bg-surface-hover/30">
+                        <td colSpan={8} className="p-0">
+                          <div className="p-4">
+                            <div className="overflow-x-auto rounded-lg border border-slate-200/70 dark:border-line bg-white dark:bg-surface">
+                              <table className="w-full text-xs">
+                                <thead className="bg-slate-100/70 dark:bg-surface-hover text-[11px] font-bold text-slate-600 dark:text-fg-secondary">
+                                  <tr>
+                                    <th className="py-2 px-3 text-left">Produk</th>
+                                    <th className="py-2 px-3 text-right">Qty Dikirim/Diajukan</th>
+                                    <th className="py-2 px-3 text-right">Qty Diterima</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-line">
+                                  {r.items.map((item) => (
+                                    <tr key={item.productId}>
+                                      <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{item.productName}</td>
+                                      <td className="py-2 px-3 text-right tabular-nums font-semibold">{item.qty}</td>
+                                      <td className="py-2 px-3 text-right tabular-nums text-slate-600 dark:text-fg-secondary">
+                                        {item.qtyReceived ?? "-"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {r.note && <p className="mt-2 text-xs text-slate-500 dark:text-fg-muted">Catatan: {r.note}</p>}
+                            <Link
+                              href={`/serah-terima-stok/${r.id}`}
+                              className="inline-block mt-3 text-xs font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                            >
+                              Buka detail lengkap →
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
 
-                {filtered.length === 0 && (
+                {rows.length === 0 && (
                   <tr>
                     <td colSpan={8} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
-                      {rows.length === 0 ? "Belum ada dokumen Serah Terima Stok." : "Tidak ada yang cocok dengan pencarian."}
+                      {total === 0 ? "Belum ada dokumen Serah Terima Stok." : "Memuat..."}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="flex items-center justify-between gap-3 mt-3.5 flex-wrap">
+            <p className="text-[11px] text-slate-500 dark:text-fg-muted">
+              Menampilkan {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, total)} dari {total} dokumen
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+                className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-surface-hover cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-semibold text-slate-700 dark:text-fg-secondary px-2">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || loading}
+                className="w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-surface-hover cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -3,14 +3,15 @@
 import React, { useEffect, useState } from "react";
 import { getRandomMotivationalQuote } from "@/lib/motivational-quotes";
 
-export const MotivationalQuote: React.FC<{ className?: string }> = ({ className = "" }) => {
+export const MotivationalQuote: React.FC<{ className?: string; role?: string }> = ({ className = "", role }) => {
   // Dipilih setelah mount (bukan saat SSR) supaya tidak mismatch hydration —
   // kalimatnya boleh beda tiap reload/refresh, itu memang tujuannya ("ganti-ganti").
   const [quote, setQuote] = useState<string | null>(null);
 
   useEffect(() => {
-    setQuote(getRandomMotivationalQuote());
-  }, []);
+    setQuote(getRandomMotivationalQuote(role));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   if (!quote) return null;
 

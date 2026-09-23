@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,8 +19,20 @@ export class StockHandoversController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  findAll() {
-    return this.stockHandoversService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: 'DIAJUKAN' | 'DIPROSES' | 'DITERIMA' | 'DITOLAK' | 'DIBATALKAN',
+    @Query('boothId') boothId?: string,
+  ) {
+    return this.stockHandoversService.findAll({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search || undefined,
+      status: status || undefined,
+      boothId: boothId || undefined,
+    });
   }
 
   @Get('in-transit')
