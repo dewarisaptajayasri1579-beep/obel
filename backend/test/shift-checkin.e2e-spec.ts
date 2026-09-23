@@ -78,6 +78,10 @@ describe('Shift check-in (e2e)', () => {
     return payload.sub as string;
   }
 
+  /// CheckInDto sekarang wajib GPS+foto selfie (soft-check saja terhadap
+  /// lokasi Booth, tidak memblokir — lihat ShiftsService.computeLocationWarning).
+  const SAMPLE_CHECKIN_LOCATION = { latitude: -6.2088, longitude: 106.8456, photoUrl: 'https://example.com/selfie.jpg' };
+
   async function assignBooth(token: string, boothIdToAssign: string) {
     await request(app.getHttpServer())
       .put('/booth-shift-assignments')
@@ -100,7 +104,7 @@ describe('Shift check-in (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
-      .send({})
+      .send(SAMPLE_CHECKIN_LOCATION)
       .expect(400);
     expect(res.body.code).toBe('NO_BOOTH_ASSIGNMENT');
   });
@@ -112,7 +116,7 @@ describe('Shift check-in (e2e)', () => {
     const checkIn = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
-      .send({})
+      .send(SAMPLE_CHECKIN_LOCATION)
       .expect(201);
 
     expect(checkIn.body.status).toBe('OPEN');
@@ -135,13 +139,13 @@ describe('Shift check-in (e2e)', () => {
     const first = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
-      .send({})
+      .send(SAMPLE_CHECKIN_LOCATION)
       .expect(201);
 
     const second = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${first.body.accessToken}`)
-      .send({})
+      .send(SAMPLE_CHECKIN_LOCATION)
       .expect(201);
 
     expect(second.body.shiftSessionId).toBe(first.body.shiftSessionId);
@@ -154,13 +158,13 @@ describe('Shift check-in (e2e)', () => {
     const first = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
-      .send({})
+      .send(SAMPLE_CHECKIN_LOCATION)
       .expect(201);
 
     const second = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${first.body.accessToken}`)
-      .send({ boothId: otherBoothId })
+      .send({ ...SAMPLE_CHECKIN_LOCATION, boothId: otherBoothId })
       .expect(400);
     expect(second.body.code).toBe('ALREADY_CHECKED_IN_ELSEWHERE');
   });
