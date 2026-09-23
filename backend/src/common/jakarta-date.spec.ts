@@ -1,4 +1,8 @@
-import { businessDateKeyJakarta, startOfDayJakarta } from './jakarta-date';
+import {
+  businessDateKeyJakarta,
+  combineJakartaDateAndTime,
+  startOfDayJakarta,
+} from './jakarta-date';
 
 /// AC-24 (docs/15-testing-acceptance-criteria.md): transaksi mendekati
 /// tengah malam harus dikelompokkan ke business date Asia/Jakarta (UTC+7)
@@ -27,5 +31,15 @@ describe('jakarta-date', () => {
     const night = new Date('2026-03-05T16:00:00.000Z'); // 23:00 Jakarta
     expect(startOfDayJakarta(morning).toISOString()).toBe('2026-03-04T17:00:00.000Z');
     expect(startOfDayJakarta(night).toISOString()).toBe('2026-03-04T17:00:00.000Z');
+  });
+
+  it('combineJakartaDateAndTime combines a Jakarta business date with an "HH:mm" time', () => {
+    const businessDate = startOfDayJakarta(new Date('2026-03-05T01:00:00.000Z')); // 2026-03-05 Jakarta
+    expect(combineJakartaDateAndTime(businessDate, '08:00').toISOString()).toBe(
+      '2026-03-05T01:00:00.000Z',
+    );
+    expect(combineJakartaDateAndTime(businessDate, '16:30').toISOString()).toBe(
+      '2026-03-05T09:30:00.000Z',
+    );
   });
 });

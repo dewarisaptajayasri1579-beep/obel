@@ -128,11 +128,11 @@ describe('Sale correction flows (e2e)', () => {
       .get('/sales')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
-    const effective = listing.body.find((s: { id: string }) => s.id === revised.body.saleId);
+    const effective = listing.body.rows.find((s: { id: string }) => s.id === revised.body.saleId);
     expect(effective).toBeDefined();
     expect(effective.versionNo).toBe(2);
     // V1 (superseded) must not appear in the effective list.
-    expect(listing.body.find((s: { id: string }) => s.id === sale.saleId)).toBeUndefined();
+    expect(listing.body.rows.find((s: { id: string }) => s.id === sale.saleId)).toBeUndefined();
   });
 
   it('COR-03: revise payment method has no stock/omzet effect', async () => {

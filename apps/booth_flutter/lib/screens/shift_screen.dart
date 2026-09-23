@@ -411,7 +411,7 @@ class ShiftScreen extends StatelessWidget {
                           onPressed: () =>
                               Navigator.of(context).pushNamed('/closing'),
                           child: const Text(
-                            'TUTUP SHIFT',
+                            'CHECK-OUT / TUTUP SHIFT',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,

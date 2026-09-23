@@ -585,6 +585,7 @@ export class SalesService {
         cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
         paymentMethod: s.paymentMethod,
         items: s.items.map((item) => ({
+          productId: item.productId,
           productName: item.productNameSnapshot,
           qty: item.qty,
         })),
