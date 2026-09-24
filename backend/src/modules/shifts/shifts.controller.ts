@@ -27,7 +27,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CheckInDto } from './dto/check-in.dto';
+import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
+import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 import { ShiftsService } from './shifts.service';
 
@@ -56,8 +58,14 @@ export class ShiftsController {
     return this.shiftsService.getMyHistory(user, month);
   }
 
+  @Get('admin-history')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  getAdminHistory() {
+    return this.shiftsService.getAdminHistory();
+  }
+
   @Get(':id/report')
-  @Roles(UserRole.BOOTH_STAFF)
+  @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN, UserRole.OWNER)
   getReport(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.getShiftReport(id, user);
   }
@@ -66,6 +74,16 @@ export class ShiftsController {
   @Roles(UserRole.BOOTH_STAFF)
   checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {
     return this.shiftsService.checkIn(user, dto);
+  }
+
+  @Post(':id/location-ping')
+  @Roles(UserRole.BOOTH_STAFF)
+  recordLocationPing(
+    @Param('id') id: string,
+    @Body() dto: LocationPingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.shiftsService.recordLocationPing(user, id, dto);
   }
 
   @Post('attendance/photo')
@@ -119,6 +137,12 @@ export class ShiftsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.shiftsService.confirmClosing(id, dto, user);
+  }
+
+  @Post(':id/cash-deposit/confirm')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  confirmCashDeposit(@Param('id') id: string, @Body() dto: ConfirmCashDepositDto, @CurrentUser() user: JwtPayload) {
+    return this.shiftsService.confirmCashDeposit(id, dto, user);
   }
 
   @Get(':id/preview-correction')

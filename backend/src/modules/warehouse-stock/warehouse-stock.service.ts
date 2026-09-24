@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { StockMovementType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { AdjustWarehouseStockDto } from './dto/adjust-warehouse-stock.dto';
 
 @Injectable()
@@ -43,7 +43,7 @@ export class WarehouseStockService {
         const businessDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('ADJ'),
+            movementNo: await nomorMovementBerikutnya(tx, 'ADJ'),
             movementType: StockMovementType.ADJUSTMENT,
             productId: dto.productId,
             qty: Math.abs(delta),

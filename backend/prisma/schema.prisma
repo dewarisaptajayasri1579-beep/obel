@@ -73,6 +73,18 @@ enum DistributionStatus {
   @@map("distribution_status")
 }
 
+/// Alasan selisih per baris item Serah Terima Stok, dipilih manual oleh
+/// Petugas saat konfirmasi terima (checklist "Kenapa selisih?"). Dipakai
+/// Laporan Stok Rusak untuk agregasi qty RUSAK per produk/periode.
+enum DiscrepancyReasonCode {
+  LEBIH
+  KURANG
+  RUSAK
+  LAINNYA
+
+  @@map("discrepancy_reason_code")
+}
+
 enum RestockRequestStatus {
   REQUESTED
   APPROVED
@@ -236,11 +248,13 @@ model Profile {
   sales                   Sale[]
   createdDistributions    StockDistribution[]     @relation("DistributionCreatedBy")
   receivedDistributions   StockDistribution[]     @relation("DistributionReceivedBy")
+  sentToDistributions     StockDistribution[]     @relation("DistributionSentTo")
   requestedRestocks       RestockRequest[]        @relation("RestockRequestedBy")
   approvedRestocks        RestockRequest[]        @relation("RestockApprovedBy")
   countedStockCounts      ShiftStockCount[]
   submittedReturns        StockReturn[]           @relation("ReturnSubmittedBy")
   receivedReturns         StockReturn[]           @relation("ReturnReceivedBy")
+  confirmedCashDeposits   ShiftCashDeposit[]
   transactionCorrections  TransactionCorrection[]
   resolvedReconciliations ReconciliationCase[]
   stockOpnames            StockOpname[]
@@ -248,6 +262,8 @@ model Profile {
   createdStockReceipts    StockReceipt[]          @relation("StockReceiptCreatedBy")
   postedStockReceipts     StockReceipt[]          @relation("StockReceiptPostedBy")
   shiftAssignments        BoothShiftAssignment[]
+  staffLiabilities        StaffLiability[]        @relation("StaffLiabilityStaff")
+  createdStaffLiabilities StaffLiability[]        @relation("StaffLiabilityCreatedBy")
 
   @@index([role])
   @@index([defaultBoothId])
@@ -303,11 +319,47 @@ model Product {
   StockOpnameItem     StockOpnameItem[]
   saleRefundItems     SaleRefundItem[]
   stockReceiptItems   StockReceiptItem[]
+  staffLiabilities    StaffLiability[]
 
   @@index([categoryId])
   @@index([active])
   @@index([deletedAt])
   @@map("products")
+}
+
+/// Beban Ganti Rugi ke Petugas — dicatat Admin dari layar Koreksi
+/// Penerimaan saat memilih tindak lanjut "Ganti Rugi Petugas" untuk satu
+/// baris produk yang selisih (qty dianggap tanggung jawab Petugas, bukan
+/// rusak/salah hitung Admin). SENGAJA cuma pencatatan (belum ada status
+/// Lunas/Belum Lunas atau alur pelunasan) — itu menyusul di task terpisah.
+/// Ganti Rugi Petugas bisa berasal dari koreksi Kirim Stok (distributionId)
+/// ATAU dari approve Stok Kembali (stockReturnId) — persis satu dari dua
+/// harus terisi, tidak pernah keduanya (lihat DistributionsService.
+/// correctReceipt & ReturnsService.receive). Dipisah jadi dua kolom
+/// nullable (bukan satu polymorphic sourceId) supaya foreign key & index
+/// Prisma tetap type-safe.
+model StaffLiability {
+  id             String             @id @default(uuid())
+  distributionId String?            @map("distribution_id")
+  distribution   StockDistribution? @relation(fields: [distributionId], references: [id])
+  stockReturnId  String?            @map("stock_return_id")
+  stockReturn    StockReturn?       @relation(fields: [stockReturnId], references: [id])
+  productId      String             @map("product_id")
+  product        Product            @relation(fields: [productId], references: [id])
+  staffId        String             @map("staff_id")
+  staff          Profile            @relation("StaffLiabilityStaff", fields: [staffId], references: [id])
+  qty            Int
+  unitPrice      BigInt             @map("unit_price")
+  totalAmount    BigInt             @map("total_amount")
+  note           String?
+  createdById    String             @map("created_by")
+  createdBy      Profile            @relation("StaffLiabilityCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@index([staffId])
+  @@index([distributionId])
+  @@index([stockReturnId])
+  @@map("staff_liabilities")
 }
 
 /// Jejak audit generik: SATU baris per aksi bermakna pada SATU entitas —
@@ -456,34 +508,44 @@ model BoothShiftAssignment {
 }
 
 model ShiftSession {
-  id               String        @id @default(uuid())
-  businessDate     DateTime      @map("business_date") @db.Date
-  boothId          String        @map("booth_id")
-  booth            Booth         @relation(fields: [boothId], references: [id])
-  shiftTemplateId  String        @map("shift_template_id")
-  shiftTemplate    ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
-  staffId          String        @map("staff_id")
-  staff            Profile       @relation(fields: [staffId], references: [id])
-  status           ShiftStatus   @default(SCHEDULED)
-  scheduledStartAt DateTime      @map("scheduled_start_at")
-  scheduledEndAt   DateTime      @map("scheduled_end_at")
-  openedAt         DateTime?     @map("opened_at")
-  closingStartedAt DateTime?     @map("closing_started_at")
-  closedAt         DateTime?     @map("closed_at")
+  id                String        @id @default(uuid())
+  businessDate      DateTime      @map("business_date") @db.Date
+  boothId           String        @map("booth_id")
+  booth             Booth         @relation(fields: [boothId], references: [id])
+  shiftTemplateId   String        @map("shift_template_id")
+  shiftTemplate     ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
+  staffId           String        @map("staff_id")
+  staff             Profile       @relation(fields: [staffId], references: [id])
+  status            ShiftStatus   @default(SCHEDULED)
+  scheduledStartAt  DateTime      @map("scheduled_start_at")
+  scheduledEndAt    DateTime      @map("scheduled_end_at")
+  openedAt          DateTime?     @map("opened_at")
+  closingStartedAt  DateTime?     @map("closing_started_at")
+  closedAt          DateTime?     @map("closed_at")
   // Absen GPS+Selfie (Check-In/Check-Out) — soft-check saja terhadap
   // Booth.latitude/longitude (lihat ShiftsService.computeLocationWarning),
   // TIDAK memblokir absen. Sama pola dgn Sale.latitude/longitude di atas.
-  checkInLatitude   Decimal?  @db.Decimal(9, 6) @map("check_in_latitude")
-  checkInLongitude  Decimal?  @db.Decimal(9, 6) @map("check_in_longitude")
-  checkInPhotoUrl   String?   @map("check_in_photo_url")
-  checkOutLatitude  Decimal?  @db.Decimal(9, 6) @map("check_out_latitude")
-  checkOutLongitude Decimal?  @db.Decimal(9, 6) @map("check_out_longitude")
-  checkOutPhotoUrl  String?   @map("check_out_photo_url")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  checkInLatitude   Decimal?      @map("check_in_latitude") @db.Decimal(9, 6)
+  checkInLongitude  Decimal?      @map("check_in_longitude") @db.Decimal(9, 6)
+  checkInPhotoUrl   String?       @map("check_in_photo_url")
+  checkOutLatitude  Decimal?      @map("check_out_latitude") @db.Decimal(9, 6)
+  checkOutLongitude Decimal?      @map("check_out_longitude") @db.Decimal(9, 6)
+  checkOutPhotoUrl  String?       @map("check_out_photo_url")
+  // Ping lokasi berkala (tiap ~1 menit) selama shift OPEN/CLOSING, dikirim
+  // app petugas — lihat ShiftsService.recordLocationPing. Cuma menyimpan
+  // titik TERAKHIR (overwrite), bukan histori — dipakai murni utk marker
+  // "Realtime Booth" di peta Monitoring > Booth Aktif, bukan transaksi yang
+  // butuh jejak audit, jadi tidak melanggar aturan append-only StockMovement.
+  lastLocationLatitude  Decimal?  @map("last_location_latitude") @db.Decimal(9, 6)
+  lastLocationLongitude Decimal?  @map("last_location_longitude") @db.Decimal(9, 6)
+  lastLocationAt        DateTime? @map("last_location_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  sales      Sale[]
-  stockCount ShiftStockCount?
+  sales        Sale[]
+  stockCount   ShiftStockCount?
+  stockReturns StockReturn[]
+  cashDeposit  ShiftCashDeposit?
 
   @@index([staffId, status])
   @@index([boothId, status])
@@ -506,38 +568,38 @@ model BoothStock {
 }
 
 model Sale {
-  id                 String        @id @default(uuid())
-  saleNo             String        @unique @map("sale_no")
-  idempotencyKey     String        @unique @map("idempotency_key")
-  boothId            String        @map("booth_id")
-  booth              Booth         @relation(fields: [boothId], references: [id])
-  shiftSessionId     String        @map("shift_session_id")
-  shiftSession       ShiftSession  @relation(fields: [shiftSessionId], references: [id])
-  staffId            String        @map("staff_id")
-  staff              Profile       @relation(fields: [staffId], references: [id])
-  status             SaleStatus    @default(PENDING)
+  id                 String         @id @default(uuid())
+  saleNo             String         @unique @map("sale_no")
+  idempotencyKey     String         @unique @map("idempotency_key")
+  boothId            String         @map("booth_id")
+  booth              Booth          @relation(fields: [boothId], references: [id])
+  shiftSessionId     String         @map("shift_session_id")
+  shiftSession       ShiftSession   @relation(fields: [shiftSessionId], references: [id])
+  staffId            String         @map("staff_id")
+  staff              Profile        @relation(fields: [staffId], references: [id])
+  status             SaleStatus     @default(PENDING)
   subtotal           BigInt
-  discount           BigInt        @default(0)
+  discount           BigInt         @default(0)
   total              BigInt
   // Null selama status PENDING (draft belum ditentukan metode bayarnya) —
   // wajib terisi begitu status jadi PAID (lihat SalesService.payDraftSale).
   paymentMethod      PaymentMethod? @map("payment_method")
-  paidAt             DateTime?     @map("paid_at")
-  voidedAt           DateTime?     @map("voided_at")
-  voidReason         String?       @map("void_reason")
+  paidAt             DateTime?      @map("paid_at")
+  voidedAt           DateTime?      @map("voided_at")
+  voidReason         String?        @map("void_reason")
   // Lineage fields per docs/24-data-consistency-correction-reversal.md (DC-003/DC-005).
   // Correction/reversal endpoints are a later phase; columns exist now so Sale rows
   // are forward-compatible without a breaking migration later.
-  transactionGroupId String        @default(uuid()) @map("transaction_group_id")
-  versionNo          Int           @default(1) @map("version_no")
-  revisionOfId       String?       @map("revision_of_id")
-  reversalOfId       String?       @map("reversal_of_id")
-  createdAt          DateTime      @default(now()) @map("created_at")
+  transactionGroupId String         @default(uuid()) @map("transaction_group_id")
+  versionNo          Int            @default(1) @map("version_no")
+  revisionOfId       String?        @map("revision_of_id")
+  reversalOfId       String?        @map("reversal_of_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
   // Koordinat GPS petugas saat transaksi dibuat (docs/26-monitoring-realtime.md §5 & §7).
   // Selalu nullable: sale tidak boleh gagal/tertunda gara-gara GPS tidak tersedia saat itu.
-  latitude           Decimal?      @db.Decimal(9, 6)
-  longitude          Decimal?      @db.Decimal(9, 6)
-  locationCapturedAt DateTime?     @map("location_captured_at")
+  latitude           Decimal?       @db.Decimal(9, 6)
+  longitude          Decimal?       @db.Decimal(9, 6)
+  locationCapturedAt DateTime?      @map("location_captured_at")
 
   items    SaleItem[]
   payments Payment[]
@@ -669,6 +731,8 @@ model StockDistribution {
   createdBy          Profile            @relation("DistributionCreatedBy", fields: [createdById], references: [id])
   receivedById       String?            @map("received_by")
   receivedBy         Profile?           @relation("DistributionReceivedBy", fields: [receivedById], references: [id])
+  sentToId           String?            @map("sent_to")
+  sentTo             Profile?           @relation("DistributionSentTo", fields: [sentToId], references: [id])
   note               String?
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
@@ -678,8 +742,9 @@ model StockDistribution {
   revisionOfId       String?            @map("revision_of_id")
   reversalOfId       String?            @map("reversal_of_id")
 
-  items          StockDistributionItem[]
-  restockRequest RestockRequest?
+  items            StockDistributionItem[]
+  restockRequest   RestockRequest?
+  staffLiabilities StaffLiability[]
 
   @@index([boothId, status])
   @@index([status])
@@ -688,16 +753,21 @@ model StockDistribution {
 }
 
 model StockDistributionItem {
-  id             String            @id @default(uuid())
-  distributionId String            @map("distribution_id")
-  distribution   StockDistribution @relation(fields: [distributionId], references: [id])
-  productId      String            @map("product_id")
-  product        Product           @relation(fields: [productId], references: [id])
-  qtySent        Int               @map("qty_sent")
-  qtyReceived    Int?              @map("qty_received")
+  id                    String                 @id @default(uuid())
+  distributionId        String                 @map("distribution_id")
+  distribution          StockDistribution      @relation(fields: [distributionId], references: [id])
+  productId             String                 @map("product_id")
+  product               Product                @relation(fields: [productId], references: [id])
+  qtySent               Int                    @map("qty_sent")
+  qtyReceived           Int?                   @map("qty_received")
+  /// Alasan selisih baris ini (LEBIH/KURANG/RUSAK/LAINNYA), null kalau
+  /// qtyReceived == qtySent. Diisi Petugas saat konfirmasi terima.
+  discrepancyReasonCode DiscrepancyReasonCode? @map("discrepancy_reason_code")
+  discrepancyNote       String?                @map("discrepancy_note")
 
   @@unique([distributionId, productId])
   @@index([productId])
+  @@index([discrepancyReasonCode])
   @@map("stock_distribution_items")
 }
 
@@ -773,42 +843,89 @@ model ShiftStockCountItem {
 }
 
 model StockReturn {
-  id                 String       @id @default(uuid())
-  returnNo           String       @unique @map("return_no")
-  boothId            String       @map("booth_id")
-  booth              Booth        @relation(fields: [boothId], references: [id])
-  status             ReturnStatus @default(SUBMITTED)
-  idempotencyKey     String       @unique @map("idempotency_key")
-  submittedById      String       @map("submitted_by")
-  submittedBy        Profile      @relation("ReturnSubmittedBy", fields: [submittedById], references: [id])
-  submittedAt        DateTime     @default(now()) @map("submitted_at")
-  receivedById       String?      @map("received_by")
-  receivedBy         Profile?     @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
-  receivedAt         DateTime?    @map("received_at")
+  id                 String        @id @default(uuid())
+  returnNo           String        @unique @map("return_no")
+  boothId            String        @map("booth_id")
+  booth              Booth         @relation(fields: [boothId], references: [id])
+  status             ReturnStatus  @default(SUBMITTED)
+  idempotencyKey     String        @unique @map("idempotency_key")
+  submittedById      String        @map("submitted_by")
+  submittedBy        Profile       @relation("ReturnSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt        DateTime      @default(now()) @map("submitted_at")
+  receivedById       String?       @map("received_by")
+  receivedBy         Profile?      @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
+  receivedAt         DateTime?     @map("received_at")
   note               String?
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  // Catatan Admin saat approve penerimaan — wajib diisi kalau qty diterima
+  // beda dari qty diajukan (lihat ReturnsService.receive).
+  receiveNote        String?       @map("receive_note")
+  // Terisi kalau Return ini dibuat OTOMATIS dari Check-Out shift (sisa Stok
+  // Fisik Booth diajukan sebagai Return begitu Petugas Check-Out) — dipakai
+  // Laporan Kembali (Admin) buat menampilkan & approve return itu di tempat,
+  // tanpa Admin harus lompat ke menu Return terpisah.
+  shiftSessionId     String?       @map("shift_session_id")
+  shiftSession       ShiftSession? @relation(fields: [shiftSessionId], references: [id])
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
   // Lineage per docs/24-data-consistency-correction-reversal.md §13.
-  transactionGroupId String       @default(uuid()) @map("transaction_group_id")
-  versionNo          Int          @default(1) @map("version_no")
-  revisionOfId       String?      @map("revision_of_id")
-  reversalOfId       String?      @map("reversal_of_id")
+  transactionGroupId String        @default(uuid()) @map("transaction_group_id")
+  versionNo          Int           @default(1) @map("version_no")
+  revisionOfId       String?       @map("revision_of_id")
+  reversalOfId       String?       @map("reversal_of_id")
 
-  items StockReturnItem[]
+  items            StockReturnItem[]
+  staffLiabilities StaffLiability[]
 
   @@index([boothId, status])
   @@index([status])
+  @@index([shiftSessionId])
   @@map("stock_returns")
 }
 
+enum CashDepositStatus {
+  PENDING
+  CONFIRMED
+  DISCREPANCY
+}
+
+/// Setoran kas Tunai Petugas ke Admin/Gudang saat Check-Out — dibuat OTOMATIS
+/// (status PENDING, expectedAmount = kasTunai shift itu) begitu Petugas
+/// Check-Out, lalu Admin approve di Laporan Kembali. Terpisah dari
+/// StockReturn (approve Stok Kembali) karena keduanya dua keputusan Admin
+/// yang independen — qty stok bisa cocok sementara uang belum disetor, atau
+/// sebaliknya.
+model ShiftCashDeposit {
+  id              String            @id @default(uuid())
+  shiftSessionId  String            @unique @map("shift_session_id")
+  shiftSession    ShiftSession      @relation(fields: [shiftSessionId], references: [id])
+  status          CashDepositStatus @default(PENDING)
+  expectedAmount  BigInt            @map("expected_amount")
+  depositedAmount BigInt?           @map("deposited_amount")
+  note            String?
+  confirmedById   String?           @map("confirmed_by")
+  confirmedBy     Profile?          @relation(fields: [confirmedById], references: [id])
+  confirmedAt     DateTime?         @map("confirmed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@map("shift_cash_deposits")
+}
+
 model StockReturnItem {
-  id            String      @id @default(uuid())
-  stockReturnId String      @map("stock_return_id")
-  stockReturn   StockReturn @relation(fields: [stockReturnId], references: [id])
-  productId     String      @map("product_id")
-  product       Product     @relation(fields: [productId], references: [id])
-  qtySubmitted  Int         @map("qty_submitted")
-  qtyReceived   Int?        @map("qty_received")
+  id                    String                 @id @default(uuid())
+  stockReturnId         String                 @map("stock_return_id")
+  stockReturn           StockReturn            @relation(fields: [stockReturnId], references: [id])
+  productId             String                 @map("product_id")
+  product               Product                @relation(fields: [productId], references: [id])
+  qtySubmitted          Int                    @map("qty_submitted")
+  qtyReceived           Int?                   @map("qty_received")
+  // Tindak Lanjut Admin per baris selisih saat approve Stok Kembali (sama
+  // pola dgn StockDistributionItem, lihat ReturnsService.receive) — RUSAK/
+  // LAINNYA disimpan di sini utk Laporan Stok Selisih; SALAH_HITUNG sengaja
+  // TIDAK meninggalkan jejak (qtyReceived yang sudah dikoreksi itu sendiri
+  // sudah representasinya); GANTI_RUGI_PETUGAS dicatat di StaffLiability.
+  discrepancyReasonCode DiscrepancyReasonCode? @map("discrepancy_reason_code")
+  discrepancyNote       String?                @map("discrepancy_note")
 
   @@unique([stockReturnId, productId])
   @@index([productId])

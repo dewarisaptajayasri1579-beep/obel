@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Package, Settings } from "lucide-react";
+import { ArrowLeftRight, Map, Package, Settings } from "lucide-react";
 
-export type ProdukTabKey = "main" | "mutasi" | "pengaturan";
+export type ProdukTabKey = "main" | "mutasi" | "sebaran" | "pengaturan";
 
 const TAB: { key: ProdukTabKey; label: string; icon: typeof Package }[] = [
   { key: "main", label: "Main", icon: Package },
   { key: "mutasi", label: "Mutasi Stok", icon: ArrowLeftRight },
+  { key: "sebaran", label: "Sebaran Stok", icon: Map },
   { key: "pengaturan", label: "Pengaturan", icon: Settings },
 ];
 

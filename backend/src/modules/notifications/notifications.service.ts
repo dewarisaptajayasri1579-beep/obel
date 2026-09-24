@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DistributionStatus, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
+import { startOfTodayJakarta } from '../../common/jakarta-date';
 
 export interface NotificationItem {
   id: string;
@@ -24,7 +25,7 @@ export class NotificationsService {
     const now = new Date().toISOString();
     const items: NotificationItem[] = [];
 
-    const [boothStocks, thresholds, pendingDistributions, pendingRestock, pendingReturns, openCases] =
+    const [boothStocks, thresholds, pendingDistributions, pendingRestock, pendingReturns, openCases, closedShiftsToday] =
       await Promise.all([
         this.prisma.boothStock.findMany({ include: { booth: true, product: true } }),
         this.prisma.boothStockThreshold.findMany(),
@@ -32,6 +33,11 @@ export class NotificationsService {
         this.prisma.restockRequest.count({ where: { status: 'REQUESTED' } }),
         this.prisma.stockReturn.count({ where: { status: ReturnStatus.SUBMITTED } }),
         this.prisma.reconciliationCase.findMany({ where: { status: 'OPEN' }, orderBy: { createdAt: 'desc' } }),
+        this.prisma.shiftSession.findMany({
+          where: { status: 'CLOSED', businessDate: startOfTodayJakarta() },
+          include: { booth: true, staff: { select: { fullName: true } }, stockCount: { include: { items: true } } },
+          orderBy: { closedAt: 'desc' },
+        }),
       ]);
 
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
@@ -89,6 +95,18 @@ export class NotificationsService {
         type: 'error',
         readAt: null,
         createdAt: c.createdAt.toISOString(),
+      });
+    }
+
+    for (const s of closedShiftsToday) {
+      const adaSelisih = s.stockCount?.items.some((i) => i.discrepancyQty !== 0) ?? false;
+      items.push({
+        id: `checkout:${s.id}`,
+        title: adaSelisih ? 'Checkout Selesai · Ada Selisih' : 'Checkout Selesai',
+        message: `${s.staff.fullName} sudah Check Out dari ${s.booth.name}. Perlu Approve Stok Kembali & Setor Uang di Laporan Kembali.`,
+        type: adaSelisih ? 'warning' : 'info',
+        readAt: null,
+        createdAt: (s.closedAt ?? s.businessDate).toISOString(),
       });
     }
 

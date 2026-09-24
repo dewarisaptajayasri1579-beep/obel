@@ -105,7 +105,11 @@ async function request<T>(
     // Timeout & putus koneksi selalu jadi ApiError berpesan jelas
     // (docs/11-notification-printing-offline.md §8: "timeout message jelas"),
     // bukan TypeError mentah dari fetch() yang jatuh ke toast generik.
-    if (err instanceof DOMException && err.name === "AbortError") {
+    // Dicek via `name` saja (bukan `instanceof DOMException`) — runtime fetch
+    // Next.js dev (undici) kadang melempar AbortError sebagai Error biasa,
+    // bukan DOMException, kalau instanceof-nya kelewat malah lolos jadi
+    // overlay Runtime Error merah alih-alih toast ini.
+    if (err instanceof Error && err.name === "AbortError") {
       throw new ApiError("TIMEOUT", "Koneksi ke server timeout. Periksa jaringan Anda lalu coba lagi.")
     }
     throw new ApiError("NETWORK_ERROR", "Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.")
@@ -187,6 +191,69 @@ export interface BarisRekapStok {
   keluar: number
   saldoAkhir: number
   perluVerifikasi: boolean
+}
+
+/// Tab "Sebaran Stok" (halaman Produk) — satu baris per produk, kolom Gudang +
+/// In Proses + tiap Booth, per tanggal (bukan rentang bulan).
+export interface BarisSebaranStokBooth {
+  boothId: string;
+  boothName: string;
+  qty: number;
+  /// Status warna BR-007 (Aman/Menipis/Kritis/Habis) dari ambang minimumQty/
+  /// criticalQty (override per Booth kalau ada, fallback ke default produk).
+  status: "Aman" | "Menipis" | "Kritis" | "Habis";
+  /// true kalau Booth ini PERNAH menerima distribusi produk ini (sampai
+  /// tanggal yang dipilih) — dipakai membedakan qty 0 karena memang belum
+  /// pernah diserahterimakan (abu-abu, bukan masalah) vs qty 0 karena sempat
+  /// ada tapi sekarang habis (merah, Kritis/Habis sungguhan).
+  pernahDikirim: boolean;
+}
+
+export interface BarisSebaranStok {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  gudang: number;
+  inProses: number;
+  /// Sisa Stok Fisik Booth yang sudah diajukan sebagai Return ke Gudang saat
+  /// Check-Out tapi belum di-approve Admin — "hilang sementara" dari saldo
+  /// Booth maupun Gudang, jadi ditampilkan terpisah supaya total tetap benar.
+  inProsesKembali: number;
+  perBooth: BarisSebaranStokBooth[];
+  total: number;
+}
+
+export interface SebaranStokResponse {
+  tanggal: string;
+  booths: { boothId: string; boothName: string }[];
+  rows: BarisSebaranStok[];
+}
+
+/// Tab "Sebaran Penjualan" (menu Transaksi Kasir) — satu baris per produk,
+/// kolom tiap Booth + Total, per tanggal bisnis (Asia/Jakarta). Angkanya qty
+/// cup terjual (status PAID), pola sama dengan BarisSebaranStok tapi tanpa
+/// Gudang/In Proses (tidak relevan di penjualan).
+export interface BarisSebaranPenjualan {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  perBooth: { boothId: string; boothName: string; qty: number; omzet: number }[];
+  totalQty: number;
+  totalOmzet: number;
+}
+
+export interface SebaranPenjualanResponse {
+  dari: string;
+  sampai: string;
+  booths: { boothId: string; boothName: string; locationName: string | null }[];
+  rows: BarisSebaranPenjualan[];
+  /// Baris footer "Total Qty" + "Total Jual" (Rp) per kolom Booth, dihitung
+  /// dari SEMUA produk (bukan cuma yang lolos filter pencarian di layar).
+  totalPerBooth: { boothId: string; boothName: string; qty: number; omzet: number }[];
+  grandTotalQty: number;
+  grandTotalOmzet: number;
 }
 
 export interface RekapStokResponse {
@@ -334,10 +401,13 @@ export interface WarehouseStockItem {
   qtyOnHand: number
 }
 
+export type DiscrepancyReasonCode = "LEBIH" | "KURANG" | "RUSAK" | "LAINNYA"
+
 export interface DistributionItem {
   id: string
   productId: string
   productName: string
+  productCategory: string | null
   sellPrice: number
   qtySent: number
   qtyReceived: number | null
@@ -351,6 +421,8 @@ export interface Distribution {
   boothName: string
   sentAt: string | null
   receivedAt: string | null
+  receivedById: string | null
+  receivedByName: string | null
   note: string | null
   items: DistributionItem[]
 }
@@ -358,11 +430,16 @@ export interface Distribution {
 /// Serah Terima Stok — 1 transaksi gabungan (RestockRequest + StockDistribution
 /// di backend, disatukan di sini). `id` berprefix "req_"/"dist_", dipakai apa
 /// adanya di endpoint aksi (approve/reject/receive/cancel/revise/correct).
+export type TindakLanjutSelisih = "RUSAK" | "SALAH_HITUNG" | "GANTI_RUGI_PETUGAS" | "LAINNYA"
+
 export interface StockHandoverItem {
   productId: string
   productName: string
   qty: number
   qtyReceived: number | null
+  sellPrice?: number
+  discrepancyReasonCode?: DiscrepancyReasonCode | null
+  discrepancyNote?: string | null
 }
 
 export interface StockHandover {
@@ -387,20 +464,56 @@ export interface FilterLaporanSerahTerima {
   status?: StockHandover["status"]
 }
 
-/// Rekap stok yang masih Diproses (in-transit) — belum dikonfirmasi diterima
-/// Petugas, dikelompokkan per produk + rincian tujuan Booth.
-export interface StockHandoverInTransitDestination {
-  boothId: string
+export interface FilterLaporanStokSelisih {
+  dateFrom?: string
+  dateTo?: string
+  boothId?: string
+}
+
+export type JenisStokSelisih = "KIRIM_STOK" | "PENGEMBALIAN_STOK"
+export type TindakLanjutStokSelisih = "RUSAK" | "GANTI_RUGI_PETUGAS" | "LAINNYA"
+
+export interface BarisStokSelisih {
+  id: string
+  jenis: JenisStokSelisih
+  docNo: string
+  tanggal: string
   boothName: string
   staffName: string | null
+  productName: string
+  qtyDiajukan: number | null
+  qtyDiterima: number | null
+  selisih: number
+  tindakLanjut: TindakLanjutStokSelisih
+  catatan: string | null
+}
+
+export interface StokSelisihData {
+  rows: BarisStokSelisih[]
+  totalSelisih: number
+  totalKejadian: number
+  totalGantiRugi: number
+  perProduk: { productName: string; totalSelisih: number; kejadian: number }[]
+}
+
+/// Stok yang masih Diproses (in-transit) — belum dikonfirmasi diterima
+/// Petugas. Satu baris per dokumen/transaksi (bukan per produk).
+export interface StockHandoverInTransitProductItem {
+  productId: string
+  productName: string
+  productCategory: string | null
   qty: number
 }
 
-export interface StockHandoverInTransitItem {
-  productId: string
-  productName: string
+export interface StockHandoverInTransitTransaction {
+  distributionId: string
+  distributionNo: string
+  boothId: string
+  boothName: string
+  staffName: string | null
+  sentAt: string | null
   totalQty: number
-  destinations: StockHandoverInTransitDestination[]
+  items: StockHandoverInTransitProductItem[]
 }
 
 /// Petugas yang sedang Aktif (sudah Check-In) — dipakai picker "Petugas" di
@@ -411,6 +524,7 @@ export interface ActiveAssignment {
   staffName: string
   boothId: string
   boothName: string
+  openedAt: string | null
 }
 
 /// Tambah Stok Gudang. DRAFT tidak menyentuh stok; POSTED sudah menambah
@@ -555,6 +669,8 @@ export interface BoothAktifCard {
   omzetToday: number
   stockQty: number
   stockStatus: "Aman" | "Menipis" | "Kritis" | "Habis"
+  pendingDistribution: { distributionNo: string; sentAt: string | null; count: number } | null
+  pendingReturn: { returnNo: string; submittedAt: string | null; count: number; qty: number } | null
   topStock: { productName: string; qty: number }[]
 }
 
@@ -568,6 +684,10 @@ export interface BoothStockRow {
   qtyOnHand: number
   minimumQty: number
   status: "Aman" | "Menipis" | "Kritis" | "Habis"
+  /// Sisa Stok Fisik yang sudah diajukan Return ke Gudang saat Check-Out,
+  /// belum di-approve Admin — qtyOnHand bisa 0 padahal bukan benar-benar
+  /// habis kalau angka ini > 0.
+  dalamProsesKembali: number
 }
 
 export type SalePaymentMethod = "CASH" | "QRIS" | "SPLIT"
@@ -834,6 +954,9 @@ export interface ActiveShift {
   status: "OPEN" | "CLOSING" | "CLOSED"
   scheduledStartAt: string
   scheduledEndAt: string
+  /// Jam Check-In SESUNGGUHNYA (bukan jadwal) — null hanya utk shift yang
+  /// belum pernah dibuka (seharusnya tidak terjadi di layar aktif manapun).
+  openedAt: string | null
   accessToken?: string
   locationWarning?: string
 }
@@ -871,6 +994,28 @@ export interface ShiftHistoryResponse {
   items: ShiftHistoryItem[]
 }
 
+export interface ShiftAdminHistoryItem {
+  id: string
+  businessDate: string
+  boothId: string
+  boothName: string
+  staffId: string
+  staffName: string
+  status: "SCHEDULED" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELLED"
+  openedAt: string | null
+  closedAt: string | null
+  checkInPhotoUrl: string | null
+  checkInLatitude: number | null
+  checkInLongitude: number | null
+  checkOutPhotoUrl: string | null
+  checkOutLatitude: number | null
+  checkOutLongitude: number | null
+  totalJualCup: number
+  adaSelisih: boolean
+  returStatus: "SUBMITTED" | "RECEIVED" | "DISCREPANCY" | "CANCELLED" | null
+  setoranStatus: "PENDING" | "CONFIRMED" | "DISCREPANCY" | null
+}
+
 export interface ShiftReportItem {
   productId: string
   productName: string
@@ -879,16 +1024,66 @@ export interface ShiftReportItem {
   terjual: number
   retur: number
   sisaSistem: number
+  stokFisik: number | null
+  selisih: number
+  reasonCode: string | null
+  reasonNote: string | null
+}
+
+export interface ShiftReportTransaksi {
+  saleId: string
+  saleNo: string
+  cupCount: number
+  total: number
+  tunai: number
+  qris: number
+}
+
+export interface ShiftReportReturItem {
+  productId: string
+  productName: string
+  sellPrice: number
+  qtySubmitted: number
+  qtyReceived: number | null
+  stokFisikPetugas: number | null
+  catatanPetugas: string | null
+  discrepancyReasonCode: "LEBIH" | "KURANG" | "RUSAK" | "LAINNYA" | null
+  discrepancyNote: string | null
+}
+
+export interface ShiftReportRetur {
+  id: string
+  returnNo: string
+  status: "SUBMITTED" | "RECEIVED" | "DISCREPANCY" | "CANCELLED"
+  note: string | null
+  receiveNote: string | null
+  submittedAt: string
+  receivedAt: string | null
+  items: ShiftReportReturItem[]
+}
+
+export interface ShiftReportSetoran {
+  status: "PENDING" | "CONFIRMED" | "DISCREPANCY"
+  expectedAmount: number
+  depositedAmount: number | null
+  note: string | null
+  confirmedAt: string | null
 }
 
 export interface ShiftReport {
   boothName: string
   shiftTemplateName: string
+  staffName: string
+  status: "SCHEDULED" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELLED"
   businessDate: string
   items: ShiftReportItem[]
+  transaksi: ShiftReportTransaksi[]
   totalPenjualan: number
   kasTunai: number
   kasQris: number
+  catatan: string | null
+  retur: ShiftReportRetur | null
+  setoran: ShiftReportSetoran | null
 }
 
 export interface MyBoothShiftAssignment {
@@ -1131,7 +1326,7 @@ export const api = {
     status?: StockHandover["status"]
     boothId?: string
   }) => request<Paginated<StockHandover>>(`/stock-handovers${toQueryString(params ?? {})}`),
-  getStockHandoverInTransit: () => request<StockHandoverInTransitItem[]>("/stock-handovers/in-transit"),
+  getStockHandoverInTransit: () => request<StockHandoverInTransitTransaction[]>("/stock-handovers/in-transit"),
   getStockHandover: (id: string) => request<StockHandover>(`/stock-handovers/${id}`),
   getStockHandoverActivityLog: (id: string) => request<ActivityLogEntry[]>(`/stock-handovers/${id}/activity-log`),
   getActiveAssignments: () => request<ActiveAssignment[]>("/shifts/active-assignments"),
@@ -1151,7 +1346,12 @@ export const api = {
   ) => request<Distribution>(`/stock-handovers/${id}/revise`, { method: "POST", body: input }),
   correctStockHandoverReceipt: (
     id: string,
-    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
+    input: {
+      idempotencyKey: string
+      items: { productId: string; qty: number; tindakLanjut?: TindakLanjutSelisih; tindakLanjutNote?: string }[]
+      reasonCode: ReasonCode
+      reasonNote?: string
+    },
   ) => request<Distribution>(`/stock-handovers/${id}/correct-receipt`, { method: "POST", body: input }),
 
   getStockHandoverReport: async (format: "pdf" | "excel", filter: FilterLaporanSerahTerima = {}) => {
@@ -1161,6 +1361,30 @@ export const api = {
     const qs = params.toString()
 
     const res = await fetch(`${BASE_URL}/reports/stock-handovers/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockDiscrepancyReport: (filter: FilterLaporanStokSelisih = {}) => {
+    const params = new URLSearchParams()
+    if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
+    if (filter.dateTo) params.set("dateTo", filter.dateTo)
+    if (filter.boothId) params.set("boothId", filter.boothId)
+    const qs = params.toString()
+    return request<StokSelisihData>(`/reports/stock-discrepancy${qs ? `?${qs}` : ""}`)
+  },
+  getStockDiscrepancyReportFile: async (format: "pdf" | "excel", filter: FilterLaporanStokSelisih = {}) => {
+    const params = new URLSearchParams()
+    if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
+    if (filter.dateTo) params.set("dateTo", filter.dateTo)
+    if (filter.boothId) params.set("boothId", filter.boothId)
+    const qs = params.toString()
+
+    const res = await fetch(`${BASE_URL}/reports/stock-discrepancy/${format}${qs ? `?${qs}` : ""}`, {
       headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     })
     if (!res.ok) {
@@ -1180,8 +1404,10 @@ export const api = {
   },
 
   getReturns: () => request<StockReturn[]>("/returns"),
-  receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[]) =>
-    request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
+  receiveReturn: (
+    id: string,
+    items: { productId: string; qtyReceived: number; tindakLanjut?: TindakLanjutSelisih; tindakLanjutNote?: string }[],
+  ) => request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
   cancelReturn: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request<StockReturn>(`/returns/${id}/cancel`, { method: "POST", body: input }),
   reviseReturn: (
@@ -1201,7 +1427,7 @@ export const api = {
   getBoothAktif: () => request<BoothAktifCard[]>("/dashboard/booth-aktif"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   exportReportsCsv: () => fetchCsvBlob("/reports/export"),
-  getBoothStock: () => request<BoothStockRow[]>("/booth-stock"),
+  getBoothStock: (params?: { boothId?: string }) => request<BoothStockRow[]>(`/booth-stock${toQueryString(params ?? {})}`),
   getSales: (params?: {
     page?: number
     limit?: number
@@ -1272,7 +1498,7 @@ export const api = {
     request<{ id: string; deleted: boolean }>(`/shift-templates/${id}`, { method: "DELETE" }),
 
   getBoothShiftAssignments: () => request<BoothShiftAssignment[]>("/booth-shift-assignments"),
-  upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null }) =>
+  upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null; force?: boolean }) =>
     request<BoothShiftAssignment>("/booth-shift-assignments", { method: "PUT", body: input }),
 
   getBoothStockThresholds: (boothId: string) =>
@@ -1385,6 +1611,10 @@ export const api = {
     return res.blob()
   },
 
+  getSebaranStok: (tanggal: string) =>
+    request<SebaranStokResponse>(`/stock-movements/sebaran?tanggal=${encodeURIComponent(tanggal)}`),
+  getSebaranPenjualan: (dari: string, sampai: string) =>
+    request<SebaranPenjualanResponse>(`/sales/sebaran?dari=${encodeURIComponent(dari)}&sampai=${encodeURIComponent(sampai)}`),
   getStockRekap: (params: { bulan: number; tahun: number; lokasi?: string; jenis?: JenisMutasi }) =>
     request<RekapStokResponse>(
       `/stock-movements/rekap?bulan=${params.bulan}&tahun=${params.tahun}&lokasi=${encodeURIComponent(params.lokasi ?? "WAREHOUSE")}&jenis=${params.jenis ?? "SEMUA"}`,
@@ -1445,12 +1675,21 @@ export const api = {
   ) => request<ClosingResponse>(`/shifts/${shiftSessionId}/closing/confirm`, { method: "POST", body: input }),
   getShiftHistory: (month?: string) =>
     request<ShiftHistoryResponse>(`/shifts/history${month ? `?month=${month}` : ""}`),
+  getShiftAdminHistory: () => request<ShiftAdminHistoryItem[]>("/shifts/admin-history"),
   getShiftReport: (shiftSessionId: string) => request<ShiftReport>(`/shifts/${shiftSessionId}/report`),
+  confirmCashDeposit: (shiftSessionId: string, input: { depositedAmount: number; note?: string }) =>
+    request<{ status: "PENDING" | "CONFIRMED" | "DISCREPANCY" }>(`/shifts/${shiftSessionId}/cash-deposit/confirm`, {
+      method: "POST",
+      body: input,
+    }),
 
   getPendingDistributions: () => request<Distribution[]>("/distributions/pending"),
   getMyDistributions: () => request<Distribution[]>("/distributions/mine"),
-  receiveDistribution: (id: string, items: { productId: string; actualQty: number }[]) =>
-    request<Distribution>(`/distributions/${id}/receive`, { method: "POST", body: { items } }),
+  receiveDistribution: (
+    id: string,
+    items: { productId: string; actualQty: number; reasonCode?: DiscrepancyReasonCode; reasonNote?: string }[],
+    note?: string,
+  ) => request<Distribution>(`/distributions/${id}/receive`, { method: "POST", body: { items, note } }),
 
   /// Salah satu WAJIB diisi: `paymentMethod` (satu metode) atau `payments`
   /// (Split, >=2 baris, jumlahnya harus PAS sama dengan total setelah diskon).

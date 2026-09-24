@@ -92,6 +92,14 @@ export class StockMovementsController {
     return this.service.ringkasPerLokasi(periode);
   }
 
+  @Get('sebaran')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  sebaran(@Query('tanggal') tanggal?: string) {
+    const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const hariIni = jakarta.toISOString().slice(0, 10);
+    return this.service.sebaranHarian(tanggal || hariIni);
+  }
+
   @Get('rinci')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   rinci(

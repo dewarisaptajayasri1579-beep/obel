@@ -133,13 +133,13 @@ export function AttendanceCapture({
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-2 mb-1">
           <MapPin size={16} style={{ color: GREEN }} />
-          <span className="text-sm font-bold text-slate-800">Konfirmasi Lokasi Anda</span>
+          <span className="text-base font-bold text-slate-800">Konfirmasi Lokasi Anda</span>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Pastikan Anda berada di area booth yang benar.</p>
+        <p className="text-sm text-slate-500 mb-3">Pastikan Anda berada di area booth yang benar.</p>
 
         {location ? (
-          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
-            <div className="text-xs text-slate-700">
+          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5.5">
+            <div className="text-sm text-slate-700">
               <div className="font-semibold">
                 {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
               </div>
@@ -152,20 +152,20 @@ export function AttendanceCapture({
             type="button"
             onClick={requestLocation}
             disabled={locating}
-            className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 disabled:opacity-60"
+            className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-base font-semibold text-slate-600 disabled:opacity-60"
           >
             {locating ? "Mengambil lokasi..." : "Ambil Lokasi Saya"}
           </button>
         )}
-        {locationError && <p className="text-xs text-rose-600 mt-2">{locationError}</p>}
+        {locationError && <p className="text-sm text-rose-600 mt-2">{locationError}</p>}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-2 mb-1">
           <Camera size={16} style={{ color: GREEN }} />
-          <span className="text-sm font-bold text-slate-800">Ambil Foto Selfie</span>
+          <span className="text-base font-bold text-slate-800">Ambil Foto Selfie</span>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Pastikan wajah Anda terlihat jelas.</p>
+        <p className="text-sm text-slate-500 mb-3">Pastikan wajah Anda terlihat jelas.</p>
 
         {cameraOpen ? (
           <div className="flex flex-col items-center gap-3">
@@ -174,7 +174,7 @@ export function AttendanceCapture({
               <button
                 type="button"
                 onClick={stopCamera}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center"
+                className="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/50 flex items-center justify-center"
               >
                 <X size={16} className="text-white" />
               </button>
@@ -201,7 +201,7 @@ export function AttendanceCapture({
             <button
               type="button"
               onClick={openCamera}
-              className="flex-1 rounded-xl py-3 text-sm font-bold text-white flex items-center justify-center gap-2"
+              className="flex-1 rounded-xl py-3 text-base font-bold text-white flex items-center justify-center gap-2"
               style={{ backgroundColor: GREEN }}
             >
               {photoFile ? <RotateCcw size={16} /> : <Camera size={16} />}
@@ -212,11 +212,11 @@ export function AttendanceCapture({
 
         {cameraError && (
           <div className="mt-2">
-            <p className="text-xs text-rose-600 mb-2">{cameraError}</p>
+            <p className="text-sm text-rose-600 mb-2">{cameraError}</p>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-xs font-semibold underline"
+              className="text-sm font-semibold underline"
               style={{ color: GREEN }}
             >
               Pilih foto dari galeri

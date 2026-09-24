@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -11,6 +12,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ReasonCode } from '@prisma/client';
+import { TINDAK_LANJUT_VALUES, type TindakLanjutSelisih } from '../../../common/tindak-lanjut';
+
+export type { TindakLanjutSelisih } from '../../../common/tindak-lanjut';
 
 export class DistributionItemQtyDto {
   @IsUUID()
@@ -19,6 +23,16 @@ export class DistributionItemQtyDto {
   @IsInt()
   @Min(0)
   qty!: number;
+}
+
+export class CorrectReceiptItemDto extends DistributionItemQtyDto {
+  @IsOptional()
+  @IsIn(TINDAK_LANJUT_VALUES)
+  tindakLanjut?: TindakLanjutSelisih;
+
+  @IsOptional()
+  @IsString()
+  tindakLanjutNote?: string;
 }
 
 export class CancelDistributionDto {
@@ -58,8 +72,8 @@ export class CorrectReceiptDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => DistributionItemQtyDto)
-  items!: DistributionItemQtyDto[];
+  @Type(() => CorrectReceiptItemDto)
+  items!: CorrectReceiptItemDto[];
 
   @IsEnum(ReasonCode)
   reasonCode!: ReasonCode;

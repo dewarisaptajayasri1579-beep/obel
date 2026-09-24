@@ -101,6 +101,14 @@ export class SalesController {
     });
   }
 
+  @Get('sebaran')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  sebaran(@Query('dari') dari?: string, @Query('sampai') sampai?: string) {
+    const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const hariIni = jakarta.toISOString().slice(0, 10);
+    return this.salesService.sebaranPenjualan(dari || hariIni, sampai || hariIni);
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findOne(@Param('id') id: string) {

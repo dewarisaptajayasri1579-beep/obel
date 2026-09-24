@@ -7,6 +7,15 @@ import { Prisma, PrismaClient } from '@prisma/client';
 /// Query-nya sendiri valid, jadi cukup diulang SEKALI dengan koneksi baru
 /// dari pool, bukan dianggap error permanen.
 const KODE_KONEKSI_TERTUTUP = 'P1017';
+/// Pool cuma 5 koneksi (lihat DATABASE_URL) dan dipakai bersamaan oleh
+/// beberapa WebSocket gateway yang polling tiap beberapa detik (BoothAktif,
+/// WarehouseStock, Notifications) + trafik HTTP biasa — gampang antre lalu
+/// timeout menunggu koneksi bebas walau query & DB-nya sendiri sehat.
+const KODE_POOL_TIMEOUT = 'P2024';
+/// DB sempat tidak terjangkau sesaat (network blip) — bukan berarti query
+/// salah, jadi diperlakukan sama seperti koneksi basi: retry sekali.
+const KODE_DB_TIDAK_TERJANGKAU = 'P1001';
+const KODE_BISA_DIRETRY = new Set([KODE_KONEKSI_TERTUTUP, KODE_POOL_TIMEOUT, KODE_DB_TIDAK_TERJANGKAU]);
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -18,8 +27,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       try {
         return await next(params);
       } catch (err) {
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_KONEKSI_TERTUTUP) {
-          this.logger.warn(`Koneksi database basi, mengulang ${params.model ?? '?'}.${params.action} sekali.`);
+        if (err instanceof Prisma.PrismaClientKnownRequestError && KODE_BISA_DIRETRY.has(err.code)) {
+          this.logger.warn(`Koneksi database bermasalah (${err.code}), mengulang ${params.model ?? '?'}.${params.action} sekali.`);
           return next(params);
         }
         throw err;

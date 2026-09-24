@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
+import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
 
 /// Font khas Web/App Petugas Booth — SAMA dengan apps/booth_flutter
 /// (`GoogleFonts.outfitTextTheme()` di theme.dart), sengaja beda dari
@@ -15,6 +16,19 @@ export const metadata: Metadata = {
   title: "Obbel Petugas Booth",
   description: "Check-In, Kasir, Terima Stok, dan aktivitas harian Petugas Booth.",
   manifest: "/petugas/manifest.webmanifest",
+  // iOS Safari TIDAK baca manifest.webmanifest sama sekali untuk "Tambah ke
+  // Layar Utama" — tanpa dua field di bawah ini PWA-nya tetap "installable"
+  // di Chrome/Android tapi kelihatan seperti bookmark biasa (bukan app) di
+  // iPhone, padahal mayoritas Petugas Booth kemungkinan pakai iPhone pribadi.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Obbel Petugas",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,5 +45,10 @@ export const viewport: Viewport = {
 /// sendiri dengan RequirePetugasAuth atau tidak (mis. /petugas/login) sesuai
 /// kebutuhan, bukan di sini — supaya halaman login tidak ikut ter-redirect.
 export default function PetugasLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${outfit.className} antialiased`}>{children}</div>;
+  return (
+    <div className={`${outfit.className} antialiased`}>
+      <RegisterServiceWorker />
+      {children}
+    </div>
+  );
 }

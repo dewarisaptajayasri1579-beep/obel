@@ -16,13 +16,19 @@ import {
   ExternalLink,
   FileText,
   FileSpreadsheet,
+  TrendingUp,
+  X,
+  XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type Booth, type SaleDetail, type SaleListItem, type UserAccount } from "@/lib/api-client";
+import { TRANSAKSI_BOOTH_FILTER_KEYS, usePersistedFilter } from "@/lib/use-persisted-filter";
 import { KasirReportPreviewModal } from "./KasirReportPreviewModal";
+import { TabSebaranPenjualan } from "./TabSebaranPenjualan";
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 const LIMIT = 20;
@@ -75,19 +81,26 @@ function waktuJakarta(iso: string) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(iso));
 }
 
+type Tab = "daftar" | "sebaran";
+
 function TransaksiKasirContent() {
   const toast = useToast();
+  const [tab, setTab] = useState<Tab>("daftar");
   const [rows, setRows] = useState<SaleListItem[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = usePersistedFilter("transaksi-kasir:search", "");
   const [search, setSearch] = useState(""); // versi debounced, dipakai buat fetch
-  const [statusFilter, setStatusFilter] = useState<"" | SaleListItem["status"]>("");
-  const [boothId, setBoothId] = useState("");
-  const [staffId, setStaffId] = useState("");
-  const [periodeFilter, setPeriodeFilter] = useState<Periode>("SEMUA");
+  const [statusFilterRaw, setStatusFilterRaw] = usePersistedFilter("transaksi-kasir:status", "");
+  const statusFilter = statusFilterRaw as "" | SaleListItem["status"];
+  const setStatusFilter = (v: "" | SaleListItem["status"]) => setStatusFilterRaw(v);
+  const [boothId, setBoothId] = usePersistedFilter(TRANSAKSI_BOOTH_FILTER_KEYS.boothId, "");
+  const [staffId, setStaffId] = usePersistedFilter(TRANSAKSI_BOOTH_FILTER_KEYS.staffId, "");
+  const [periodeFilterRaw, setPeriodeFilterRaw] = usePersistedFilter("transaksi-kasir:periode", "SEMUA");
+  const periodeFilter = periodeFilterRaw as Periode;
+  const setPeriodeFilter = (v: Periode) => setPeriodeFilterRaw(v);
 
   const [booths, setBooths] = useState<Booth[]>([]);
   const [staffList, setStaffList] = useState<UserAccount[]>([]);
@@ -146,6 +159,15 @@ function TransaksiKasirContent() {
   }, [page, search, statusFilter, boothId, staffId, periodeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const filterAktif = searchInput.trim() !== "" || statusFilter !== "" || boothId !== "" || staffId !== "" || periodeFilter !== "SEMUA";
+
+  function resetFilter() {
+    setSearchInput("");
+    setStatusFilter("");
+    setBoothId("");
+    setStaffId("");
+    setPeriodeFilter("SEMUA");
+  }
 
   const reportFilter = useMemo(() => {
     const awalPeriode = batasAwalPeriode(periodeFilter, new Date());
@@ -263,6 +285,33 @@ function TransaksiKasirContent() {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        {(
+          [
+            ["daftar", "Daftar Transaksi", ClipboardList],
+            ["sebaran", "Sebaran Penjualan", TrendingUp],
+          ] as [Tab, string, typeof ClipboardList][]
+        ).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+              tab === key
+                ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)] shadow-xs"
+                : "bg-white/90 dark:bg-surface text-slate-700 dark:text-fg-secondary border-slate-200/90 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === "sebaran" && <TabSebaranPenjualan />}
+
+      {tab === "daftar" && (
+      <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
@@ -320,58 +369,84 @@ function TransaksiKasirContent() {
               placeholder="Cari no. sale atau petugas..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+                searchInput.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
+              }`}
+            />
+            {searchInput.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                title="Bersihkan pencarian"
+                className="absolute right-2.5 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-fg cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="w-36">
+            <Select
+              options={[
+                { value: "PAID", label: "Lunas" },
+                { value: "VOIDED", label: "Dibatalkan" },
+                { value: "PENDING", label: "Pending" },
+              ]}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              placeholder="Semua Status"
+              sizeVariant="sm"
+              className="!h-9"
+              active={statusFilter !== ""}
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="h-9 px-3 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none shadow-2xs"
-          >
-            <option value="">Semua Status</option>
-            <option value="PAID">Lunas</option>
-            <option value="VOIDED">Dibatalkan</option>
-            <option value="PENDING">Pending</option>
-          </select>
+          <div className="w-44">
+            <Select
+              options={booths.map((b) => ({ value: b.id, label: b.name }))}
+              value={boothId}
+              onChange={setBoothId}
+              placeholder="Semua Booth"
+              sizeVariant="sm"
+              className="!h-9"
+              active={boothId !== ""}
+            />
+          </div>
 
-          <select
-            value={boothId}
-            onChange={(e) => setBoothId(e.target.value)}
-            className="h-9 px-3 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none shadow-2xs"
-          >
-            <option value="">Semua Booth</option>
-            {booths.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-44">
+            <Select
+              options={staffList.map((s) => ({ value: s.id, label: s.fullName }))}
+              value={staffId}
+              onChange={setStaffId}
+              placeholder="Semua Petugas"
+              sizeVariant="sm"
+              className="!h-9"
+              active={staffId !== ""}
+            />
+          </div>
 
-          <select
-            value={staffId}
-            onChange={(e) => setStaffId(e.target.value)}
-            className="h-9 px-3 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none shadow-2xs"
-          >
-            <option value="">Semua Petugas</option>
-            {staffList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.fullName}
-              </option>
-            ))}
-          </select>
+          <div className="w-40">
+            <Select
+              options={PERIODE_OPTIONS}
+              value={periodeFilter}
+              onChange={(v) => setPeriodeFilter(v as Periode)}
+              sizeVariant="sm"
+              className="!h-9"
+              active={periodeFilter !== "SEMUA"}
+            />
+          </div>
 
-          <select
-            value={periodeFilter}
-            onChange={(e) => setPeriodeFilter(e.target.value as Periode)}
-            className="h-9 px-3 rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-xs font-semibold text-slate-700 dark:text-fg-secondary cursor-pointer focus:outline-none shadow-2xs"
-          >
-            {PERIODE_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+          {filterAktif && (
+            <button
+              type="button"
+              onClick={resetFilter}
+              title="Hapus semua filter yang aktif"
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/15 hover:bg-amber-100 dark:hover:bg-amber-900/25 border border-amber-200 dark:border-amber-900/40 text-xs font-semibold text-amber-700 dark:text-amber-400 cursor-pointer transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Reset Filter</span>
+            </button>
+          )}
 
           <div className="flex-1" />
 
@@ -594,6 +669,8 @@ function TransaksiKasirContent() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       <KasirReportPreviewModal isOpen={showPreview} onClose={() => setShowPreview(false)} filter={reportFilter} />
     </div>

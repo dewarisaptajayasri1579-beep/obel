@@ -3,7 +3,7 @@ import { RestockRequestStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya } from '../../common/doc-no';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { DistributionsService } from '../distributions/distributions.service';
 import { CorrectionsService } from '../corrections/corrections.service';
@@ -58,18 +58,27 @@ export class RestockRequestsService {
       }
     }
 
-    const request = await this.prisma.restockRequest.create({
-      data: {
-        requestNo: generateDocNo('RSTK'),
-        boothId,
-        requestedById: staffId,
-        status: RestockRequestStatus.REQUESTED,
-        note: dto.note,
-        items: {
-          createMany: { data: dto.items.map((i) => ({ productId: i.productId, qtyRequested: i.qty })) },
+    const request = await this.prisma.$transaction(async (tx) => {
+      const semua = await tx.restockRequest.findMany({
+        where: { requestNo: { startsWith: 'RSTK-' } },
+        select: { requestNo: true },
+      });
+      return tx.restockRequest.create({
+        data: {
+          requestNo: nomorSekuensialBerikutnya(
+            semua.map((r) => r.requestNo),
+            'RSTK',
+          ),
+          boothId,
+          requestedById: staffId,
+          status: RestockRequestStatus.REQUESTED,
+          note: dto.note,
+          items: {
+            createMany: { data: dto.items.map((i) => ({ productId: i.productId, qtyRequested: i.qty })) },
+          },
         },
-      },
-      include: { items: { include: { product: true } } },
+        include: { items: { include: { product: true } } },
+      });
     });
 
     await this.activityLog.record(this.prisma, {

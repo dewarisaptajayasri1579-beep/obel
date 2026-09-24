@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ReconciliationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ResolveReconciliationCaseDto } from './dto/resolve-case.dto';
@@ -35,15 +35,24 @@ export class ReconciliationCasesService {
     reasonCode: import('@prisma/client').ReasonCode;
     details: Record<string, unknown>;
   }) {
-    return this.prisma.reconciliationCase.create({
-      data: {
-        caseNo: generateDocNo('RECON'),
-        sourceEntityType: input.sourceEntityType,
-        sourceEntityId: input.sourceEntityId,
-        severity: input.severity,
-        reasonCode: input.reasonCode,
-        details: input.details as never,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const semua = await tx.reconciliationCase.findMany({
+        where: { caseNo: { startsWith: 'RECON-' } },
+        select: { caseNo: true },
+      });
+      return tx.reconciliationCase.create({
+        data: {
+          caseNo: nomorSekuensialBerikutnya(
+            semua.map((c) => c.caseNo),
+            'RECON',
+          ),
+          sourceEntityType: input.sourceEntityType,
+          sourceEntityId: input.sourceEntityId,
+          severity: input.severity,
+          reasonCode: input.reasonCode,
+          details: input.details as never,
+        },
+      });
     });
   }
 

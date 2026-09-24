@@ -3,7 +3,7 @@ import { OpnameLocationType, OpnameStatus, Prisma, StockMovementType } from '@pr
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CorrectionsService } from '../corrections/corrections.service';
@@ -25,6 +25,17 @@ export class StockOpnameService {
     private readonly reconciliationCases: ReconciliationCasesService,
   ) {}
 
+  private async nomorOpnameBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.stockOpname.findMany({
+      where: { opnameNo: { startsWith: 'OPN-' } },
+      select: { opnameNo: true },
+    });
+    return nomorSekuensialBerikutnya(
+      semua.map((o) => o.opnameNo),
+      'OPN',
+    );
+  }
+
   findAll() {
     return this.prisma.stockOpname.findMany({
       include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
@@ -45,26 +56,28 @@ export class StockOpnameService {
       expectedByProduct = new Map(stocks.map((s) => [s.productId, s.qtyOnHand]));
     }
 
-    const opname = await this.prisma.stockOpname.create({
-      data: {
-        opnameNo: generateDocNo('OPN'),
-        locationType: dto.locationType,
-        boothId: dto.locationType === OpnameLocationType.BOOTH ? dto.boothId : null,
-        businessDate: startOfTodayJakarta(),
-        status: OpnameStatus.DRAFT,
-        countedById: user.sub,
-        items: {
-          createMany: {
-            data: products.map((p) => ({
-              productId: p.id,
-              expectedQty: expectedByProduct.get(p.id) ?? 0,
-              actualQty: expectedByProduct.get(p.id) ?? 0,
-              discrepancyQty: 0,
-            })),
+    const opname = await this.prisma.$transaction(async (tx) => {
+      return tx.stockOpname.create({
+        data: {
+          opnameNo: await this.nomorOpnameBerikutnya(tx),
+          locationType: dto.locationType,
+          boothId: dto.locationType === OpnameLocationType.BOOTH ? dto.boothId : null,
+          businessDate: startOfTodayJakarta(),
+          status: OpnameStatus.DRAFT,
+          countedById: user.sub,
+          items: {
+            createMany: {
+              data: products.map((p) => ({
+                productId: p.id,
+                expectedQty: expectedByProduct.get(p.id) ?? 0,
+                actualQty: expectedByProduct.get(p.id) ?? 0,
+                discrepancyQty: 0,
+              })),
+            },
           },
         },
-      },
-      include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
+        include: { booth: true, countedBy: { select: SAFE_PROFILE_SELECT }, items: { include: { product: true } } },
+      });
     });
 
     return opname;
@@ -129,7 +142,7 @@ export class StockOpnameService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
             productId: item.productId,
             qty: Math.abs(discrepancy),
@@ -244,7 +257,7 @@ export class StockOpnameService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
             productId: item.productId,
             qty: Math.abs(compensatingDelta),
@@ -266,7 +279,7 @@ export class StockOpnameService {
       await tx.stockOpname.create({
         data: {
           id: newOpnameId,
-          opnameNo: generateDocNo('OPN'),
+          opnameNo: await this.nomorOpnameBerikutnya(tx),
           locationType: previous.locationType,
           boothId: previous.boothId,
           businessDate: previous.businessDate,

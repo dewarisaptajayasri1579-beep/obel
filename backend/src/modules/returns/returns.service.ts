@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ReturnStatus, StockMovementType } from '@prisma/client';
+import { Prisma, ReturnStatus, StockMovementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
@@ -16,6 +16,12 @@ function businessDateOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
+/// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama
+/// (sama pola dgn StockReceiptsService.nomorBerikutnya).
+const KODE_UNIQUE_VIOLATION = 'P2002';
+const MAKS_PERCOBAAN_NOMOR = 5;
+
 @Injectable()
 export class ReturnsService {
   constructor(
@@ -23,6 +29,19 @@ export class ReturnsService {
     private readonly reconciliationCases: ReconciliationCasesService,
     private readonly corrections: CorrectionsService,
   ) {}
+
+  /// Nomor Return sederhana: `RTN-000001` naik satu per dokumen, pola sama
+  /// dengan StockReceiptsService.nomorBerikutnya ("Tambah Stok Gudang").
+  private async nomorReturnBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.stockReturn.findMany({
+      where: { returnNo: { startsWith: 'RTN-' } },
+      select: { returnNo: true },
+    });
+    return nomorSekuensialBerikutnya(
+      semua.map((r) => r.returnNo),
+      'RTN',
+    );
+  }
 
   findAll() {
     return this.prisma.stockReturn.findMany({
@@ -43,7 +62,7 @@ export class ReturnsService {
   /// stok Booth saat ini (biasanya dipanggil setelah closing). Stok
   /// langsung dikeluarkan dari booth_stocks supaya "tidak boleh dijual
   /// lagi" begitu diajukan.
-  async create(dto: CreateReturnDto, boothId: string, staffId: string) {
+  async create(dto: CreateReturnDto, boothId: string, staffId: string, shiftSessionIdOverride?: string) {
     let items = dto.items;
     if (!items || items.length === 0) {
       const currentStocks = await this.prisma.boothStock.findMany({
@@ -55,11 +74,14 @@ export class ReturnsService {
       throw new DomainError('NO_STOCK_TO_RETURN', 'Tidak ada stok Booth untuk dikembalikan.');
     }
 
-    const returnId = randomUUID();
     const now = new Date();
+    let returnId = '';
 
-    await this.prisma.$transaction(async (tx) => {
-      const shiftSessionId = await cariShiftTerbukaBoothStaff(tx, boothId, staffId);
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      returnId = randomUUID();
+      try {
+        await this.prisma.$transaction(async (tx) => {
+      const shiftSessionId = shiftSessionIdOverride ?? (await cariShiftTerbukaBoothStaff(tx, boothId, staffId));
 
       for (const item of items!) {
         const decremented = await tx.boothStock.updateMany({
@@ -84,7 +106,7 @@ export class ReturnsService {
         // arahnya tidak pernah ambigu saat riwayat dibaca ulang.
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
             productId: item.productId,
             qty: item.qty,
@@ -104,25 +126,38 @@ export class ReturnsService {
       await tx.stockReturn.create({
         data: {
           id: returnId,
-          returnNo: generateDocNo('RTN'),
+          returnNo: await this.nomorReturnBerikutnya(tx),
           boothId,
           status: ReturnStatus.SUBMITTED,
           idempotencyKey: randomUUID(),
           submittedById: staffId,
           note: dto.note,
+          shiftSessionId: shiftSessionIdOverride ?? null,
           items: {
             createMany: { data: items!.map((i) => ({ productId: i.productId, qtySubmitted: i.qty })) },
           },
         },
       });
-    });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.loadWithRelations(returnId);
   }
 
   /// Mirrors receive_stock_return (§09): warehouse hanya bertambah sesuai
   /// qty actual received (BR-013). Beda submitted vs received -> DISCREPANCY,
-  /// tapi tidak memblokir penerimaan (dokumen fisik tetap final).
+  /// tapi tidak memblokir penerimaan (dokumen fisik tetap final). Tiap baris
+  /// selisih wajib Tindak Lanjut (sama pola dgn DistributionsService.
+  /// correctReceipt): RUSAK/LAINNYA ditandai di item utk Laporan Stok
+  /// Selisih, GANTI_RUGI_PETUGAS bikin StaffLiability dibebankan ke
+  /// stockReturn.submittedById (Petugas yang Check-Out shift ini), SALAH_HITUNG
+  /// tidak meninggalkan jejak (qtyReceived yang sudah dikoreksi itu sendiri
+  /// representasinya).
   async receive(id: string, dto: ReceiveReturnDto, actorId: string) {
     const stockReturn = await this.loadWithRelations(id);
     if (!stockReturn) {
@@ -135,19 +170,47 @@ export class ReturnsService {
       throw new DomainError('RETURN_NOT_PENDING', 'Return ini tidak sedang menunggu diterima.');
     }
 
-    const qtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qtyReceived]));
+    const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));
+    const hasDiscrepancy = stockReturn.items.some(
+      (item) => (inputByProduct.get(item.productId)?.qtyReceived ?? item.qtySubmitted) !== item.qtySubmitted,
+    );
+    for (const item of stockReturn.items) {
+      const input = inputByProduct.get(item.productId);
+      const qtyReceived = input?.qtyReceived ?? item.qtySubmitted;
+      if (qtyReceived === item.qtySubmitted) continue;
+      if (!input?.tindakLanjut) {
+        throw new DomainError(
+          'DISCREPANCY_REASON_REQUIRED',
+          'Pilih Tindak Lanjut untuk setiap produk yang Stok Dikembalikan-nya berbeda dari Stok Sistem.',
+          { productId: item.productId },
+        );
+      }
+      if (input.tindakLanjut === 'LAINNYA' && !input.tindakLanjutNote?.trim()) {
+        throw new DomainError(
+          'DISCREPANCY_REASON_REQUIRED',
+          'Catatan wajib diisi untuk Tindak Lanjut "Lainnya".',
+          { productId: item.productId },
+        );
+      }
+    }
+
     const receivedAt = new Date();
     const businessDate = businessDateOf(receivedAt);
-    let hasDiscrepancy = false;
+    const liabilityNotes: string[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       for (const item of stockReturn.items) {
-        const qtyReceived = qtyByProduct.get(item.productId) ?? item.qtySubmitted;
-        if (qtyReceived !== item.qtySubmitted) hasDiscrepancy = true;
+        const input = inputByProduct.get(item.productId);
+        const qtyReceived = input?.qtyReceived ?? item.qtySubmitted;
+        const tindakLanjut = qtyReceived !== item.qtySubmitted ? input?.tindakLanjut : undefined;
 
         await tx.stockReturnItem.update({
           where: { id: item.id },
-          data: { qtyReceived },
+          data: {
+            qtyReceived,
+            discrepancyReasonCode: tindakLanjut === 'RUSAK' || tindakLanjut === 'LAINNYA' ? tindakLanjut : null,
+            discrepancyNote: tindakLanjut === 'LAINNYA' ? input?.tindakLanjutNote?.trim() : null,
+          },
         });
 
         if (qtyReceived > 0) {
@@ -159,7 +222,7 @@ export class ReturnsService {
 
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.RETURN_TO_WAREHOUSE,
               productId: item.productId,
               qty: qtyReceived,
@@ -169,8 +232,30 @@ export class ReturnsService {
               businessDate,
               occurredAt: receivedAt,
               createdBy: actorId,
+              note: tindakLanjut ? `Tindak Lanjut: ${tindakLanjut}` : undefined,
             },
           });
+        }
+
+        if (tindakLanjut === 'GANTI_RUGI_PETUGAS') {
+          const qtyRugi = item.qtySubmitted - qtyReceived;
+          if (qtyRugi > 0) {
+            const unitPrice = item.product.sellPrice;
+            const totalAmount = unitPrice * BigInt(qtyRugi);
+            await tx.staffLiability.create({
+              data: {
+                stockReturnId: stockReturn.id,
+                productId: item.productId,
+                staffId: stockReturn.submittedById,
+                qty: qtyRugi,
+                unitPrice,
+                totalAmount,
+                note: input?.tindakLanjutNote?.trim(),
+                createdById: actorId,
+              },
+            });
+            liabilityNotes.push(`${item.product.name}: ${qtyRugi} cup`);
+          }
         }
       }
 
@@ -180,6 +265,7 @@ export class ReturnsService {
           status: hasDiscrepancy ? ReturnStatus.DISCREPANCY : ReturnStatus.RECEIVED,
           receivedAt,
           receivedById: actorId,
+          receiveNote: liabilityNotes.length > 0 ? `Ganti Rugi Petugas: ${liabilityNotes.join(', ')}` : null,
         },
       });
     });
@@ -217,7 +303,7 @@ export class ReturnsService {
         });
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.VOID_REVERSAL,
             productId: item.productId,
             qty: item.qtySubmitted,
@@ -286,10 +372,13 @@ export class ReturnsService {
     const newQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
     const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
 
-    const newReturnId = randomUUID();
     const now = new Date();
+    let newReturnId = '';
 
     try {
+      for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      newReturnId = randomUUID();
+      try {
       await this.prisma.$transaction(async (tx) => {
       for (const productId of allProductIds) {
         const oldQty = oldQtyByProduct.get(productId) ?? 0;
@@ -315,7 +404,7 @@ export class ReturnsService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: delta > 0 ? StockMovementType.RETURN_TO_WAREHOUSE : StockMovementType.VOID_REVERSAL,
             productId,
             qty: Math.abs(delta),
@@ -335,7 +424,7 @@ export class ReturnsService {
       await tx.stockReturn.create({
         data: {
           id: newReturnId,
-          returnNo: generateDocNo('RTN'),
+          returnNo: await this.nomorReturnBerikutnya(tx),
           boothId: stockReturn.boothId,
           status: ReturnStatus.SUBMITTED,
           idempotencyKey: dto.idempotencyKey,
@@ -371,6 +460,13 @@ export class ReturnsService {
         idempotencyKey: dto.idempotencyKey,
       });
       });
+      break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (bentrokNomor && percobaan < MAKS_PERCOBAAN_NOMOR - 1) continue;
+        throw err;
+      }
+      }
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
         const reconciliationCase = await this.reconciliationCases.create({
@@ -445,7 +541,7 @@ export class ReturnsService {
 
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.ADJUSTMENT,
               productId,
               qty: Math.abs(delta),

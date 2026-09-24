@@ -1,4 +1,4 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 
 export class UpsertBoothShiftAssignmentDto {
   @IsUUID()
@@ -12,4 +12,12 @@ export class UpsertBoothShiftAssignmentDto {
   @IsOptional()
   @IsUUID()
   staffId?: string | null;
+
+  /// Konfirmasi eksplisit dari Admin untuk tetap lanjut walau petugas yang
+  /// sedang dipegang slot ini masih aktif shift (belum check-out) — lihat
+  /// STAFF_SHIFT_ACTIVE di BoothShiftAssignmentsService.upsert(). Tanpa ini,
+  /// perubahan/pengosongan slot itu ditolak dulu supaya Admin sadar dulu.
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean;
 }

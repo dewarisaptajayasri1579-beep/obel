@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 
-import { OBBEL } from "../_lib/theme";
+import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 function SettingContent() {
@@ -55,27 +55,27 @@ function SettingContent() {
     <div className="min-h-screen bg-[#F7F9F6]">
       <div className="bg-white px-5 pt-5 pb-4">
         <h1 className="text-lg font-extrabold text-slate-900">Profil &amp; Pengaturan</h1>
-        <p className="text-xs text-slate-500 mt-1">Kelola informasi akun Anda.</p>
+        <p className="text-sm text-slate-500 mt-1">Kelola informasi akun Anda.</p>
       </div>
 
       <div className="p-4">
         <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E8F5E9" }}>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
             <User size={24} style={{ color: GREEN }} />
           </div>
           <div>
             <p className="font-extrabold text-slate-900">{profile.fullName}</p>
-            <p className="text-xs text-slate-500">Petugas Booth • @{profile.username}</p>
+            <p className="text-sm text-slate-500">Petugas Booth • @{profile.username}</p>
           </div>
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-200 p-4 mb-4">
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nama Lengkap</label>
+          <label className="text-base font-semibold text-slate-700 block mb-1.5">Nama Lengkap</label>
           <input
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#0B5D34]"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none focus:border-[#0B5D34]"
           />
           <button
             type="button"
@@ -96,7 +96,7 @@ function SettingContent() {
           <LogOut size={18} /> Keluar Akun
         </button>
 
-        <p className="text-center text-[11px] text-slate-400 mt-6">Obbel Coffee &amp; Milk — Good Coffee, Good Mood</p>
+        <p className="text-center text-sm text-slate-400 mt-6">Obbel Coffee &amp; Milk — Good Coffee, Good Mood</p>
       </div>
     </div>
   );

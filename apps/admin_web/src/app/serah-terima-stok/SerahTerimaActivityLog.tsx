@@ -74,15 +74,8 @@ export function SerahTerimaActivityLog({ id }: { id: string }) {
       ) : (
         <div className="rounded-xl border border-slate-200/80 dark:border-line overflow-hidden">
           <table className="w-full text-xs">
-            <thead className="bg-slate-50/80 dark:bg-surface-hover text-[11px] font-bold text-slate-500 dark:text-fg-muted">
-              <tr>
-                <th className="py-2.5 px-3 text-left w-40">Tanggal</th>
-                <th className="py-2.5 px-3 text-left w-36">Siapa</th>
-                <th className="py-2.5 px-3 text-left">Ngapain</th>
-              </tr>
-            </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
-              {log.map((entri) => (
+              {[...log].reverse().map((entri) => (
                 <tr key={entri.id}>
                   <td className="py-2.5 px-3 text-slate-500 dark:text-fg-muted whitespace-nowrap">{waktuJakarta(entri.occurredAt)}</td>
                   <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-fg">{entri.actorName}</td>

@@ -3,7 +3,7 @@ import { Prisma, StockMovementType, StockReceiptStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto';
 import { UpdateStockReceiptDto } from './dto/update-stock-receipt.dto';
@@ -298,7 +298,7 @@ export class StockReceiptsService {
           }
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.ADJUSTMENT,
               productId,
               qty: berkurang,
@@ -318,7 +318,7 @@ export class StockReceiptsService {
           });
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.OPENING,
               productId,
               qty: delta,
@@ -343,7 +343,7 @@ export class StockReceiptsService {
         });
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.OPENING,
             productId: item.productId,
             qty: item.qtyReceived,

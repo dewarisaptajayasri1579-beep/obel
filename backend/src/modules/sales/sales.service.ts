@@ -11,9 +11,9 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { generateDocNo } from '../../common/doc-no';
+import { nomorSekuensialBerikutnya, nomorMovementBerikutnya, nomorMovementBerikutnyaBanyak } from '../../common/doc-no';
 import { effectiveByGroup } from '../../common/effective-version';
-import { batasBulanJakarta, businessDateKeyJakarta } from '../../common/jakarta-date';
+import { batasBulanJakarta, businessDateKeyJakarta, rangeJakarta } from '../../common/jakarta-date';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
@@ -70,16 +70,22 @@ export class SalesService {
       select: { saleNo: true },
     });
 
-    const tertinggi = semua.reduce((maks, s) => {
-      const cocok = /^OBL-(\d{6})$/.exec(s.saleNo);
-      return cocok ? Math.max(maks, Number(cocok[1])) : maks;
-    }, 0);
+    return nomorSekuensialBerikutnya(
+      semua.map((s) => s.saleNo),
+      'OBL',
+    );
+  }
 
-    if (tertinggi >= 999999) {
-      throw new DomainError('SALE_NO_EXHAUSTED', 'Nomor invoice Penjualan sudah mencapai batas 999999.');
-    }
-
-    return `OBL-${String(tertinggi + 1).padStart(6, '0')}`;
+  /// Nomor refund sederhana: `RFD-000001`, pola sama seperti sale_no di atas.
+  private async nomorRefundBerikutnya(tx: Prisma.TransactionClient): Promise<string> {
+    const semua = await tx.saleRefund.findMany({
+      where: { refundNo: { startsWith: 'RFD-' } },
+      select: { refundNo: true },
+    });
+    return nomorSekuensialBerikutnya(
+      semua.map((r) => r.refundNo),
+      'RFD',
+    );
   }
 
   /// Mirrors create_paid_sale from
@@ -138,11 +144,12 @@ export class SalesService {
       try {
         await this.prisma.$transaction(async (tx) => {
       const saleNo = await this.nomorSaleBerikutnya(tx);
+      const movementNos = await nomorMovementBerikutnyaBanyak(tx, 'MOV', dto.items.length);
       let subtotal = 0n;
       const saleItemsData: Prisma.SaleItemCreateManyInput[] = [];
       const movementsData: Prisma.StockMovementCreateManyInput[] = [];
 
-      for (const item of dto.items) {
+      for (const [index, item] of dto.items.entries()) {
         const product = productById.get(item.productId)!;
 
         const decremented = await tx.boothStock.updateMany({
@@ -183,7 +190,7 @@ export class SalesService {
 
         movementsData.push({
           id: randomUUID(),
-          movementNo: generateDocNo('MOV'),
+          movementNo: movementNos[index],
           movementType: StockMovementType.SALE,
           productId: item.productId,
           qty: item.qty,
@@ -419,9 +426,12 @@ export class SalesService {
     const paidAt = new Date();
     const businessDate = businessDateOf(paidAt);
 
-    await this.prisma.$transaction(async (tx) => {
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+      const movementNos = await nomorMovementBerikutnyaBanyak(tx, 'MOV', sale.items.length);
       const movementsData: Prisma.StockMovementCreateManyInput[] = [];
-      for (const item of sale.items) {
+      for (const [index, item] of sale.items.entries()) {
         const decremented = await tx.boothStock.updateMany({
           where: { boothId: sale.boothId, productId: item.productId, qtyOnHand: { gte: item.qty } },
           data: { qtyOnHand: { decrement: item.qty }, version: { increment: 1 } },
@@ -438,7 +448,7 @@ export class SalesService {
         }
         movementsData.push({
           id: randomUUID(),
-          movementNo: generateDocNo('MOV'),
+          movementNo: movementNos[index],
           movementType: StockMovementType.SALE,
           productId: item.productId,
           qty: item.qty,
@@ -470,7 +480,13 @@ export class SalesService {
         actorName: user.username,
         note: `${sale.saleNo} dibayar (${plan.saleMethod}) — ${formatRupiah(sale.total)}.`,
       });
-    });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toSaleResponse(sale.id);
   }
@@ -761,7 +777,9 @@ export class SalesService {
     const voidedAt = new Date();
     const businessDate = businessDateOf(voidedAt);
 
-    await this.prisma.$transaction(async (tx) => {
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
       for (const delta of impact.stockDeltas) {
         await tx.boothStock.upsert({
           where: { boothId_productId: { boothId: sale.boothId, productId: delta.productId } },
@@ -771,7 +789,7 @@ export class SalesService {
 
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.VOID_REVERSAL,
             productId: delta.productId,
             qty: delta.qtyDelta,
@@ -821,7 +839,13 @@ export class SalesService {
         actorName: user.username,
         note: `${sale.saleNo} dibatalkan — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
       });
-    });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toSaleResponse(sale.id);
   }
@@ -853,13 +877,16 @@ export class SalesService {
     // PENDING/draft yang null, lihat SalesService.createDraftSale), jadi
     // non-null assertion ini aman.
     const paymentMethod = dto.paymentMethod ?? sale.paymentMethod!;
-    const newSaleId = randomUUID();
-    const newSaleNo = generateDocNo('OBL');
     const revisedAt = new Date();
     const businessDate = businessDateOf(sale.paidAt ?? revisedAt);
+    let newSaleId = '';
 
     try {
+      for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      newSaleId = randomUUID();
+      try {
       await this.prisma.$transaction(async (tx) => {
+      const newSaleNo = await this.nomorSaleBerikutnya(tx);
       for (const delta of impact.stockDeltas) {
         if (delta.qtyDelta > 0) {
           const decremented = await tx.boothStock.updateMany({
@@ -873,7 +900,7 @@ export class SalesService {
           }
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.SALE,
               productId: delta.productId,
               qty: delta.qtyDelta,
@@ -894,7 +921,7 @@ export class SalesService {
           });
           await tx.stockMovement.create({
             data: {
-              movementNo: generateDocNo('MOV'),
+              movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
               movementType: StockMovementType.VOID_REVERSAL,
               productId: delta.productId,
               qty: -delta.qtyDelta,
@@ -969,6 +996,13 @@ export class SalesService {
         note: `Revisi dari ${sale.saleNo} — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
       });
       });
+      break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (bentrokNomor && percobaan < MAKS_PERCOBAAN_NOMOR - 1) continue;
+        throw err;
+      }
+      }
     } catch (err) {
       if (err instanceof DomainError && err.code === 'INSUFFICIENT_STOCK') {
         const reconciliationCase = await this.reconciliationCases.create({
@@ -1108,10 +1142,13 @@ export class SalesService {
       }
     }
 
-    const refundId = randomUUID();
     const now = new Date();
+    let refundId = '';
 
-    await this.prisma.$transaction(async (tx) => {
+    for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
+      refundId = randomUUID();
+      try {
+        await this.prisma.$transaction(async (tx) => {
       for (const { productId, qty } of stockDeltas) {
         await tx.boothStock.upsert({
           where: { boothId_productId: { boothId: sale.boothId, productId } },
@@ -1120,7 +1157,7 @@ export class SalesService {
         });
         await tx.stockMovement.create({
           data: {
-            movementNo: generateDocNo('MOV'),
+            movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
             productId,
             qty,
@@ -1138,7 +1175,7 @@ export class SalesService {
       await tx.saleRefund.create({
         data: {
           id: refundId,
-          refundNo: generateDocNo('RFD'),
+          refundNo: await this.nomorRefundBerikutnya(tx),
           saleId: sale.id,
           condition: dto.condition,
           amount,
@@ -1158,7 +1195,13 @@ export class SalesService {
         actorName: user.username,
         note: `Refund ${formatRupiah(amount)} (${dto.condition === 'REFUND_WITH_STOCK_RETURN' ? 'stok kembali' : 'uang saja'}) — ${dto.reasonCode}${dto.reasonNote ? `: ${dto.reasonNote}` : ''}.`,
       });
-    });
+        });
+        break;
+      } catch (err) {
+        const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
+        if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
+      }
+    }
 
     return this.toRefundResponse(refundId);
   }
@@ -1346,6 +1389,88 @@ export class SalesService {
         productId: s.productId,
         qtyOnHand: s.qtyOnHand,
       })),
+    };
+  }
+
+  /// Tab "Sebaran Penjualan" (menu Transaksi Kasir) — SATU baris per produk,
+  /// kolom tiap Booth + Total, dijumlahkan atas RENTANG tanggal bisnis
+  /// (Asia/Jakarta) — beda dari StockMovementsService.sebaranHarian (saldo
+  /// stok cuma masuk akal per satu titik waktu), penjualan itu data flow jadi
+  /// wajar dijumlah lintas hari (Hari Ini/Minggu Ini/Bulan Ini/Custom).
+  /// Angkanya qty cup TERJUAL (status PAID, versi efektif terbaru per
+  /// transactionGroupId), tanpa kolom Gudang/In Proses (tidak relevan di
+  /// konteks penjualan).
+  async sebaranPenjualan(dariStr: string, sampaiStr: string) {
+    const pola = /^(\d{4})-(\d{2})-(\d{2})$/;
+    if (!pola.test(dariStr) || !pola.test(sampaiStr)) {
+      throw new DomainError('TANGGAL_INVALID', 'Format tanggal harus YYYY-MM-DD.', { dari: dariStr, sampai: sampaiStr });
+    }
+    if (dariStr > sampaiStr) {
+      throw new DomainError('TANGGAL_INVALID', 'Tanggal "dari" tidak boleh setelah "sampai".', { dari: dariStr, sampai: sampaiStr });
+    }
+    const { awal, akhir } = rangeJakarta(dariStr, sampaiStr);
+
+    const [products, booths, sales] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { deletedAt: null },
+        select: { id: true, sku: true, name: true, category: { select: { name: true } } },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.booth.findMany({
+        select: { id: true, name: true, locationName: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.sale.findMany({
+        where: { status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] }, paidAt: { gte: awal, lt: akhir } },
+        include: { items: true },
+      }),
+    ]);
+
+    const effective = effectiveByGroup(sales).filter((s) => s.status === SaleStatus.PAID);
+
+    const qty = new Map<string, number>();
+    const omzet = new Map<string, number>();
+    const kunci = (productId: string, boothId: string) => `${productId}|${boothId}`;
+    for (const s of effective) {
+      for (const it of s.items) {
+        const k = kunci(it.productId, s.boothId);
+        qty.set(k, (qty.get(k) ?? 0) + it.qty);
+        omzet.set(k, (omzet.get(k) ?? 0) + Number(it.lineTotal));
+      }
+    }
+
+    const rows = products.map((p) => {
+      const perBooth = booths.map((b) => ({
+        boothId: b.id,
+        boothName: b.name,
+        qty: qty.get(kunci(p.id, b.id)) ?? 0,
+        omzet: omzet.get(kunci(p.id, b.id)) ?? 0,
+      }));
+      const totalQty = perBooth.reduce((s, b) => s + b.qty, 0);
+      const totalOmzet = perBooth.reduce((s, b) => s + b.omzet, 0);
+      return { productId: p.id, sku: p.sku, name: p.name, category: p.category?.name ?? null, perBooth, totalQty, totalOmzet };
+    });
+
+    // Footer "Total Qty" + "Total Jual" per kolom Booth + Grand Total —
+    // dihitung dari SEMUA produk (bukan cuma yang lolos filter/sort di
+    // frontend), supaya angkanya tetap benar walau tabel disaring.
+    const totalPerBooth = booths.map((b) => ({
+      boothId: b.id,
+      boothName: b.name,
+      qty: products.reduce((s, p) => s + (qty.get(kunci(p.id, b.id)) ?? 0), 0),
+      omzet: products.reduce((s, p) => s + (omzet.get(kunci(p.id, b.id)) ?? 0), 0),
+    }));
+    const grandTotalQty = totalPerBooth.reduce((s, b) => s + b.qty, 0);
+    const grandTotalOmzet = totalPerBooth.reduce((s, b) => s + b.omzet, 0);
+
+    return {
+      dari: dariStr,
+      sampai: sampaiStr,
+      booths: booths.map((b) => ({ boothId: b.id, boothName: b.name, locationName: b.locationName })),
+      rows,
+      totalPerBooth,
+      grandTotalQty,
+      grandTotalOmzet,
     };
   }
 }

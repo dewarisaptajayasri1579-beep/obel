@@ -26,4 +26,8 @@ export class CreateDistributionDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sentToId?: string;
 }

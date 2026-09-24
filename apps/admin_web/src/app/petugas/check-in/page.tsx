@@ -85,7 +85,7 @@ export default function CheckInPage() {
 
   if (authLoading || loadingInit) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F9F6]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F9F6] max-w-md mx-auto">
         <Spinner />
       </div>
     );
@@ -93,18 +93,18 @@ export default function CheckInPage() {
 
   if (!assignment) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9F6] px-6 text-center gap-3">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9F6] max-w-md mx-auto px-6 text-center gap-3">
         <p className="font-bold text-slate-800">Anda belum ditugaskan ke Booth manapun.</p>
-        <p className="text-sm text-slate-500">Hubungi Admin untuk mengatur penugasan Booth/Shift Anda.</p>
+        <p className="text-base text-slate-500">Hubungi Admin untuk mengatur penugasan Booth/Shift Anda.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F9F6] pb-28">
+    <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto pb-28">
       <div style={{ backgroundColor: GREEN }} className="px-5 pt-6 pb-5">
         <h1 className="text-white font-extrabold text-xl">Proses Check-In</h1>
-        <p className="text-white/80 text-sm mt-1">Lengkapi absen sebelum mulai bekerja.</p>
+        <p className="text-white/80 text-base mt-1">Lengkapi absen sebelum mulai bekerja.</p>
       </div>
 
       <div className="px-4 -mt-2 flex flex-col gap-4">
@@ -118,14 +118,14 @@ export default function CheckInPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 mb-1">
             <Store size={16} style={{ color: GREEN }} />
-            <span className="text-sm font-bold text-slate-800">Pilih Booth</span>
+            <span className="text-base font-bold text-slate-800">Pilih Booth</span>
           </div>
-          <p className="text-xs text-slate-500 mb-3">Pilih booth tempat Anda bekerja hari ini.</p>
+          <p className="text-sm text-slate-500 mb-3">Pilih booth tempat Anda bekerja hari ini.</p>
 
           <button
             type="button"
             onClick={() => setShowBoothPicker((v) => !v)}
-            className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800"
+            className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold text-slate-800"
           >
             {selectedBooth?.name ?? "Pilih Booth"}
             <ChevronDown size={16} className="text-slate-400" />
@@ -141,7 +141,7 @@ export default function CheckInPage() {
                     setSelectedBoothId(b.id);
                     setShowBoothPicker(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50"
+                  className="w-full text-left px-4 py-3 text-base hover:bg-slate-50"
                   style={b.id === selectedBoothId ? { color: GREEN, fontWeight: 700 } : undefined}
                 >
                   {b.name}
@@ -152,8 +152,8 @@ export default function CheckInPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-sm font-bold text-slate-800 mb-2">Konfirmasi Data Anda</p>
-          <div className="text-sm text-slate-600 flex flex-col gap-1.5">
+          <p className="text-base font-bold text-slate-800 mb-2">Konfirmasi Data Anda</p>
+          <div className="text-base text-slate-600 flex flex-col gap-1.5">
             <div className="flex justify-between">
               <span className="text-slate-400">Nama</span>
               <span className="font-semibold text-slate-800">{session?.profile.fullName}</span>
@@ -170,12 +170,12 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 p-4">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-200 p-4">
         <button
           type="button"
           onClick={handleCheckIn}
           disabled={!canSubmit || submitting}
-          className="w-full max-w-md mx-auto flex items-center justify-center rounded-xl py-3.5 font-extrabold text-white disabled:opacity-50"
+          className="w-full flex items-center justify-center rounded-xl py-3.5 font-extrabold text-white disabled:opacity-50"
           style={{ backgroundColor: GREEN }}
         >
           {submitting ? <Spinner size="sm" color="white" /> : "KONFIRMASI CHECK IN"}

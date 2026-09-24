@@ -5,7 +5,7 @@ import {
   ShoppingCart,
   Truck,
   PackagePlus,
-  Undo2,
+  PackageCheck,
   Receipt,
   Database,
   Package,
@@ -18,6 +18,9 @@ import {
   Building2,
   UserRound,
   Radar,
+  Fingerprint,
+  AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 
 export interface NavItem {
@@ -38,17 +41,6 @@ export interface NavGroup {
  *  - "pengaturan" : master data & konfigurasi sistem, dibuka lewat tombol Pengaturan. */
 export type NavMode = "utama" | "pengaturan";
 
-/** Dashboard berdiri sendiri karena ditampilkan di KEDUA mode sidebar. */
-export const DASHBOARD_ITEM: NavItem = {
-  // Dashboard & Laporan digabung jadi satu halaman ber-tab (lihat
-  // app/dashboard/page.tsx) — dulu dua entri menu terpisah yang saling
-  // tumpang tindih (sama-sama "ringkasan operasional").
-  label: "Dashboard",
-  href: "/dashboard",
-  icon: LayoutGrid,
-  bottomBar: true,
-};
-
 /* ─── MENU UTAMA — alur kerja harian ──────────────────────────────────── */
 
 export const MAIN_NAV: NavGroup[] = [
@@ -59,6 +51,15 @@ export const MAIN_NAV: NavGroup[] = [
         label: "Booth Aktif",
         href: "/monitoring/booth-aktif",
         icon: Radar,
+        bottomBar: true,
+      },
+      {
+        // Dashboard & Laporan digabung jadi satu halaman ber-tab (lihat
+        // app/dashboard/page.tsx) — dulu dua entri menu terpisah yang saling
+        // tumpang tindih (sama-sama "ringkasan operasional").
+        label: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutGrid,
         bottomBar: true,
       },
     ],
@@ -82,12 +83,6 @@ export const MAIN_NAV: NavGroup[] = [
             icon: Truck,
             bottomBar: true,
           },
-          {
-            label: "Return Stok",
-            href: "/return",
-            icon: Undo2,
-            bottomBar: false,
-          },
         ],
       },
       {
@@ -95,10 +90,34 @@ export const MAIN_NAV: NavGroup[] = [
         icon: Store,
         children: [
           {
+            label: "Check In-Check Out",
+            href: "/transaksi-checkin-checkout",
+            icon: Fingerprint,
+            bottomBar: false,
+          },
+          {
+            label: "Terima Stok",
+            href: "/transaksi-terima-stok",
+            icon: PackageCheck,
+            bottomBar: false,
+          },
+          {
             label: "Kasir",
             href: "/transaksi-kasir",
             icon: Receipt,
             bottomBar: true,
+          },
+          {
+            label: "Setor & Pengembalian Stok",
+            href: "/transaksi-laporan-kembali",
+            icon: ClipboardList,
+            bottomBar: false,
+          },
+          {
+            label: "Rekap Stok Selisih",
+            href: "/laporan/stok-selisih",
+            icon: AlertTriangle,
+            bottomBar: false,
           },
         ],
       },
@@ -191,11 +210,7 @@ export const SETTINGS_NAV: NavGroup[] = [
 export const SETTINGS_PREFIXES = ["/pengaturan", "/master", "/dokumentasi"];
 
 /** Gabungan kedua mode — dipakai search bar / apa pun yang butuh daftar lengkap. */
-export const NAV_GROUPS: NavGroup[] = [
-  { items: [DASHBOARD_ITEM] },
-  ...MAIN_NAV,
-  ...SETTINGS_NAV,
-];
+export const NAV_GROUPS: NavGroup[] = [...MAIN_NAV, ...SETTINGS_NAV];
 
 /** Semua href di dalam satu item, termasuk anak submenu. */
 function allHrefs(item: NavItem): string[] {

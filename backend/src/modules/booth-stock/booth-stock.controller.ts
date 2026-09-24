@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -15,8 +15,8 @@ export class BoothStockController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  findAll() {
-    return this.boothStockService.findAll();
+  findAll(@Query('boothId') boothId?: string) {
+    return this.boothStockService.findAll(boothId);
   }
 
   @Get('mine')

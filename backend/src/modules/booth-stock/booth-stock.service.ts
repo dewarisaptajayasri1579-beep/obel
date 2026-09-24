@@ -10,15 +10,28 @@ export class BoothStockService {
   /// Booth (boothId kosong) dipakai Admin/Owner; di-filter satu Booth
   /// dipakai endpoint Petugas Booth (`/booth-stock/mine`, boothId dari JWT).
   async findAll(boothId?: string) {
-    const [stocks, thresholds] = await Promise.all([
+    const [stocks, thresholds, pendingReturnItems] = await Promise.all([
       this.prisma.boothStock.findMany({
         where: boothId ? { boothId } : undefined,
         include: { booth: true, product: { include: { category: true } } },
         orderBy: [{ booth: { name: 'asc' } }, { product: { sortOrder: 'asc' } }],
       }),
       this.prisma.boothStockThreshold.findMany(),
+      // Sisa Stok Fisik yang otomatis diajukan sebagai Return ke Gudang saat
+      // Check-Out, tapi belum di-approve Admin — supaya qtyOnHand 0 pasca
+      // Check-Out tidak salah dibaca sebagai "Habis" biasa (lihat
+      // TabSebaranStok "Proses Kembali" & Booth Aktif pendingReturn).
+      this.prisma.stockReturnItem.findMany({
+        where: { stockReturn: { status: 'SUBMITTED', boothId: boothId ? boothId : undefined } },
+        select: { productId: true, qtySubmitted: true, stockReturn: { select: { boothId: true } } },
+      }),
     ]);
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
+    const dalamProsesKembaliByKey = new Map<string, number>();
+    for (const i of pendingReturnItems) {
+      const key = `${i.stockReturn.boothId}:${i.productId}`;
+      dalamProsesKembaliByKey.set(key, (dalamProsesKembaliByKey.get(key) ?? 0) + i.qtySubmitted);
+    }
 
     return stocks.map((s) => {
       const threshold = thresholdByKey.get(`${s.boothId}:${s.productId}`);
@@ -34,6 +47,7 @@ export class BoothStockService {
         qtyOnHand: s.qtyOnHand,
         minimumQty,
         status: resolveStockStatus(s.qtyOnHand, minimumQty, criticalQty),
+        dalamProsesKembali: dalamProsesKembaliByKey.get(`${s.boothId}:${s.productId}`) ?? 0,
       };
     });
   }

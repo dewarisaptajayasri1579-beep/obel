@@ -16,6 +16,7 @@ import {
 import { ProdukTabs } from "./ProdukTabs";
 import { TabMain } from "./TabMain";
 import { TabMutasiStok } from "./TabMutasiStok";
+import { TabSebaranStok } from "./TabSebaranStok";
 import { TabPengaturan } from "./TabPengaturan";
 import { periodeBerjalanJakarta } from "./PeriodeFilter";
 
@@ -85,6 +86,7 @@ function ProdukContent() {
             />
           ),
           mutasi: <TabMutasiStok products={products} booths={booths} />,
+          sebaran: <TabSebaranStok />,
           pengaturan: <TabPengaturan products={products} onReload={load} />,
         }}
       />

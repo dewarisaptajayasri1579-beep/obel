@@ -81,7 +81,14 @@ function MonitorStokBoothContent() {
                 <TableRow key={`${r.boothId}-${r.productId}`}>
                   <TableCell className="font-semibold">{r.boothName}</TableCell>
                   <TableCell>{r.productName}</TableCell>
-                  <TableCell>{r.qtyOnHand} cup</TableCell>
+                  <TableCell>
+                    {r.qtyOnHand} cup
+                    {r.dalamProsesKembali > 0 && (
+                      <span className="block text-[11px] font-bold text-sky-600">
+                        {r.dalamProsesKembali} cup Proses Kembali
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge type={STATUS_CONFIG[r.status]} label={r.status} />
                   </TableCell>

@@ -100,6 +100,47 @@ Ditetapkan 2026-09-22, berlaku untuk **seluruh** entitas di backend, bukan hanya
   ditutup bertahap. Setiap kali menyentuh modul transaksi untuk alasan lain, sekalian
   pasang `ActivityLogService.record()` di jalur tulisnya kalau belum ada.
 
+### 3. Tampilan Panel "Riwayat Aktivitas" (ditetapkan 2026-09-23)
+
+Berlaku untuk **semua** panel yang menampilkan `ActivityLogEntry[]` di `admin_web`
+(contoh: `SerahTerimaActivityLog.tsx`, `PenerimaanActivityLog.tsx`, `SaleActivityLog.tsx`
+— jadikan acuan pola untuk panel baru di menu Transaksi lain):
+
+- **Urutan tampil dari yang paling awal ke paling baru** (ascending by `occurredAt`),
+  meskipun endpoint backend mengembalikannya `desc` (terbaru dulu) — urutkan ulang di
+  komponen (`[...log].reverse()`), jangan ubah `orderBy` di backend karena endpoint yang
+  sama tidak dipakai di tempat lain yang butuh urutan terbalik.
+- **Tanpa header kolom.** Baris tabel langsung berisi kolom kapan/siapa/ngapain tanpa
+  `<thead>` "Tanggal / Siapa / Ngapain" — konteksnya sudah jelas dari judul panel
+  "Riwayat Aktivitas" dan badge aksi berwarna di kolom terakhir.
+- Struktur baris tetap: kolom waktu (format `waktuJakarta`, Asia/Jakarta), kolom nama
+  aktor (`entri.actorName`), kolom badge aksi (`AKSI_LABEL`/`AKSI_WARNA` map per modul)
+  + catatan (`entri.note`) kalau ada.
+
+### 4. Penomoran Nomor Bukti (ditetapkan 2026-09-23)
+
+Berlaku untuk **semua** jenis nomor bukti/dokumen di backend (Penjualan, Tambah Stok
+Gudang, Serah Terima/Terima Stok, Retur, Restock Request, Stock Opname, Reconciliation
+Case, Refund, Stock Movement, dst — lihat `08-business-rules.md` BR-037):
+
+- **Format sekuensial sederhana**: `PREFIX-000001`, naik satu per dokumen, diambil dari
+  nomor TERBESAR yang sudah ada per prefix (bukan dari jumlah baris). Contoh acuan:
+  Tambah Stok Gudang (`TRM-000001`, `StockReceiptsService.nomorBerikutnya`).
+- **Dilarang** format timestamp+random (mis. `DIST-LX2K3A-1F2B3C`) atau skema lain yang
+  tidak berurutan — nomor bukti dipakai Admin/Petugas Booth di lapangan, harus enak
+  dibaca dan diucapkan, bukan cuma unik secara teknis.
+- Pakai helper bersama di `backend/src/common/doc-no.ts`
+  (`nomorSekuensialBerikutnya`, `alokasikanNomorSekuensial` untuk batch,
+  `nomorMovementBerikutnya`/`nomorMovementBerikutnyaBanyak` khusus `StockMovement`) —
+  jangan tulis ulang regex parsing nomor tertinggi di tiap service.
+- Query nomor tertinggi dalam `tx` yang sama dengan insert-nya, lalu bungkus transaksi
+  dengan retry-on-unique-constraint-violation (kode Prisma `P2002`, pola
+  `MAKS_PERCOBAAN_NOMOR` di `StockReceiptsService.create`) untuk menangani dua request
+  bersamaan yang membaca nomor tertinggi yang sama.
+- Dokumen versi baru hasil revisi (mis. `reviseDistribution`, `reviseSale`,
+  `reviseReturn`) **wajib** ambil nomor baru lewat generator yang sama — bukan alasan
+  untuk kembali ke skema lama.
+
 ## Definition of Done
 Fitur dianggap selesai hanya jika:
 - UI sesuai role dan flow.

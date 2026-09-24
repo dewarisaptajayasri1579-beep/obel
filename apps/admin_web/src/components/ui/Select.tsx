@@ -9,6 +9,9 @@ export interface SelectOption {
   label: string;
   disabled?: boolean;
   icon?: React.ReactNode;
+  /** Tampilkan label abu-abu/redup — dipakai buat opsi "kosongkan" (mis. "Belum
+   *  ditugaskan") supaya beda dari opsi data sungguhan. */
+  muted?: boolean;
 }
 
 export interface SelectProps {
@@ -38,6 +41,9 @@ export interface SelectProps {
   deferCreate?: boolean;
   /** Kelas pengganti label bawaan — dipakai form padat (lihat ProdukForm). */
   labelClassName?: string;
+  /** Tandai filter ini sedang aktif (bukan nilai default "semua") — border jadi
+   *  amber + titik indikator, supaya user sadar data di layar sudah disaring. */
+  active?: boolean;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -61,6 +67,7 @@ export const Select: React.FC<SelectProps> = ({
   onCreateOption,
   createOptionLabel,
   deferCreate = false,
+  active = false,
 }) => {
   const generatedId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
   const listboxId = useId();
@@ -247,7 +254,9 @@ export const Select: React.FC<SelectProps> = ({
           onKeyDown={handleTriggerKeyDown}
           className={`w-full flex items-center ${sizeClasses[sizeVariant]} ${leftPadding} pr-10 bg-white/60 hover:bg-white/80 dark:bg-[var(--field-bg)] dark:hover:bg-[var(--field-bg)] border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] text-left transition-all duration-200 focus:outline-none focus:bg-white/95 dark:focus:bg-[var(--field-bg)] focus:border-brand-600 dark:focus:border-[var(--brand-500)] focus:ring-4 focus:ring-brand-500/10 dark:focus:ring-0 dark:focus:shadow-[0_0_0_3px_rgba(79, 169, 125,0.12),0_0_16px_rgba(79, 169, 125,0.08)] backdrop-blur-md dark:backdrop-blur-none shadow-[0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             open ? "bg-white/95 dark:bg-[var(--field-bg)] border-brand-600 ring-4 ring-brand-500/10" : ""
-          } ${error ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : ""} ${className}`}
+          } ${error ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : ""} ${
+            active && !open && !error ? "border-amber-400 dark:border-amber-500/50" : ""
+          } ${className}`}
         >
           {leftIcon && (
             <span className="absolute left-4 text-slate-600 dark:text-fg-muted flex items-center justify-center pointer-events-none">
@@ -256,12 +265,20 @@ export const Select: React.FC<SelectProps> = ({
           )}
           <span
             className={`flex-1 min-w-0 truncate font-medium ${
-              selectedOption && !selectedOption.disabled ? "text-slate-800 dark:text-fg" : "text-slate-400 dark:text-fg-muted"
+              selectedOption && !selectedOption.disabled && !selectedOption.muted
+                ? "text-slate-800 dark:text-fg"
+                : "text-slate-400 dark:text-fg-muted"
             }`}
           >
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </button>
+        {active && (
+          <span
+            title="Filter ini sedang aktif"
+            className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-white dark:border-surface pointer-events-none"
+          />
+        )}
         <div
           className={`absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-fg-muted flex items-center justify-center pointer-events-none transition-transform duration-200 ${
             open ? "rotate-180" : ""
@@ -325,11 +342,15 @@ export const Select: React.FC<SelectProps> = ({
                       aria-disabled={opt.disabled}
                       onMouseEnter={() => setActiveIndex(idx)}
                       onClick={() => commitSelection(opt)}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-colors ${
+                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-colors ${
+                        opt.muted ? "font-medium italic" : "font-semibold"
+                      } ${
                         opt.disabled
                           ? "opacity-40 cursor-not-allowed"
                           : isActive
                           ? "bg-brand-50 dark:bg-brand-500/15 text-[var(--brand-700)] dark:text-[var(--accent-primary)]"
+                          : opt.muted
+                          ? "text-slate-400 dark:text-fg-muted hover:bg-slate-50 dark:hover:bg-surface-hover"
                           : "text-slate-700 dark:text-fg-secondary hover:bg-slate-50 dark:hover:bg-surface-hover"
                       }`}
                     >

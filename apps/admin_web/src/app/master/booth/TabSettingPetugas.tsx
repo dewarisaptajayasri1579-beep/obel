@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -32,12 +34,21 @@ function kunci(boothId: string, shiftTemplateId: string) {
 /// shift baru, kolomnya otomatis bertambah di sini. Booth baru juga otomatis
 /// jadi baris baru — `booths` datang dari state induk (BoothContent) yang
 /// sudah memuat ulang tiap kali ada perubahan.
+interface PeringatanShiftAktif {
+  boothId: string;
+  shiftTemplateId: string;
+  staffIdBaru: string;
+  pesan: string;
+}
+
 export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   const toast = useToast();
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
   const [petugas, setPetugas] = useState<UserAccount[]>([]);
   const [assignments, setAssignments] = useState<BoothShiftAssignment[] | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [peringatan, setPeringatan] = useState<PeringatanShiftAktif | null>(null);
+  const [memproseskanPaksa, setMemproseskanPaksa] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -88,18 +99,21 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
 
   function opsiPetugasUntuk(boothId: string, shiftTemplateId: string) {
     const slotIni = kunci(boothId, shiftTemplateId);
-    return petugas.map((p) => {
-      const dipakaiDi = dipegangDiSlotLain.get(p.id);
-      const dipakaiSlotLain = dipakaiDi && assignmentByKey.get(slotIni) !== p.id;
-      return {
-        value: p.id,
-        label: dipakaiSlotLain ? `${p.fullName} (sudah di ${dipakaiDi})` : p.fullName,
-        disabled: !!dipakaiSlotLain,
-      };
-    });
+    return [
+      { value: "", label: "Belum ditugaskan", muted: true },
+      ...petugas.map((p) => {
+        const dipakaiDi = dipegangDiSlotLain.get(p.id);
+        const dipakaiSlotLain = dipakaiDi && assignmentByKey.get(slotIni) !== p.id;
+        return {
+          value: p.id,
+          label: dipakaiSlotLain ? `${p.fullName} (sudah di ${dipakaiDi})` : p.fullName,
+          disabled: !!dipakaiSlotLain,
+        };
+      }),
+    ];
   }
 
-  async function pilihPetugas(boothId: string, shiftTemplateId: string, staffId: string) {
+  async function pilihPetugas(boothId: string, shiftTemplateId: string, staffId: string, force = false) {
     const key = kunci(boothId, shiftTemplateId);
     setSavingKey(key);
     // Optimistic — biar Select langsung menampilkan pilihan tanpa menunggu round-trip.
@@ -119,16 +133,31 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
     });
 
     try {
-      const saved = await api.upsertBoothShiftAssignment({ boothId, shiftTemplateId, staffId: staffId || null });
+      const saved = await api.upsertBoothShiftAssignment({ boothId, shiftTemplateId, staffId: staffId || null, force });
       setAssignments((prev) => [
         ...(prev ?? []).filter((a) => !(a.boothId === boothId && a.shiftTemplateId === shiftTemplateId)),
         saved,
       ]);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal menyimpan penugasan.");
       await load(); // gagal — tarik ulang state sungguhan, batalkan optimistic update.
+      if (err instanceof ApiError && err.code === "STAFF_SHIFT_ACTIVE") {
+        setPeringatan({ boothId, shiftTemplateId, staffIdBaru: staffId, pesan: err.message });
+      } else {
+        toast.error(err instanceof ApiError ? err.message : "Gagal menyimpan penugasan.");
+      }
     } finally {
       setSavingKey(null);
+    }
+  }
+
+  async function lanjutkanPaksa() {
+    if (!peringatan) return;
+    setMemproseskanPaksa(true);
+    try {
+      await pilihPetugas(peringatan.boothId, peringatan.shiftTemplateId, peringatan.staffIdBaru, true);
+      setPeringatan(null);
+    } finally {
+      setMemproseskanPaksa(false);
     }
   }
 
@@ -155,6 +184,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                 <tr className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
                   <th className="py-3.5 px-3 text-center w-12">No.</th>
                   <th className="py-3.5 px-3">Booth</th>
+                  <th className="py-3.5 px-3">Lokasi</th>
                   {shiftTemplates.map((t) => (
                     <th key={t.id} className="py-3.5 px-3 min-w-[220px]">
                       {t.name}
@@ -168,7 +198,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
               <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
                 {boothAktif.length === 0 ? (
                   <tr>
-                    <td colSpan={2 + shiftTemplates.length} className="text-center py-10 text-slate-500 dark:text-fg-muted">
+                    <td colSpan={3 + shiftTemplates.length} className="text-center py-10 text-slate-500 dark:text-fg-muted">
                       Belum ada Booth aktif.
                     </td>
                   </tr>
@@ -179,6 +209,9 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                       <td className="py-3 px-3">
                         <span className="font-bold text-slate-800 dark:text-fg">{b.name}</span>
                         <span className="ml-2 font-mono text-[10px] text-slate-400 dark:text-fg-muted">{b.code}</span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-600 dark:text-fg-secondary">
+                        {b.locationName ?? b.address ?? "-"}
                       </td>
                       {shiftTemplates.map((t) => {
                         const key = kunci(b.id, t.id);
@@ -209,6 +242,27 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
           </div>
         )}
       </div>
+
+      <Modal isOpen={!!peringatan} onClose={() => setPeringatan(null)} title="Petugas Masih Aktif Shift" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-fg-secondary">
+            <AlertTriangle className="w-4.5 h-4.5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p>{peringatan?.pesan}</p>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-fg-muted">
+            Penugasan cuma menentukan roster berikutnya — mengubahnya TIDAK otomatis meng-check-out petugas yang sedang shift.
+            Shift yang sudah berjalan tetap aktif sampai dia check-out sendiri.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPeringatan(null)}>
+              Batal
+            </Button>
+            <Button variant="danger" size="sm" isLoading={memproseskanPaksa} onClick={lanjutkanPaksa}>
+              Tetap Lanjutkan
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
