@@ -74,5 +74,24 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- Wajib di Android 11+ (package visibility) supaya url_launcher
+             bisa "lihat" app target lewat skema non-http(s) yang diserahkan
+             dari onNavigationRequest di webview_screen.dart (mis. tombol
+             "Kirim WA" di struk kasir yang redirect ke whatsapp://send?...).
+             Tanpa ini, launchUrl bisa gagal diam-diam walau app-nya
+             sebenarnya terpasang, karena queryIntentActivities dibatasi. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="whatsapp"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="mailto"/>
+        </intent>
     </queries>
 </manifest>

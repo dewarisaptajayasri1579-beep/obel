@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -29,6 +30,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
         NavigationDelegate(
           onPageStarted: (_) => setState(() => _loading = true),
           onPageFinished: (_) => setState(() => _loading = false),
+          // Skema selain http/https (whatsapp:, tel:, mailto:, intent:, dst —
+          // mis. wa.me/?text=... redirect ke whatsapp://send?text=... di
+          // context mobile) TIDAK bisa dirender WebView sama sekali
+          // (net::ERR_UNKNOWN_URL_SCHEME, "Webpage not available"). Browser
+          // biasa/Chrome tahu cara serahin ini ke app lain lewat App Links;
+          // WebView polos TIDAK, harus diserahkan manual ke Android di sini.
+          onNavigationRequest: (request) async {
+            final uri = Uri.tryParse(request.url);
+            if (uri == null || uri.scheme == 'http' || uri.scheme == 'https') {
+              return NavigationDecision.navigate;
+            }
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            return NavigationDecision.prevent;
+          },
         ),
       );
 

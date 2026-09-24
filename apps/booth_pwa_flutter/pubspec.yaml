@@ -56,6 +56,11 @@ dependencies:
   print_bluetooth_thermal: ^1.2.4
   esc_pos_utils_plus: ^2.0.4
   image_picker: ^1.1.2
+  # Skema non-http(s) (whatsapp:, tel:, mailto:, dst) TIDAK bisa dirender
+  # WebView (net::ERR_UNKNOWN_URL_SCHEME) — dipakai onNavigationRequest di
+  # webview_screen.dart buat serahin ke Android biar app yang sesuai
+  # (WhatsApp, Telepon, dst) yang buka, bukan WebView yang nyoba render.
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
