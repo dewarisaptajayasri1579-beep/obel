@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polyline, CircleMarker, TileLayer, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
+import { Maximize } from "lucide-react";
 import type { BoothAktifCard, ShiftJourney } from "@/lib/api-client";
 import { kategoriBooth, type KategoriKartu } from "./kategori";
 
@@ -47,21 +48,35 @@ function buatIkon(kategori: KategoriKartu): L.DivIcon {
 
 const PUSAT_FALLBACK: [number, number] = [-7.5361, 110.6021]; // Boyolali
 
-/// Zoom tetap ({zoom=15}) bikin titik yang jauh dari rata-rata koordinat
-/// terpotong keluar layar. Komponen ini menyesuaikan `fitBounds` tiap kali
-/// daftar titik berubah, supaya SEMUA marker selalu masuk area yang
-/// terlihat — baik saat baru dibuka maupun saat datanya live-update.
-function FitBounds({ points }: { points: [number, number][] }) {
+/// Auto-fit HANYA sekali (saat titik pertama kali muncul) — sengaja tidak
+/// re-fit lagi tiap `points` berubah (live-update lokasi realtime, ganti
+/// booth terpilih, dsb), supaya tidak menimpa zoom/pan manual Admin terus-
+/// menerus. Untuk fit ulang setelah itu, Admin pakai tombol "Fit ke Semua
+/// Titik" di atas peta — itu yang menaikkan `fitTrigger` dan memicu effect
+/// kedua di bawah.
+function FitBounds({ points, fitTrigger }: { points: [number, number][]; fitTrigger: number }) {
   const map = useMap();
+  const sudahAutoFit = useRef(false);
 
   useEffect(() => {
-    if (points.length === 0) return;
+    if (sudahAutoFit.current || points.length === 0) return;
+    sudahAutoFit.current = true;
     if (points.length === 1) {
       map.setView(points[0], 16);
       return;
     }
     map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 16 });
   }, [points, map]);
+
+  useEffect(() => {
+    if (fitTrigger === 0 || points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], 16);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 16 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitTrigger]);
 
   return null;
 }
@@ -149,6 +164,8 @@ export function BoothMapView({
   const pointsKey = rawPoints.map(([lat, lng]) => `${lat.toFixed(6)},${lng.toFixed(6)}`).join('|');
   const points = useMemo<[number, number][]>(() => rawPoints, [pointsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [fitTrigger, setFitTrigger] = useState(0);
+
   const labelKosong =
     sumberLokasi === "realtime"
       ? "Booth belum ada ping lokasi realtime (petugas belum check-in / belum kirim GPS), tidak tampil di peta."
@@ -156,12 +173,22 @@ export function BoothMapView({
 
   return (
     <div className="flex-1 min-w-0 rounded-2xl overflow-hidden border border-slate-200/90 dark:border-line" style={{ height: 560 }}>
-      <MapContainer center={pusat} zoom={15} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
+      <div className="flex items-center justify-end px-3 py-1.5 bg-white/90 dark:bg-surface border-b border-slate-200/90 dark:border-line">
+        <button
+          type="button"
+          onClick={() => setFitTrigger((n) => n + 1)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5"
+        >
+          <Maximize className="w-3.5 h-3.5" />
+          Fit ke Semua Titik
+        </button>
+      </div>
+      <MapContainer center={pusat} zoom={15} scrollWheelZoom style={{ height: "calc(100% - 37px)", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FitBounds points={points} />
+        <FitBounds points={points} fitTrigger={fitTrigger} />
         {jalurPoints.length > 1 && (
           <Polyline positions={jalurPoints} pathOptions={{ color: "#0B5D34", weight: 3, opacity: 0.8 }} />
         )}
