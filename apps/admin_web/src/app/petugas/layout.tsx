@@ -37,6 +37,12 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#0B5D34",
+  // Web/App Petugas Booth SELALU tampil terang (belum ada dark mode di sini).
+  // Tanpa ini, WebView Android otomatis "force-dark" native form control
+  // (input/textarea) saat HP di-set dark mode — teksnya jadi putih padahal
+  // background input tetap putih (di-set manual lewat Tailwind), jadi teks
+  // yang diketik nggak kelihatan sama sekali.
+  colorScheme: "light",
 };
 
 /// Layout ini SENGAJA tetap di dalam <html>/<body> root (app/layout.tsx) —

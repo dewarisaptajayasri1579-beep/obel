@@ -67,7 +67,7 @@ export default function PetugasLoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
-              className="w-full rounded-2xl border border-slate-200 pl-10 pr-4 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
+              className="w-full rounded-2xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 pl-10 pr-4 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
               placeholder="Masukkan username"
             />
           </div>
@@ -81,7 +81,7 @@ export default function PetugasLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-2xl border border-slate-200 pl-10 pr-10 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
+              className="w-full rounded-2xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 pl-10 pr-10 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
               placeholder="Masukkan password"
             />
             <button
