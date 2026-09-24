@@ -134,18 +134,20 @@ export function BoothMapView({
 
   /// Reference points HARUS stabil selama isi datanya sama, karena FitBounds
   /// men-trigger ulang map.fitBounds/setView tiap kali `points` berubah
-  /// reference. Tanpa useMemo di sini, klik marker (yang cuma mengubah state
-  /// `selectedId` di parent) ikut membuat array baru tiap render dan peta
-  /// zoom ulang ke bounds — membatalkan zoom-out manual user.
+  /// reference. `dengankoordinat` (dan `booths` sumbernya) dibuat ulang tiap
+  /// snapshot WebSocket masuk (~tiap beberapa detik) walau koordinatnya
+  /// persis sama, jadi useMemo yang cuma bergantung ke reference-nya TETAP
+  /// menghasilkan array baru tiap tick — peta zoom ulang ke bounds tiap
+  /// polling, membatalkan zoom manual user. `pointsKey` di bawah
+  /// membandingkan ISI koordinat (bukan reference), supaya `points` cuma
+  /// ganti reference kalau titiknya beneran berubah.
   ///
   /// Begitu ada jalur (booth sedang disorot), fit ke jalur itu SAJA — supaya
   /// Admin lihat keseluruhan rute booth yang dipilih, bukan tetap zoom-out
   /// ke semua booth lain yang sudah diredupkan.
-  const points = useMemo<[number, number][]>(() => {
-    if (jalurPoints.length > 0) return jalurPoints;
-    return dengankoordinat.map(koordinatOf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dengankoordinat, sumberLokasi, jalurPoints]);
+  const rawPoints = jalurPoints.length > 0 ? jalurPoints : dengankoordinat.map(koordinatOf);
+  const pointsKey = rawPoints.map(([lat, lng]) => `${lat.toFixed(6)},${lng.toFixed(6)}`).join('|');
+  const points = useMemo<[number, number][]>(() => rawPoints, [pointsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const labelKosong =
     sumberLokasi === "realtime"
