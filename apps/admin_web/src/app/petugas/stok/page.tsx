@@ -24,8 +24,18 @@ import {
   Equal,
   Download,
   ChevronDown,
+  Clock,
+  XCircle,
 } from "lucide-react";
-import { api, ApiError, type ActiveShift, type BoothStockRow, type Product, type StockLedgerResponse } from "@/lib/api-client";
+import {
+  api,
+  ApiError,
+  type ActiveShift,
+  type BoothStockRow,
+  type Product,
+  type RestockRequest,
+  type StockLedgerResponse,
+} from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
@@ -35,6 +45,20 @@ import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
+
+/// Status pengajuan restok Petugas — REJECTED sengaja ditonjolkan (merah +
+/// alasan) karena inilah yang tadinya sama sekali tidak tersorot ke Petugas
+/// (endpoint GET /restock-requests/mine sudah lama ada, tapi belum pernah
+/// dipanggil dari layar manapun).
+const RESTOCK_REQUEST_STATUS_STYLE: Record<
+  RestockRequest["status"],
+  { label: string; bg: string; fg: string; icon: typeof Clock }
+> = {
+  REQUESTED: { label: "Diajukan", bg: "#FFF8E1", fg: "#B45309", icon: Clock },
+  APPROVED: { label: "Disetujui & Dikirim", bg: OBBEL_SCALE[50], fg: GREEN, icon: CheckCircle2 },
+  REJECTED: { label: "Ditolak", bg: "#FEE2E2", fg: "#D21919", icon: XCircle },
+  CANCELLED: { label: "Dibatalkan", bg: "#F1F5F9", fg: "#64748B", icon: Ban },
+};
 
 const STATUS_STYLE: Record<BoothStockRow["status"], { bg: string; fg: string; bar: string; icon: typeof CheckCircle2 }> = {
   Aman: { bg: OBBEL_SCALE[50], fg: GREEN, bar: OBBEL_SCALE[600], icon: CheckCircle2 },
@@ -131,20 +155,23 @@ function StokContent() {
   const [ledgerPeriode, setLedgerPeriode] = useState<Periode>("7_HARI");
   const [ledger, setLedger] = useState<StockLedgerResponse | null>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
+  const [riwayatRestock, setRiwayatRestock] = useState<RestockRequest[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [stockRows, productList, active, terlaris] = await Promise.all([
+        const [stockRows, productList, active, terlaris, restockRequests] = await Promise.all([
           api.getMyBoothStock(),
           api.getProducts(),
           api.getActiveShift(),
           api.getTerlarisMine().catch(() => []),
+          api.getMyRestockRequests().catch(() => []),
         ]);
         setStock(stockRows);
         setProducts(productList.filter((p) => p.active));
         setShift(active);
         setQtyTerjual7Hari(new Map(terlaris.map((t) => [t.productId, t.qty])));
+        setRiwayatRestock(restockRequests);
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat stok booth.");
       } finally {
@@ -276,6 +303,7 @@ function StokContent() {
       toast.success("Permintaan restock berhasil dikirim.");
       setRequestQty({});
       if (draftKey) localStorage.removeItem(draftKey);
+      api.getMyRestockRequests().then(setRiwayatRestock).catch(() => {});
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal mengirim permintaan restock.");
     } finally {
@@ -508,6 +536,43 @@ function StokContent() {
               <p className="text-xs text-slate-500">estimasi total cup</p>
             </div>
           </div>
+
+          {riwayatRestock.length > 0 && (
+            <div className="mb-4">
+              <p className="text-base font-extrabold text-slate-900 mb-2.5">Riwayat Pengajuan</p>
+              <div className="flex flex-col gap-2">
+                {riwayatRestock.slice(0, 5).map((r) => {
+                  const style = RESTOCK_REQUEST_STATUS_STYLE[r.status];
+                  const Icon = style.icon;
+                  const totalQty = r.items.reduce((sum, i) => sum + i.qtyRequested, 0);
+                  return (
+                    <div key={r.id} className="rounded-2xl bg-white border border-slate-200 p-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-slate-900 truncate">{r.requestNo}</p>
+                          <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Calendar size={10} /> {formatTanggalJakarta(r.createdAt)} · {r.items.length} produk · {totalQty} cup
+                          </p>
+                        </div>
+                        <span
+                          className="flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1 shrink-0"
+                          style={{ backgroundColor: style.bg, color: style.fg }}
+                        >
+                          <Icon size={12} />
+                          {style.label}
+                        </span>
+                      </div>
+                      {r.status === "REJECTED" && r.rejectReason && (
+                        <p className="text-xs font-semibold mt-2 pt-2 border-t border-dashed border-slate-200" style={{ color: "#D21919" }}>
+                          Alasan ditolak: {r.rejectReason}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-base font-extrabold text-slate-900">Pilih Produk untuk Direstock</p>
