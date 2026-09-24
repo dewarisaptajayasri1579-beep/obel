@@ -4,16 +4,12 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
-import { startOfTodayJakarta } from '../../common/jakarta-date';
+import { startOfTodayJakarta, businessDateOf } from '../../common/jakarta-date';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ConfirmOpnameDto, RecountOpnameDto, StartOpnameDto } from './dto/opname.dto';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 /// TX-11/TX-12 — Stock Opname standalone (terpisah dari Closing Count
 /// shift), untuk Gudang maupun Booth (05-feature-specification.md §B11).
@@ -148,7 +144,17 @@ export class StockOpnameService {
             qty: Math.abs(discrepancy),
             toBoothId: opname.locationType === OpnameLocationType.BOOTH && discrepancy > 0 ? opname.boothId : null,
             fromBoothId: opname.locationType === OpnameLocationType.BOOTH && discrepancy < 0 ? opname.boothId : null,
-            referenceType: 'stock_opname',
+            // Sufiks arah WAJIB ada khusus kasus Gudang — Booth sudah punya
+            // arah pasti lewat from/to booth di atas, tapi mutasi Gudang tidak
+            // punya penanda itu sama sekali, jadi arahnya harus dikodekan di
+            // referenceType (lihat arah.util.ts adjustmentGudang()). Tanpa ini
+            // baris jatuh ke tebakan note-sniffing yang bisa salah arah.
+            referenceType:
+              opname.locationType === OpnameLocationType.WAREHOUSE
+                ? discrepancy > 0
+                  ? 'stock_opname_in'
+                  : 'stock_opname_out'
+                : 'stock_opname',
             referenceId: opname.id,
             businessDate,
             occurredAt: now,
@@ -265,7 +271,13 @@ export class StockOpnameService {
               previous.locationType === OpnameLocationType.BOOTH && compensatingDelta > 0 ? previous.boothId : null,
             fromBoothId:
               previous.locationType === OpnameLocationType.BOOTH && compensatingDelta < 0 ? previous.boothId : null,
-            referenceType: 'stock_opname_recount',
+            // Sama seperti confirm() di atas — sufiks arah wajib khusus Gudang.
+            referenceType:
+              previous.locationType === OpnameLocationType.WAREHOUSE
+                ? compensatingDelta > 0
+                  ? 'stock_opname_recount_in'
+                  : 'stock_opname_recount_out'
+                : 'stock_opname_recount',
             referenceId: newOpnameId,
             businessDate,
             occurredAt: now,

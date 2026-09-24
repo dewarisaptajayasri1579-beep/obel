@@ -13,7 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya, nomorMovementBerikutnyaBanyak } from '../../common/doc-no';
 import { effectiveByGroup } from '../../common/effective-version';
-import { batasBulanJakarta, businessDateKeyJakarta, rangeJakarta } from '../../common/jakarta-date';
+import { batasBulanJakarta, businessDateKeyJakarta, businessDateOf, rangeJakarta } from '../../common/jakarta-date';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
@@ -34,10 +34,6 @@ interface StockDelta {
   productId: string;
   productName: string;
   qtyDelta: number;
-}
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 /// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
@@ -132,9 +128,7 @@ export class SalesService {
 
     const saleId = randomUUID();
     const paidAt = new Date();
-    const businessDate = new Date(
-      Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth(), paidAt.getUTCDate()),
-    );
+    const businessDate = businessDateOf(paidAt);
 
     // Retry loop membungkus TRANSAKSI (bukan cuma pembuatan nomornya) —
     // kalau constraint unik saleNo bentrok (dua Kasir submit nyaris

@@ -5,16 +5,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
+import { businessDateOf } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ReceiveReturnDto } from './dto/receive-return.dto';
 import { CancelReturnDto, CorrectReturnReceiptDto, ReviseReturnDto } from './dto/correction.dto';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 /// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
 /// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama

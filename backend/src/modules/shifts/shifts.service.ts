@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { combineJakartaDateAndTime, startOfTodayJakarta, batasBulanJakarta } from '../../common/jakarta-date';
+import { combineJakartaDateAndTime, startOfTodayJakarta, batasBulanJakarta, businessDateOf } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReturnsService } from '../returns/returns.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -17,10 +17,6 @@ import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 
 const UNIQUE_VIOLATION = 'P2002';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 const LOCATION_WARNING_RADIUS_METERS = 300;
 const EARTH_RADIUS_METERS = 6_371_000;

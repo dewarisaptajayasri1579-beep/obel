@@ -47,7 +47,7 @@ export function BoothTabs({ isi }: { isi: Partial<Record<BoothTabKey, React.Reac
               onClick={() => pilih(key)}
               className={`flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
                 aktif
-                  ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)] shadow-xs"
+                  ? "bg-(--brand-700) text-white border-(--brand-700) shadow-xs"
                   : "bg-white/90 dark:bg-surface text-slate-700 dark:text-fg-secondary border-slate-200/90 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
               }`}
             >

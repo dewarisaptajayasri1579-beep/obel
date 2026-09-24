@@ -5,12 +5,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { ActivityLogService } from '../../common/activity-log.service';
+import { businessDateOf } from '../../common/jakarta-date';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto';
 import { UpdateStockReceiptDto } from './dto/update-stock-receipt.dto';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 /// Kode error unique-constraint Prisma — dipakai untuk retry saat dua
 /// permintaan bersamaan kebetulan membaca nomor tertinggi yang sama.

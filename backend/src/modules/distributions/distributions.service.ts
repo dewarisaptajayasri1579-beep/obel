@@ -6,16 +6,13 @@ import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { ActivityLogService } from '../../common/activity-log.service';
+import { businessDateOf } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateDistributionDto } from './dto/create-distribution.dto';
 import { ReceiveDistributionDto } from './dto/receive-distribution.dto';
 import { CancelDistributionDto, CorrectReceiptDto, ReviseDistributionDto } from './dto/correction.dto';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 /// Kode error unique-constraint Prisma & batas percobaan ulang — dipakai saat
 /// dua permintaan bersamaan kebetulan membaca nomor urut tertinggi yang sama
@@ -336,7 +333,11 @@ export class DistributionsService {
             movementType: StockMovementType.VOID_REVERSAL,
             productId: item.productId,
             qty: item.qtySent,
-            referenceType: 'distribution_cancel',
+            // Selalu stok masuk (batal kirim = kembali ke Gudang penuh) — tapi
+            // tetap wajib disufiks _in, VOID_REVERSAL di Gudang sekarang baca
+            // arah dari referenceType juga (lihat arah.util.ts), bukan lagi
+            // diasumsikan selalu positif.
+            referenceType: 'distribution_cancel_in',
             referenceId: distribution.id,
             businessDate: businessDateOf(now),
             occurredAt: now,
@@ -449,7 +450,12 @@ export class DistributionsService {
             movementType: delta > 0 ? StockMovementType.WAREHOUSE_TO_BOOTH : StockMovementType.VOID_REVERSAL,
             productId,
             qty: Math.abs(delta),
-            referenceType: 'distribution_revision',
+            // Cabang VOID_REVERSAL (delta<0) selalu stok masuk ke Gudang (qty
+            // dikirim dikurangi) — sufiks _in wajib, lihat komentar di
+            // cancelDistribution() & arah.util.ts. Cabang WAREHOUSE_TO_BOOTH
+            // tidak butuh sufiks, arahnya sudah pasti dari movementType itu
+            // sendiri (lihat dampakMutasi()).
+            referenceType: delta > 0 ? 'distribution_revision' : 'distribution_revision_in',
             referenceId: newDistributionId,
             businessDate: businessDateOf(now),
             occurredAt: now,

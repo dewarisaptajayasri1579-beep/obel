@@ -39,6 +39,24 @@ export function businessDateKeyJakarta(date: Date): string {
   return jakartaTime.toISOString().slice(0, 10);
 }
 
+/// Tanggal bisnis Asia/Jakarta dari sebuah instant UTC, dinyatakan sebagai
+/// Date yang UTC Y/M/D-nya SUDAH merupakan tanggal kalender Jakarta yang
+/// benar — dipakai untuk kolom `@db.Date` polos seperti
+/// `StockMovement.businessDate` (Postgres DATE mengambil Y/M/D dari field UTC
+/// Date JS-nya apa adanya, bukan konsep instant). BEDA dari `startOfDayJakarta`
+/// (dipakai untuk kolom timestamptz, hasilnya instant UTC yang SECARA WAKTU
+/// sama dengan tengah malam Jakarta — Y/M/D UTC-nya justru sering mundur
+/// sehari karena itu instant 17:00 UTC hari sebelumnya).
+///
+/// WAJIB pakai ini untuk businessDate StockMovement/transaksi — jangan
+/// reimplementasi `Date.UTC(date.getUTCFullYear(), ...)` manual tanpa geser
+/// +7 jam dulu (riwayat: dulu ada 8 salinan identik yang lupa langkah geser
+/// ini, jadi transaksi jam 00:00-06:59 WIB kena tanggal mundur sehari).
+export function businessDateOf(date: Date): Date {
+  const jakartaTime = new Date(date.getTime() + JAKARTA_OFFSET_MS);
+  return new Date(Date.UTC(jakartaTime.getUTCFullYear(), jakartaTime.getUTCMonth(), jakartaTime.getUTCDate()));
+}
+
 /// Batas satu bulan kalender Asia/Jakarta, dinyatakan sebagai instant UTC —
 /// dipakai untuk menyaring kolom timestamp UTC biasa (mis. `Sale.paidAt`)
 /// per periode bulanan tanpa tujuh jam pertama tanggal 1 jatuh ke bulan

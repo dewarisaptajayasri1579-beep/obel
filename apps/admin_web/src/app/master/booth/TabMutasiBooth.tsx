@@ -47,7 +47,7 @@ function tanggalJakarta(iso: string) {
 function PeringatanVerifikasi() {
   return (
     <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/15 p-3.5 flex items-start gap-2.5">
-      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
       <div className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
         <p className="font-bold">Sebagian angka perlu diverifikasi</p>
         <p className="mt-0.5">
@@ -71,7 +71,7 @@ function KartuAngka({
   icon: typeof Layers;
 }) {
   const skin = {
-    brand: "bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
+    brand: "bg-brand-50 dark:bg-brand-900/20 text-(--brand-700) dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
     hijau: "bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
     jingga: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
     abu: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line",
@@ -79,7 +79,7 @@ function KartuAngka({
 
   return (
     <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border ${skin}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${skin}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
       <div>
@@ -214,14 +214,14 @@ export function TabMutasiBooth({
           <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4 space-y-3">
             <PeriodeFilter bulan={periode.bulan} tahun={periode.tahun} onChange={setPeriode} />
 
-            <div className="relative w-full sm:max-w-[270px]">
+            <div className="relative w-full sm:max-w-67.5">
               <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Cari nama atau kode Booth..."
                 value={cariRekap}
                 onChange={(e) => setCariRekap(e.target.value)}
-                className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
+                className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs"
               />
             </div>
           </div>

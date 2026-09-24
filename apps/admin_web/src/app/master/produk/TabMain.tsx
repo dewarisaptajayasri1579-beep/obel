@@ -381,7 +381,7 @@ export function TabMain({
       nilai: angka(metrics.total),
       ket: adaPenyaring ? `dari ${metrics.totalSemua} produk` : "item terdaftar",
       icon: Package,
-      skin: "bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
+      skin: "bg-brand-50 dark:bg-brand-900/20 text-(--brand-700) dark:text-brand-400 border-brand-100 dark:border-brand-900/30",
     },
     {
       label: "Produk Aktif",
@@ -419,7 +419,7 @@ export function TabMain({
             <button
               type="button"
               onClick={() => toggleExpandRow(p.id)}
-              className="w-7 h-7 rounded-full bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-700)] dark:text-brand-400 border border-brand-200/80 dark:border-brand-800/40 flex items-center justify-center hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-full bg-brand-50 dark:bg-brand-900/20 text-(--brand-700) dark:text-brand-400 border border-brand-200/80 dark:border-brand-800/40 flex items-center justify-center hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors cursor-pointer"
               title={isExpanded ? "Tutup Rincian" : "Buka Rincian"}
             >
               <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
@@ -446,7 +446,7 @@ export function TabMain({
             <td className="py-3 px-3 font-mono font-bold">
               <Link
                 href={linkEdit(p.id)}
-                className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                className="text-(--brand-700) dark:text-brand-400 hover:underline"
                 title="Ubah produk ini"
               >
                 {p.sku}
@@ -458,7 +458,7 @@ export function TabMain({
             <td className="py-3 px-3">
               <Link
                 href={linkEdit(p.id)}
-                className="font-bold text-slate-800 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 hover:underline"
+                className="font-bold text-slate-800 dark:text-fg hover:text-(--brand-700) dark:hover:text-brand-400 hover:underline"
                 title="Ubah produk ini"
               >
                 {p.name}
@@ -481,7 +481,7 @@ export function TabMain({
               <button
                 type="button"
                 onClick={() => toggleExpandRow(p.id)}
-                className="font-extrabold text-slate-900 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 cursor-pointer transition-colors tabular-nums"
+                className="font-extrabold text-slate-900 dark:text-fg hover:text-(--brand-700) dark:hover:text-brand-400 cursor-pointer transition-colors tabular-nums"
                 title="Lihat rincian per lokasi"
               >
                 {angka(stokTotal(p.id))}
@@ -506,9 +506,9 @@ export function TabMain({
                       setActionMenuAnchor(buka ? e.currentTarget : null);
                       setActionMenuRowId(buka ? p.id : null);
                     }}
-                    className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
+                    className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
                       actionMenuRowId === p.id
-                        ? "bg-brand-50 text-[var(--brand-700)] border-brand-300"
+                        ? "bg-brand-50 text-(--brand-700) border-brand-300"
                         : "bg-white/80 dark:bg-surface hover:bg-slate-50"
                     }`}
                     title="Aksi Lainnya"
@@ -530,7 +530,7 @@ export function TabMain({
                       onClick={() => setActionMenuRowId(null)}
                       className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
                     >
-                      <Pencil className="w-3.5 h-3.5 text-[var(--brand-700)]" />
+                      <Pencil className="w-3.5 h-3.5 text-(--brand-700)" />
                       <span>Edit Produk</span>
                     </Link>
 
@@ -688,7 +688,7 @@ export function TabMain({
               <button
                 type="button"
                 onClick={() => toggleKelompokDiperluas(nama)}
-                className="text-[11px] font-bold text-[var(--brand-700)] dark:text-brand-400 hover:underline cursor-pointer"
+                className="text-[11px] font-bold text-(--brand-700) dark:text-brand-400 hover:underline cursor-pointer"
               >
                 Lihat {sisa} produk lainnya di {nama}
               </button>
@@ -731,7 +731,7 @@ export function TabMain({
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
             <Package className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -751,7 +751,7 @@ export function TabMain({
 
       {adaPenyaring && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200/70 dark:border-brand-500/20 bg-brand-50/60 dark:bg-brand-500/5 px-3 py-2">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--brand-700)] dark:text-brand-400 uppercase tracking-wide">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-(--brand-700) dark:text-brand-400 uppercase tracking-wide">
             <Filter className="w-3.5 h-3.5" />
             Filter aktif
           </span>
@@ -779,7 +779,7 @@ export function TabMain({
           <button
             type="button"
             onClick={bersihkanSemuaPenyaring}
-            className="ml-auto text-[11px] font-bold text-[var(--brand-700)] dark:text-brand-400 hover:underline cursor-pointer"
+            className="ml-auto text-[11px] font-bold text-(--brand-700) dark:text-brand-400 hover:underline cursor-pointer"
           >
             Hapus semua filter
           </button>
@@ -792,7 +792,7 @@ export function TabMain({
             key={label}
             className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3"
           >
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border ${skin}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${skin}`}>
               <Icon className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0">
@@ -808,7 +808,7 @@ export function TabMain({
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3.5">
-          <div className="relative flex items-center w-full sm:max-w-[180px] lg:max-w-[270px] sm:shrink-0">
+          <div className="relative flex items-center w-full sm:max-w-45 lg:max-w-67.5 sm:shrink-0">
             <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 pointer-events-none" />
             <input
               type="text"
@@ -818,7 +818,7 @@ export function TabMain({
                 setSearch(e.target.value);
                 updateUrlParam("q", e.target.value);
               }}
-              className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs"
+              className="w-full h-9 pl-9 pr-3.5 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs"
             />
           </div>
 
@@ -837,7 +837,7 @@ export function TabMain({
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <span>Filter</span>
                 {jumlahPenyaringAktif > 0 && (
-                  <span className="min-w-4 h-4 px-1 rounded-full bg-[var(--brand-700)] text-white text-[10px] font-bold flex items-center justify-center">
+                  <span className="min-w-4 h-4 px-1 rounded-full bg-(--brand-700) text-white text-[10px] font-bold flex items-center justify-center">
                     {jumlahPenyaringAktif}
                   </span>
                 )}
@@ -857,12 +857,12 @@ export function TabMain({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold rounded-lg text-left cursor-pointer transition-colors ${
                         kategoriFilter === c.id
-                          ? "bg-brand-50 text-[var(--brand-700)] dark:bg-brand-900/30 dark:text-brand-300"
+                          ? "bg-brand-50 text-(--brand-700) dark:bg-brand-900/30 dark:text-brand-300"
                           : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100/70 dark:hover:bg-surface-hover"
                       }`}
                     >
                       <span>{c.name}</span>
-                      {kategoriFilter === c.id && <Check className="w-3.5 h-3.5 text-[var(--brand-700)]" />}
+                      {kategoriFilter === c.id && <Check className="w-3.5 h-3.5 text-(--brand-700)" />}
                     </button>
                   ))}
 
@@ -878,12 +878,12 @@ export function TabMain({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold rounded-lg text-left cursor-pointer transition-colors ${
                         statusFilter === opt.value
-                          ? "bg-brand-50 text-[var(--brand-700)] dark:bg-brand-900/30 dark:text-brand-300"
+                          ? "bg-brand-50 text-(--brand-700) dark:bg-brand-900/30 dark:text-brand-300"
                           : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100/70 dark:hover:bg-surface-hover"
                       }`}
                     >
                       <span>{opt.label}</span>
-                      {statusFilter === opt.value && <Check className="w-3.5 h-3.5 text-[var(--brand-700)]" />}
+                      {statusFilter === opt.value && <Check className="w-3.5 h-3.5 text-(--brand-700)" />}
                     </button>
                   ))}
                 </div>
@@ -952,7 +952,7 @@ export function TabMain({
                     <button
                       type="button"
                       onClick={() => handleSort("code")}
-                      className="flex items-center gap-1.5 hover:text-[var(--brand-700)] transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 hover:text-(--brand-700) transition-colors cursor-pointer"
                     >
                       <span>Kode</span>
                       <ArrowUpDown className="w-3.5 h-3.5 opacity-70" />
@@ -964,7 +964,7 @@ export function TabMain({
                     <button
                       type="button"
                       onClick={() => handleSort("name")}
-                      className="flex items-center gap-1.5 hover:text-[var(--brand-700)] transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 hover:text-(--brand-700) transition-colors cursor-pointer"
                     >
                       <span>Nama Barang</span>
                       <ArrowUpDown className="w-3.5 h-3.5 opacity-70" />
@@ -977,7 +977,7 @@ export function TabMain({
                     <button
                       type="button"
                       onClick={() => handleSort("hargaJual")}
-                      className="flex items-center gap-1.5 ml-auto hover:text-[var(--brand-700)] transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 ml-auto hover:text-(--brand-700) transition-colors cursor-pointer"
                     >
                       <span>Harga Jual</span>
                       <ArrowUpDown className="w-3.5 h-3.5 opacity-70" />
@@ -989,7 +989,7 @@ export function TabMain({
                     <button
                       type="button"
                       onClick={() => handleSort("totalStok")}
-                      className="flex items-center gap-1.5 ml-auto hover:text-[var(--brand-700)] transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 ml-auto hover:text-(--brand-700) transition-colors cursor-pointer"
                     >
                       <span>Total Stok</span>
                       <ArrowUpDown className="w-3.5 h-3.5 opacity-70" />

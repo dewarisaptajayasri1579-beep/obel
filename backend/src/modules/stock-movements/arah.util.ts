@@ -55,12 +55,16 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
       if (diGudang) return { delta: qty, perluVerifikasi: false };
       return TIDAK_MENYENTUH;
 
-    // Pembalikan. Booth ditandai lewat from/to; tanpa keduanya berarti Gudang,
-    // dan pembalikan di Gudang selalu berarti stok kembali masuk.
+    // Pembalikan. Booth ditandai lewat from/to. Tanpa keduanya berarti Gudang —
+    // BUKAN selalu berarti stok masuk (itu cuma kebetulan benar untuk
+    // pembatalan/revisi distribusi yang memang cuma pernah mengembalikan stok
+    // ke Gudang); reversal adjustment manual (stock_adjustment_reversal) bisa
+    // dua arah tergantung arah adjustment aslinya, jadi tetap butuh sufiks
+    // arah di referenceType sama seperti ADJUSTMENT/OPENING di bawah.
     case StockMovementType.VOID_REVERSAL:
       if (m.toBoothId) return !diGudang && m.toBoothId === lokasi ? { delta: qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
       if (m.fromBoothId) return !diGudang && m.fromBoothId === lokasi ? { delta: -qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
-      return diGudang ? { delta: qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
+      return diGudang ? adjustmentGudang(m, qty) : TIDAK_MENYENTUH;
 
     case StockMovementType.ADJUSTMENT:
       if (m.toBoothId) return !diGudang && m.toBoothId === lokasi ? { delta: qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
@@ -75,8 +79,17 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
       if (m.fromBoothId) return !diGudang && m.fromBoothId === lokasi ? { delta: -qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
       return diGudang ? adjustmentGudang(m, qty) : TIDAK_MENYENTUH;
 
-    // Tidak pernah ditulis kode mana pun (lihat docsV2/04-migrasi.md §1).
+    // Tidak pernah ditulis kode mana pun (lihat docsV2/04-migrasi.md §1) — kalau
+    // suatu saat ada kode baru yang mulai menulisnya, wajib gagal keras di sini
+    // dulu (bukan diam-diam dianggap TIDAK_MENYENTUH) supaya ringkas tidak
+    // diam-diam salah hitung begitu ada baris yang lolos tanpa penanganan.
     case StockMovementType.RESTOCK:
+      throw new Error(
+        `StockMovement ${m.id} pakai movementType RESTOCK, yang belum ada logika dampak ke saldo di ` +
+          `dampakMutasi() (tipe ini sengaja tidak pernah ditulis kode mana pun — lihat docsV2/04-migrasi.md §1). ` +
+          `Kalau ada kode baru yang mulai menulis RESTOCK, tambahkan dulu case-nya di sini sebelum dipakai.`,
+      );
+
     default:
       return TIDAK_MENYENTUH;
   }
@@ -106,7 +119,9 @@ const KETERANGAN: Record<string, string> = {
   warehouse_stock_adjustment_out: 'Pengurangan stok Gudang',
   stock_distribution: 'Distribusi ke Booth',
   distribution_cancel: 'Pembatalan distribusi',
+  distribution_cancel_in: 'Pembatalan distribusi',
   distribution_revision: 'Revisi distribusi',
+  distribution_revision_in: 'Revisi distribusi',
   distribution_receipt_correction: 'Koreksi penerimaan distribusi',
   sale: 'Penjualan',
   sale_void: 'Pembatalan penjualan',
@@ -125,8 +140,17 @@ const KETERANGAN: Record<string, string> = {
   stock_receipt_reversal_out: 'Pembalikan Tambah Stok Gudang (revisi)',
   shift_closing: 'Selisih tutup shift',
   stock_opname: 'Stock opname',
+  stock_opname_in: 'Stock opname',
+  stock_opname_out: 'Stock opname',
+  stock_opname_recount: 'Stock opname (recount)',
+  stock_opname_recount_in: 'Stock opname (recount)',
+  stock_opname_recount_out: 'Stock opname (recount)',
   stock_adjustment: 'Adjustment stok',
+  stock_adjustment_in: 'Adjustment stok',
+  stock_adjustment_out: 'Adjustment stok',
   stock_adjustment_reversal: 'Pembatalan adjustment',
+  stock_adjustment_reversal_in: 'Pembatalan adjustment',
+  stock_adjustment_reversal_out: 'Pembatalan adjustment',
 };
 
 export function keteranganMutasi(m: StockMovement): string {

@@ -4,14 +4,11 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorMovementBerikutnya } from '../../common/doc-no';
+import { businessDateOf } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateStockAdjustmentDto, ReverseStockAdjustmentDto } from './dto/create-stock-adjustment.dto';
-
-function businessDateOf(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 /// TX-13 — Manual Stock Adjustment. BUKAN jalan pintas edit stok bebas:
 /// Admin memilih lokasi+produk+target qty+reason, server hitung delta
@@ -88,7 +85,13 @@ export class StockAdjustmentsService {
             qty: Math.abs(delta),
             toBoothId: dto.locationType === OpnameLocationType.BOOTH && delta > 0 ? dto.boothId : null,
             fromBoothId: dto.locationType === OpnameLocationType.BOOTH && delta < 0 ? dto.boothId : null,
-            referenceType: 'stock_adjustment',
+            // Sufiks arah wajib khusus Gudang — lihat arah.util.ts adjustmentGudang().
+            referenceType:
+              dto.locationType === OpnameLocationType.WAREHOUSE
+                ? delta > 0
+                  ? 'stock_adjustment_in'
+                  : 'stock_adjustment_out'
+                : 'stock_adjustment',
             referenceId: adjustmentId,
             businessDate: businessDateOf(now),
             occurredAt: now,
@@ -196,7 +199,16 @@ export class StockAdjustmentsService {
             qty: Math.abs(inverseDelta),
             toBoothId: snapshot.locationType === OpnameLocationType.BOOTH && inverseDelta > 0 ? snapshot.boothId : null,
             fromBoothId: snapshot.locationType === OpnameLocationType.BOOTH && inverseDelta < 0 ? snapshot.boothId : null,
-            referenceType: 'stock_adjustment_reversal',
+            // Beda dari distribution_cancel/_revision (selalu +), reversal
+            // adjustment manual bisa dua arah tergantung arah adjustment
+            // aslinya — sufiks arah WAJIB dan tergantung tanda inverseDelta,
+            // khusus kasus Gudang (Booth sudah pasti dari from/to booth).
+            referenceType:
+              snapshot.locationType === OpnameLocationType.WAREHOUSE
+                ? inverseDelta > 0
+                  ? 'stock_adjustment_reversal_in'
+                  : 'stock_adjustment_reversal_out'
+                : 'stock_adjustment_reversal',
             referenceId: adjustmentId,
             businessDate: businessDateOf(now),
             occurredAt: now,

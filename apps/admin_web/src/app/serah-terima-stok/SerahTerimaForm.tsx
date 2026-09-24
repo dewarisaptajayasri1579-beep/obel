@@ -13,7 +13,7 @@ import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError, BASE_URL, getToken, type ActiveAssignment, type Product, type WarehouseStockItem } from "@/lib/api-client";
 import { SerahTerimaLivePreview } from "./SerahTerimaLivePreview";
 
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 const TANPA_KATEGORI = "Tanpa Kategori";
 
@@ -292,7 +292,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
 
         <div className="w-full flex flex-col gap-1.5">
           <span className={COMPACT_LABEL}>Booth Tujuan</span>
-          <div className="h-8.5 min-h-[34px] px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
+          <div className="h-8.5 min-h-8.5 px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
             {selectedAssignment ? (
               <span className="text-xs font-bold text-slate-700 dark:text-fg-secondary">{selectedAssignment.boothName}</span>
             ) : (
@@ -303,7 +303,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
 
         <div className="w-full flex flex-col gap-1.5">
           <span className={COMPACT_LABEL}>No. Dokumen</span>
-          <div className="h-8.5 min-h-[34px] px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
+          <div className="h-8.5 min-h-8.5 px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
             <span className="text-xs italic text-slate-400 dark:text-fg-muted">Otomatis saat dikirim</span>
           </div>
         </div>
@@ -333,7 +333,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Catatan (opsional)..."
-        className={`w-full px-3 rounded-lg border border-slate-200/90 dark:border-line text-xs font-medium text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 ${COMPACT_FIELD}`}
+        className={`w-full px-3 rounded-lg border border-slate-200/90 dark:border-line text-xs font-medium text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 ${COMPACT_FIELD}`}
       />
 
       <div>
@@ -422,7 +422,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
             type="button"
             onClick={() => validasi() && setKonfirmasi(true)}
             disabled={mengirim}
-            className="px-4 py-1.5 rounded-lg bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{mengirim ? "Mengirim..." : "Kirim Stok"}</span>
@@ -562,7 +562,7 @@ function RenderKelompokBaris({
                   className={`w-24 h-8 px-2 text-right text-xs font-bold tabular-nums rounded-md border bg-white dark:bg-surface focus:outline-none focus:ring-2 ${
                     kurang
                       ? "border-rose-300 dark:border-rose-900/50 focus:border-rose-500 focus:ring-rose-500/10"
-                      : "border-slate-200 dark:border-line focus:border-[var(--brand-700)] focus:ring-[var(--brand-700)]/10"
+                      : "border-slate-200 dark:border-line focus:border-(--brand-700) focus:ring-(--brand-700)/10"
                   }`}
                 />
               </div>
