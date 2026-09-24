@@ -67,6 +67,22 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # Generate launcher icons (Android mipmap semua densitas + adaptive icon,
+  # iOS AppIcon set) dari satu source PNG — lihat konfigurasi
+  # `flutter_launcher_icons` di bawah dan assets/icon/icon.png.
+  flutter_launcher_icons: ^0.14.4
+
+# Logo Obbel (sama seperti apps/admin_web/public/icon-512.png, "Web Petugas
+# Booth") dipakai sebagai launcher icon app ini juga, supaya identitas visual
+# konsisten Android<->PWA. Jalankan `dart run flutter_launcher_icons` setelah
+# ganti file ini buat regenerate mipmap/AppIcon.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0B5D34"
+  adaptive_icon_foreground: "assets/icon/icon.png"
+  min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
