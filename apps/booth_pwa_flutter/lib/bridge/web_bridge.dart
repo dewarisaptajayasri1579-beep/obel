@@ -42,13 +42,26 @@ class WebBridge {
             locationPath: (req.payload['locationPath'] as String?) ?? 'shifts/{shiftId}/location-ping',
             intervalSeconds: (req.payload['intervalSeconds'] as num?)?.toInt() ?? 60,
           );
-          return ok
-              ? BridgeResponse.ok(req.id, {'tracking': true})
-              : BridgeResponse.fail(req.id, 'Izin lokasi (termasuk "Izinkan selalu") ditolak.');
+          if (ok) return BridgeResponse.ok(req.id, {'tracking': true});
+          // Bedakan "ditolak permanen" (butuh buka Settings manual, lihat
+          // action gps.openSettings) dari sekadar ditolak (dialog masih akan
+          // muncul lagi di percobaan berikutnya) — `.request()` yang dipakai
+          // di atas TIDAK menampilkan dialog apapun kalau sudah permanen.
+          final permanentlyDenied = await LocationBridgeService.instance.isPermanentlyDenied;
+          return BridgeResponse.fail(
+            req.id,
+            permanentlyDenied
+                ? 'Izin lokasi ditolak permanen — buka Pengaturan app untuk mengizinkan manual.'
+                : 'Izin lokasi (termasuk "Izinkan selalu") ditolak.',
+          );
 
         case 'gps.stop':
           await LocationBridgeService.instance.stop();
           return BridgeResponse.ok(req.id, {'tracking': false});
+
+        case 'gps.openSettings':
+          final opened = await LocationBridgeService.instance.openAppSettings();
+          return BridgeResponse.ok(req.id, {'opened': opened});
 
         case 'gps.status':
           final tracking = await LocationBridgeService.instance.isTracking;

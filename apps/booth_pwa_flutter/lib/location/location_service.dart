@@ -1,5 +1,6 @@
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart' hide openAppSettings;
+import 'package:permission_handler/permission_handler.dart' as permission_handler show openAppSettings;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'location_task_handler.dart';
@@ -56,6 +57,24 @@ class LocationBridgeService {
 
     return always.isGranted && (notif.isGranted || notif.isLimited);
   }
+
+  /// true kalau salah satu izin (lokasi atau notifikasi) pernah ditolak
+  /// permanen ("jangan tanya lagi") — pada kondisi ini `.request()` di
+  /// [requestPermissions] tidak akan menampilkan dialog apapun lagi, jadi
+  /// satu-satunya jalan pemulihan buat user adalah buka Settings app manual.
+  /// Cek `.status` (bukan `.request()`) supaya tidak memicu dialog OS lagi.
+  Future<bool> get isPermanentlyDenied async {
+    final statuses = await Future.wait([
+      Permission.locationWhenInUse.status,
+      Permission.locationAlways.status,
+      Permission.notification.status,
+    ]);
+    return statuses.any((status) => status.isPermanentlyDenied);
+  }
+
+  /// Membuka halaman Settings app supaya user bisa mengaktifkan izin yang
+  /// sudah terlanjur ditolak permanen secara manual.
+  Future<bool> openAppSettings() => permission_handler.openAppSettings();
 
   Future<bool> get isTracking async => FlutterForegroundTask.isRunningService;
 

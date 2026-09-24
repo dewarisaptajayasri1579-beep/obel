@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -42,7 +43,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
     // di-approve eksplisit di sisi native tiap kali diminta.
     final platform = controller.platform;
     if (platform is AndroidWebViewController) {
-      platform.setOnPlatformPermissionRequest((request) => request.grant());
+      // Hanya kabulkan kamera — jangan blanket-grant microphone kalau suatu
+      // saat PWA (tanpa sengaja atau lewat domain lain) memintanya juga.
+      platform.setOnPlatformPermissionRequest((request) {
+        final onlyCamera = request.types.every(
+          (type) => type == WebViewPermissionResourceType.camera,
+        );
+        if (onlyCamera) {
+          request.grant();
+        } else {
+          request.deny();
+        }
+      });
       // `navigator.geolocation` (dipakai AttendanceCapture.tsx untuk lokasi
       // check-in/out) punya prompt izin terpisah dari izin media di atas dan
       // dari izin lokasi OS — tanpa callback ini WebView Android menolak
@@ -51,6 +63,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
         onShowPrompt: (request) async =>
             const GeolocationPermissionsResponse(allow: true, retain: true),
       );
+      // `<input type="file">` (fallback "Pilih foto dari galeri" di
+      // AttendanceCapture.tsx saat getUserMedia gagal/ditolak) butuh callback
+      // ini juga — tanpanya WebView Android mengabaikan klik file-input
+      // secara diam-diam, sama seperti geolocation di atas kalau tidak diisi.
+      platform.setOnShowFileSelector((params) async {
+        final picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 80,
+          maxWidth: 1600,
+        );
+        if (picked == null) return <String>[];
+        return ['file://${picked.path}'];
+      });
     }
 
     controller.loadRequest(Uri.parse(kPwaUrl));
