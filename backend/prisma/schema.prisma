@@ -332,24 +332,33 @@ model Product {
 /// baris produk yang selisih (qty dianggap tanggung jawab Petugas, bukan
 /// rusak/salah hitung Admin). SENGAJA cuma pencatatan (belum ada status
 /// Lunas/Belum Lunas atau alur pelunasan) — itu menyusul di task terpisah.
+/// Ganti Rugi Petugas bisa berasal dari koreksi Kirim Stok (distributionId)
+/// ATAU dari approve Stok Kembali (stockReturnId) — persis satu dari dua
+/// harus terisi, tidak pernah keduanya (lihat DistributionsService.
+/// correctReceipt & ReturnsService.receive). Dipisah jadi dua kolom
+/// nullable (bukan satu polymorphic sourceId) supaya foreign key & index
+/// Prisma tetap type-safe.
 model StaffLiability {
-  id             String            @id @default(uuid())
-  distributionId String            @map("distribution_id")
-  distribution   StockDistribution @relation(fields: [distributionId], references: [id])
-  productId      String            @map("product_id")
-  product        Product           @relation(fields: [productId], references: [id])
-  staffId        String            @map("staff_id")
-  staff          Profile           @relation("StaffLiabilityStaff", fields: [staffId], references: [id])
+  id             String             @id @default(uuid())
+  distributionId String?            @map("distribution_id")
+  distribution   StockDistribution? @relation(fields: [distributionId], references: [id])
+  stockReturnId  String?            @map("stock_return_id")
+  stockReturn    StockReturn?       @relation(fields: [stockReturnId], references: [id])
+  productId      String             @map("product_id")
+  product        Product            @relation(fields: [productId], references: [id])
+  staffId        String             @map("staff_id")
+  staff          Profile            @relation("StaffLiabilityStaff", fields: [staffId], references: [id])
   qty            Int
-  unitPrice      BigInt            @map("unit_price")
-  totalAmount    BigInt            @map("total_amount")
+  unitPrice      BigInt             @map("unit_price")
+  totalAmount    BigInt             @map("total_amount")
   note           String?
-  createdById    String            @map("created_by")
-  createdBy      Profile           @relation("StaffLiabilityCreatedBy", fields: [createdById], references: [id])
-  createdAt      DateTime          @default(now()) @map("created_at")
+  createdById    String             @map("created_by")
+  createdBy      Profile            @relation("StaffLiabilityCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime           @default(now()) @map("created_at")
 
   @@index([staffId])
   @@index([distributionId])
+  @@index([stockReturnId])
   @@map("staff_liabilities")
 }
 
@@ -522,6 +531,14 @@ model ShiftSession {
   checkOutLatitude  Decimal?      @map("check_out_latitude") @db.Decimal(9, 6)
   checkOutLongitude Decimal?      @map("check_out_longitude") @db.Decimal(9, 6)
   checkOutPhotoUrl  String?       @map("check_out_photo_url")
+  // Ping lokasi berkala (tiap ~1 menit) selama shift OPEN/CLOSING, dikirim
+  // app petugas — lihat ShiftsService.recordLocationPing. Cuma menyimpan
+  // titik TERAKHIR (overwrite), bukan histori — dipakai murni utk marker
+  // "Realtime Booth" di peta Monitoring > Booth Aktif, bukan transaksi yang
+  // butuh jejak audit, jadi tidak melanggar aturan append-only StockMovement.
+  lastLocationLatitude  Decimal?  @map("last_location_latitude") @db.Decimal(9, 6)
+  lastLocationLongitude Decimal?  @map("last_location_longitude") @db.Decimal(9, 6)
+  lastLocationAt        DateTime? @map("last_location_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
@@ -856,7 +873,8 @@ model StockReturn {
   revisionOfId       String?       @map("revision_of_id")
   reversalOfId       String?       @map("reversal_of_id")
 
-  items StockReturnItem[]
+  items            StockReturnItem[]
+  staffLiabilities StaffLiability[]
 
   @@index([boothId, status])
   @@index([status])
@@ -894,13 +912,20 @@ model ShiftCashDeposit {
 }
 
 model StockReturnItem {
-  id            String      @id @default(uuid())
-  stockReturnId String      @map("stock_return_id")
-  stockReturn   StockReturn @relation(fields: [stockReturnId], references: [id])
-  productId     String      @map("product_id")
-  product       Product     @relation(fields: [productId], references: [id])
-  qtySubmitted  Int         @map("qty_submitted")
-  qtyReceived   Int?        @map("qty_received")
+  id                    String                 @id @default(uuid())
+  stockReturnId         String                 @map("stock_return_id")
+  stockReturn           StockReturn            @relation(fields: [stockReturnId], references: [id])
+  productId             String                 @map("product_id")
+  product               Product                @relation(fields: [productId], references: [id])
+  qtySubmitted          Int                    @map("qty_submitted")
+  qtyReceived           Int?                   @map("qty_received")
+  // Tindak Lanjut Admin per baris selisih saat approve Stok Kembali (sama
+  // pola dgn StockDistributionItem, lihat ReturnsService.receive) — RUSAK/
+  // LAINNYA disimpan di sini utk Laporan Stok Selisih; SALAH_HITUNG sengaja
+  // TIDAK meninggalkan jejak (qtyReceived yang sudah dikoreksi itu sendiri
+  // sudah representasinya); GANTI_RUGI_PETUGAS dicatat di StaffLiability.
+  discrepancyReasonCode DiscrepancyReasonCode? @map("discrepancy_reason_code")
+  discrepancyNote       String?                @map("discrepancy_note")
 
   @@unique([stockReturnId, productId])
   @@index([productId])

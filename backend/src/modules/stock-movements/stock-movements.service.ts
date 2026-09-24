@@ -355,7 +355,7 @@ export class StockMovementsService {
     // sama gaya dengan batasPeriode() di atas.
     const akhir = new Date(Date.UTC(y, m - 1, d + 1));
 
-    const [products, booths, thresholds, movements, inProsesRows, pernahDikirimRows] = await Promise.all([
+    const [products, booths, thresholds, movements, inProsesRows, pernahDikirimRows, inProsesKembaliRows] = await Promise.all([
       this.prisma.product.findMany({
         where: { deletedAt: null },
         select: { id: true, sku: true, name: true, minimumQty: true, criticalQty: true, category: { select: { name: true } } },
@@ -382,6 +382,14 @@ export class StockMovementsService {
         where: { distribution: { status: { not: 'CANCELLED' }, sentAt: { lt: akhir } } },
         select: { productId: true, distribution: { select: { boothId: true } } },
       }),
+      // Proses Kembali: sisa Stok Fisik Booth yang sudah diajukan sebagai
+      // Return ke Gudang (submitted saat Check-Out) tapi belum di-approve
+      // Admin — stok ini sudah keluar dari BoothStock tapi belum masuk
+      // WarehouseStock, jadi "hilang" dari saldo kalau tidak dihitung di sini.
+      this.prisma.stockReturnItem.findMany({
+        where: { stockReturn: { status: 'SUBMITTED', submittedAt: { lt: akhir } } },
+        select: { productId: true, qtySubmitted: true },
+      }),
     ]);
 
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
@@ -407,9 +415,15 @@ export class StockMovementsService {
       inProses.set(i.productId, (inProses.get(i.productId) ?? 0) + i.qtySent);
     }
 
+    const inProsesKembali = new Map<string, number>();
+    for (const i of inProsesKembaliRows) {
+      inProsesKembali.set(i.productId, (inProsesKembali.get(i.productId) ?? 0) + i.qtySubmitted);
+    }
+
     const rows = products.map((p) => {
       const gudang = saldo.get(kunci(p.id, WAREHOUSE)) ?? 0;
       const prosesQty = inProses.get(p.id) ?? 0;
+      const prosesKembaliQty = inProsesKembali.get(p.id) ?? 0;
       const perBooth = booths.map((b) => {
         const qty = saldo.get(kunci(p.id, b.id)) ?? 0;
         const threshold = thresholdByKey.get(`${b.id}:${p.id}`);
@@ -423,7 +437,7 @@ export class StockMovementsService {
           pernahDikirim: pernahDikirimSet.has(`${p.id}:${b.id}`),
         };
       });
-      const total = gudang + prosesQty + perBooth.reduce((s, b) => s + b.qty, 0);
+      const total = gudang + prosesQty + prosesKembaliQty + perBooth.reduce((s, b) => s + b.qty, 0);
       return {
         productId: p.id,
         sku: p.sku,
@@ -431,6 +445,7 @@ export class StockMovementsService {
         category: p.category?.name ?? null,
         gudang,
         inProses: prosesQty,
+        inProsesKembali: prosesKembaliQty,
         perBooth,
         total,
       };

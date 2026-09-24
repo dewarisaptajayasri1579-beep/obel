@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested, IsUUID } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, Min, ValidateNested, IsUUID } from 'class-validator';
+import { TINDAK_LANJUT_VALUES, type TindakLanjutSelisih } from '../../../common/tindak-lanjut';
 
 export class ReceiveReturnItemDto {
   @IsUUID()
@@ -8,6 +9,16 @@ export class ReceiveReturnItemDto {
   @IsInt()
   @Min(0)
   qtyReceived!: number;
+
+  /// Wajib diisi kalau qtyReceived != qtySubmitted (lihat ReturnsService.receive).
+  @IsOptional()
+  @IsIn(TINDAK_LANJUT_VALUES)
+  tindakLanjut?: TindakLanjutSelisih;
+
+  /// Wajib diisi kalau tindakLanjut = LAINNYA.
+  @IsOptional()
+  @IsString()
+  tindakLanjutNote?: string;
 }
 
 export class ReceiveReturnDto {
@@ -16,10 +27,4 @@ export class ReceiveReturnDto {
   @ValidateNested({ each: true })
   @Type(() => ReceiveReturnItemDto)
   items!: ReceiveReturnItemDto[];
-
-  /// Wajib diisi kalau ada item dengan qtyReceived != qtySubmitted (lihat
-  /// ReturnsService.receive).
-  @IsOptional()
-  @IsString()
-  note?: string;
 }

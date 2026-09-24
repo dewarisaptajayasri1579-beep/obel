@@ -15,13 +15,13 @@ export function TopBar({ title, subtitle, back }: { title: string; subtitle?: st
       <button
         type="button"
         onClick={() => (back ? router.push(back) : router.back())}
-        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 shrink-0"
+        className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 shrink-0"
       >
-        <ArrowLeft size={18} className="text-slate-700" />
+        <ArrowLeft size={22} className="text-slate-700" />
       </button>
       <div className="min-w-0">
-        <h1 className="font-extrabold text-slate-900 text-base leading-tight">{title}</h1>
-        {subtitle && <p className="text-xs text-slate-500 truncate">{subtitle}</p>}
+        <h1 className="font-extrabold text-slate-900 text-lg leading-tight">{title}</h1>
+        {subtitle && <p className="text-sm text-slate-500 truncate">{subtitle}</p>}
       </div>
     </div>
   );

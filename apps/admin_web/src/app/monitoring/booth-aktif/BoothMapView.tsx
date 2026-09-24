@@ -81,6 +81,16 @@ export function BoothMapView({
     return [lat, lng];
   }, [dengankoordinat]);
 
+  /// Reference points HARUS stabil selama isi datanya sama, karena FitBounds
+  /// men-trigger ulang map.fitBounds/setView tiap kali `points` berubah
+  /// reference. Tanpa useMemo di sini, klik marker (yang cuma mengubah state
+  /// `selectedId` di parent) ikut membuat array baru tiap render dan peta
+  /// zoom ulang ke bounds — membatalkan zoom-out manual user.
+  const points = useMemo<[number, number][]>(
+    () => dengankoordinat.map((b) => [b.latitude, b.longitude]),
+    [dengankoordinat],
+  );
+
   return (
     <div className="flex-1 min-w-0 rounded-2xl overflow-hidden border border-slate-200/90 dark:border-line" style={{ height: 560 }}>
       <MapContainer center={pusat} zoom={15} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
@@ -88,7 +98,7 @@ export function BoothMapView({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FitBounds points={dengankoordinat.map((b): [number, number] => [b.latitude, b.longitude])} />
+        <FitBounds points={points} />
         {dengankoordinat.map((booth) => (
           <Marker
             key={booth.boothId}

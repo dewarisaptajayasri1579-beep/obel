@@ -197,9 +197,9 @@ function HomeContent() {
       <div className="pb-6">
         <div className="bg-white px-5 pt-5 pb-4 flex items-start justify-between">
           <div>
-            <p className="text-xs text-slate-500 font-semibold">Selamat bekerja,</p>
+            <p className="text-sm text-slate-500 font-semibold">Selamat bekerja,</p>
             <p className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">{session?.profile.fullName} 👋</p>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
+            <p className="text-sm text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
           </div>
           <button
             type="button"
@@ -220,7 +220,7 @@ function HomeContent() {
             <Coffee size={64} className="absolute right-5 bottom-4 text-white/25" strokeWidth={1.2} />
             <DoorOpen size={28} className="relative text-white/80 mb-2" />
             <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Belum Ada Shift Aktif</p>
-            <p className="relative text-white/80 text-sm mt-2 font-medium max-w-[220px]">
+            <p className="relative text-white/80 text-base mt-2 font-medium max-w-[220px]">
               Lakukan Check-In dulu untuk mulai bekerja hari ini.
             </p>
           </div>
@@ -243,9 +243,9 @@ function HomeContent() {
     <div className="pb-6">
       <div className="bg-white px-5 pt-5 pb-4 flex items-start justify-between">
         <div>
-          <p className="text-xs text-slate-500 font-semibold">Selamat bekerja,</p>
+          <p className="text-sm text-slate-500 font-semibold">Selamat bekerja,</p>
           <p className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">{session?.profile.fullName} 👋</p>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
+          <p className="text-sm text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <button
@@ -281,21 +281,21 @@ function HomeContent() {
           <Leaf size={56} className="absolute right-10 top-16 text-white/10 -rotate-[15deg]" strokeWidth={1} />
           <div className="absolute right-5 bottom-4 flex flex-col items-center">
             <Coffee size={64} className="text-white/25" strokeWidth={1.2} />
-            <p className="text-white/30 text-[10px] italic font-medium mt-1 text-center leading-tight max-w-[70px]">
+            <p className="text-white/30 text-xs italic font-medium mt-1 text-center leading-tight max-w-[70px]">
               Satu Kopi Sejuta Cerita
             </p>
           </div>
 
-          <span className="relative inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 tracking-wide">
+          <span className="relative inline-flex items-center gap-1.5 text-sm font-bold text-white bg-white/20 backdrop-blur-sm rounded-full px-3 py-2 tracking-wide">
             <Store size={12} /> {shift.booth.name.toUpperCase()}
           </span>
           <p className="relative text-white font-extrabold text-[28px] mt-3 tracking-tight leading-none">
             {shift.shiftName.toUpperCase()} AKTIF
           </p>
-          <p className="relative text-white/80 text-sm mt-2 font-medium flex items-center gap-1.5">
+          <p className="relative text-white/80 text-base mt-2 font-medium flex items-center gap-1.5">
             <Clock size={13} /> Sejak {formatJamJakarta(shift.scheduledStartAt)}
           </p>
-          <p className="relative text-white/70 text-xs mt-3 font-medium">— Kerja hebat hari ini 💚</p>
+          <p className="relative text-white/70 text-sm mt-3 font-medium">— Kerja hebat hari ini 💚</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
@@ -312,7 +312,7 @@ function HomeContent() {
                 <Watermark size={72} className="absolute -right-3 -bottom-3 opacity-[0.09]" style={{ color: item.fg }} strokeWidth={1.5} />
                 {item.href === "/petugas/terima-stok" && stokMasukBaru > 0 && (
                   <span
-                    className="absolute top-3 left-3.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white tracking-wide z-10"
+                    className="absolute top-3 left-3.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white tracking-wide z-10"
                     style={{ backgroundColor: OBBEL.accentRed }}
                   >
                     BARU · {stokMasukBaru}
@@ -320,7 +320,7 @@ function HomeContent() {
                 )}
                 {item.href === "/petugas/stok" && adaStokBermasalah && (
                   <span
-                    className="absolute top-3 left-3.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white tracking-wide z-10"
+                    className="absolute top-3 left-3.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white tracking-wide z-10"
                     style={{ backgroundColor: STOK_BADGE_COLOR[statusStokTerparah] }}
                   >
                     {statusStokTerparah}
@@ -335,9 +335,9 @@ function HomeContent() {
                   <Icon size={20} style={{ color: item.fg }} strokeWidth={2.4} />
                 </div>
                 <div className="relative">
-                  <p className="font-bold text-sm text-slate-900">{item.label}</p>
+                  <p className="font-bold text-base text-slate-900">{item.label}</p>
                   {item.href === "/petugas/stok" && adaStokBermasalah ? (
-                    <p className="text-[11px] mt-0.5 font-semibold" style={{ color: OBBEL.accentRed }}>
+                    <p className="text-sm mt-0.5 font-semibold" style={{ color: OBBEL.accentRed }}>
                       {[
                         jumlahStokBermasalah.habis > 0 ? `${jumlahStokBermasalah.habis} habis` : null,
                         jumlahStokBermasalah.menipis > 0 ? `${jumlahStokBermasalah.menipis} menipis` : null,
@@ -346,11 +346,11 @@ function HomeContent() {
                         .join(", ")}
                     </p>
                   ) : item.href === "/petugas/kasir" && cupTerjualHariIni > 0 ? (
-                    <p className="text-[11px] mt-0.5 font-bold" style={{ color: GREEN }}>
+                    <p className="text-sm mt-0.5 font-bold" style={{ color: GREEN }}>
                       {cupTerjualHariIni} cup · {formatRupiah(omzetHariIni)}
                     </p>
                   ) : (
-                    <p className="text-[11px] text-slate-500 mt-0.5 font-medium">{item.desc}</p>
+                    <p className="text-sm text-slate-500 mt-0.5 font-medium">{item.desc}</p>
                   )}
                 </div>
               </Link>
@@ -370,7 +370,7 @@ function HomeContent() {
 
         <div className="flex items-center gap-3 mt-5 px-6">
           <div className="flex-1 h-px bg-slate-200" />
-          <p className="text-[11px] italic text-slate-400 font-medium text-center whitespace-nowrap">
+          <p className="text-sm italic text-slate-400 font-medium text-center whitespace-nowrap">
             Team yang hebat, hasil yang luar biasa 🌱
           </p>
           <div className="flex-1 h-px bg-slate-200" />
@@ -391,7 +391,7 @@ function HomeContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
               {notifications.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-10">Belum ada notifikasi.</p>
+                <p className="text-base text-slate-400 text-center py-10">Belum ada notifikasi.</p>
               ) : (
                 notifications.map((n) => {
                   const Icon = NOTIF_ICON[n.type];
@@ -400,14 +400,14 @@ function HomeContent() {
                   const isi = (
                     <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50">
                       <span
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: `${warna}1A`, color: warna }}
                       >
                         <Icon size={16} />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900">{n.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
+                        <p className="text-base font-bold text-slate-900">{n.title}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{n.message}</p>
                       </div>
                     </div>
                   );

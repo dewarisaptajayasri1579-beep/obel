@@ -10,7 +10,7 @@ import { ReportsService } from './reports.service';
 import { ProductReportService, type FilterLaporanProduk } from './product-report.service';
 import { StockReceiptReportService, type FilterLaporanPenerimaan } from './stock-receipt-report.service';
 import { StockHandoverReportService, type FilterLaporanSerahTerima, type StockHandoverStatus } from './stock-handover-report.service';
-import { StockDamageReportService, type FilterLaporanStokRusak } from './stock-damage-report.service';
+import { StockDiscrepancyReportService, type FilterLaporanStokSelisih } from './stock-discrepancy-report.service';
 import { SalesReportService, type FilterLaporanKasir } from './sales-report.service';
 
 @Controller('reports')
@@ -21,7 +21,7 @@ export class ReportsController {
     private readonly productReport: ProductReportService,
     private readonly stockReceiptReport: StockReceiptReportService,
     private readonly stockHandoverReport: StockHandoverReportService,
-    private readonly stockDamageReport: StockDamageReportService,
+    private readonly stockDiscrepancyReport: StockDiscrepancyReportService,
     private readonly salesReport: SalesReportService,
   ) {}
 
@@ -180,7 +180,7 @@ export class ReportsController {
     return new StreamableFile(buffer);
   }
 
-  private filterStokRusakDari(dateFrom?: string, dateTo?: string, boothId?: string, dicetakOleh?: string): FilterLaporanStokRusak {
+  private filterStokSelisihDari(dateFrom?: string, dateTo?: string, boothId?: string, dicetakOleh?: string): FilterLaporanStokSelisih {
     return {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
@@ -189,46 +189,46 @@ export class ReportsController {
     };
   }
 
-  @Get('stock-damage')
+  @Get('stock-discrepancy')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  async stokRusakData(
+  async stokSelisihData(
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
   ) {
-    return this.stockDamageReport.data(this.filterStokRusakDari(dateFrom, dateTo, boothId));
+    return this.stockDiscrepancyReport.data(this.filterStokSelisihDari(dateFrom, dateTo, boothId));
   }
 
-  @Get('stock-damage/excel')
+  @Get('stock-discrepancy/excel')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  async stokRusakExcel(
+  async stokSelisihExcel(
     @Res({ passthrough: true }) res: Response,
     @CurrentUser() user: JwtPayload,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
   ) {
-    const buffer = await this.stockDamageReport.excel(this.filterStokRusakDari(dateFrom, dateTo, boothId, user.username));
+    const buffer = await this.stockDiscrepancyReport.excel(this.filterStokSelisihDari(dateFrom, dateTo, boothId, user.username));
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${this.namaBerkas('stok-rusak', 'xlsx')}"`,
+      'Content-Disposition': `attachment; filename="${this.namaBerkas('stok-selisih', 'xlsx')}"`,
     });
     return new StreamableFile(buffer);
   }
 
-  @Get('stock-damage/pdf')
+  @Get('stock-discrepancy/pdf')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  async stokRusakPdf(
+  async stokSelisihPdf(
     @Res({ passthrough: true }) res: Response,
     @CurrentUser() user: JwtPayload,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
   ) {
-    const buffer = await this.stockDamageReport.pdf(this.filterStokRusakDari(dateFrom, dateTo, boothId, user.username));
+    const buffer = await this.stockDiscrepancyReport.pdf(this.filterStokSelisihDari(dateFrom, dateTo, boothId, user.username));
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${this.namaBerkas('stok-rusak', 'pdf')}"`,
+      'Content-Disposition': `inline; filename="${this.namaBerkas('stok-selisih', 'pdf')}"`,
     });
     return new StreamableFile(buffer);
   }

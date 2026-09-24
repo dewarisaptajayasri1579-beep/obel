@@ -151,7 +151,13 @@ export class ReturnsService {
 
   /// Mirrors receive_stock_return (§09): warehouse hanya bertambah sesuai
   /// qty actual received (BR-013). Beda submitted vs received -> DISCREPANCY,
-  /// tapi tidak memblokir penerimaan (dokumen fisik tetap final).
+  /// tapi tidak memblokir penerimaan (dokumen fisik tetap final). Tiap baris
+  /// selisih wajib Tindak Lanjut (sama pola dgn DistributionsService.
+  /// correctReceipt): RUSAK/LAINNYA ditandai di item utk Laporan Stok
+  /// Selisih, GANTI_RUGI_PETUGAS bikin StaffLiability dibebankan ke
+  /// stockReturn.submittedById (Petugas yang Check-Out shift ini), SALAH_HITUNG
+  /// tidak meninggalkan jejak (qtyReceived yang sudah dikoreksi itu sendiri
+  /// representasinya).
   async receive(id: string, dto: ReceiveReturnDto, actorId: string) {
     const stockReturn = await this.loadWithRelations(id);
     if (!stockReturn) {
@@ -164,27 +170,47 @@ export class ReturnsService {
       throw new DomainError('RETURN_NOT_PENDING', 'Return ini tidak sedang menunggu diterima.');
     }
 
-    const qtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qtyReceived]));
+    const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));
     const hasDiscrepancy = stockReturn.items.some(
-      (item) => (qtyByProduct.get(item.productId) ?? item.qtySubmitted) !== item.qtySubmitted,
+      (item) => (inputByProduct.get(item.productId)?.qtyReceived ?? item.qtySubmitted) !== item.qtySubmitted,
     );
-    if (hasDiscrepancy && !dto.note?.trim()) {
-      throw new DomainError(
-        'DISCREPANCY_REASON_REQUIRED',
-        'Catatan wajib diisi kalau qty Stok Kembali yang diterima berbeda dari yang diajukan.',
-      );
+    for (const item of stockReturn.items) {
+      const input = inputByProduct.get(item.productId);
+      const qtyReceived = input?.qtyReceived ?? item.qtySubmitted;
+      if (qtyReceived === item.qtySubmitted) continue;
+      if (!input?.tindakLanjut) {
+        throw new DomainError(
+          'DISCREPANCY_REASON_REQUIRED',
+          'Pilih Tindak Lanjut untuk setiap produk yang Stok Dikembalikan-nya berbeda dari Stok Sistem.',
+          { productId: item.productId },
+        );
+      }
+      if (input.tindakLanjut === 'LAINNYA' && !input.tindakLanjutNote?.trim()) {
+        throw new DomainError(
+          'DISCREPANCY_REASON_REQUIRED',
+          'Catatan wajib diisi untuk Tindak Lanjut "Lainnya".',
+          { productId: item.productId },
+        );
+      }
     }
 
     const receivedAt = new Date();
     const businessDate = businessDateOf(receivedAt);
+    const liabilityNotes: string[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       for (const item of stockReturn.items) {
-        const qtyReceived = qtyByProduct.get(item.productId) ?? item.qtySubmitted;
+        const input = inputByProduct.get(item.productId);
+        const qtyReceived = input?.qtyReceived ?? item.qtySubmitted;
+        const tindakLanjut = qtyReceived !== item.qtySubmitted ? input?.tindakLanjut : undefined;
 
         await tx.stockReturnItem.update({
           where: { id: item.id },
-          data: { qtyReceived },
+          data: {
+            qtyReceived,
+            discrepancyReasonCode: tindakLanjut === 'RUSAK' || tindakLanjut === 'LAINNYA' ? tindakLanjut : null,
+            discrepancyNote: tindakLanjut === 'LAINNYA' ? input?.tindakLanjutNote?.trim() : null,
+          },
         });
 
         if (qtyReceived > 0) {
@@ -206,8 +232,30 @@ export class ReturnsService {
               businessDate,
               occurredAt: receivedAt,
               createdBy: actorId,
+              note: tindakLanjut ? `Tindak Lanjut: ${tindakLanjut}` : undefined,
             },
           });
+        }
+
+        if (tindakLanjut === 'GANTI_RUGI_PETUGAS') {
+          const qtyRugi = item.qtySubmitted - qtyReceived;
+          if (qtyRugi > 0) {
+            const unitPrice = item.product.sellPrice;
+            const totalAmount = unitPrice * BigInt(qtyRugi);
+            await tx.staffLiability.create({
+              data: {
+                stockReturnId: stockReturn.id,
+                productId: item.productId,
+                staffId: stockReturn.submittedById,
+                qty: qtyRugi,
+                unitPrice,
+                totalAmount,
+                note: input?.tindakLanjutNote?.trim(),
+                createdById: actorId,
+              },
+            });
+            liabilityNotes.push(`${item.product.name}: ${qtyRugi} cup`);
+          }
         }
       }
 
@@ -217,7 +265,7 @@ export class ReturnsService {
           status: hasDiscrepancy ? ReturnStatus.DISCREPANCY : ReturnStatus.RECEIVED,
           receivedAt,
           receivedById: actorId,
-          receiveNote: dto.note?.trim() || null,
+          receiveNote: liabilityNotes.length > 0 ? `Ganti Rugi Petugas: ${liabilityNotes.join(', ')}` : null,
         },
       });
     });

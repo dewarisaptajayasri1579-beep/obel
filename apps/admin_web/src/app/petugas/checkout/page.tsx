@@ -9,11 +9,16 @@ import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
+import { QtyStepper } from "../_components/QtyStepper";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
+
+function kelasAngka(n: number) {
+  return n === 0 ? "text-slate-400 font-normal" : "text-slate-800 font-bold";
+}
 
 type Step = "LAPORAN" | "ABSEN";
 
@@ -147,21 +152,21 @@ function CheckoutContent() {
   if (step === "LAPORAN") {
     return (
       <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto pb-32">
-        <TopBar title="Laporan Kembali" back="/petugas" />
+        <TopBar title="Setor & Pengembalian Stok" back="/petugas" />
         <div className="p-4">
           <div className="rounded-2xl bg-white border border-slate-200 p-4 mb-4">
             <p className="font-extrabold text-slate-900">{report.boothName}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               Shift {report.shiftTemplateName} • {formatTanggalJakarta(report.businessDate)}
             </p>
           </div>
 
-          <p className="text-sm font-bold text-slate-800 mb-2">Rekap Stok Produk</p>
-          <p className="text-xs text-slate-500 mb-2">
+          <p className="text-base font-bold text-slate-800 mb-2">Rekap Stok Produk</p>
+          <p className="text-sm text-slate-500 mb-2">
             Masukkan jumlah fisik cup yang tersisa di kolom Stok Fisik. Isi Catatan kalau ada selisih dari sistem.
           </p>
           <div className="rounded-2xl bg-white border border-slate-200 overflow-x-auto mb-4">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="text-slate-400 text-left whitespace-nowrap">
                   <th className="p-3 font-semibold">Produk</th>
@@ -181,30 +186,19 @@ function CheckoutContent() {
                   return (
                     <tr key={b.productId}>
                       <td className="p-3 font-semibold text-slate-800 whitespace-nowrap">{b.productName}</td>
-                      <td className="p-3 text-center">{b.stokAwal}</td>
-                      <td className="p-3 text-center">{b.restock}</td>
-                      <td className="p-3 text-center">{b.terjual}</td>
-                      <td className="p-3 text-center">{b.retur}</td>
-                      <td className="p-3 text-center font-bold">{b.sisaSistem}</td>
+                      <td className={`p-3 text-center text-base ${kelasAngka(b.stokAwal)}`}>{b.stokAwal}</td>
+                      <td className={`p-3 text-center text-base ${kelasAngka(b.restock)}`}>{b.restock}</td>
+                      <td className={`p-3 text-center text-base ${kelasAngka(b.terjual)}`}>{b.terjual}</td>
+                      <td className={`p-3 text-center text-base ${kelasAngka(b.retur)}`}>{b.retur}</td>
+                      <td className={`p-3 text-center text-base ${kelasAngka(b.sisaSistem)}`}>{b.sisaSistem}</td>
                       <td className="p-2 text-center">
-                        <input
-                          type="number"
-                          min={0}
-                          value={fisik === 0 ? "" : fisik}
-                          placeholder="0"
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) =>
-                            setStokFisik((prev) => ({
-                              ...prev,
-                              [b.productId]: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)),
-                            }))
-                          }
-                          className={`w-16 rounded-lg border px-2 py-1.5 text-xs text-center ${
-                            selisih !== 0 ? "border-amber-300 bg-amber-50" : "border-slate-200"
-                          }`}
+                        <QtyStepper
+                          value={fisik}
+                          highlighted={selisih !== 0}
+                          onChange={(n) => setStokFisik((prev) => ({ ...prev, [b.productId]: n }))}
                         />
                       </td>
-                      <td className={`p-3 text-center font-bold ${selisih === 0 ? "text-slate-400" : "text-rose-600"}`}>
+                      <td className={`p-3 text-center text-base font-bold ${selisih === 0 ? "text-slate-400" : "text-rose-600"}`}>
                         {selisih === 0 ? "0" : selisih > 0 ? `+${selisih}` : selisih}
                       </td>
                     </tr>
@@ -214,9 +208,9 @@ function CheckoutContent() {
             </table>
           </div>
 
-          <p className="text-sm font-bold text-slate-800 mb-2">Rekap Penjualan</p>
+          <p className="text-base font-bold text-slate-800 mb-2">Rekap Penjualan</p>
           <div className="rounded-2xl bg-white border border-slate-200 overflow-x-auto mb-4">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="text-slate-400 text-left whitespace-nowrap">
                   <th className="p-3 font-semibold">No Transaksi</th>
@@ -248,19 +242,19 @@ function CheckoutContent() {
             </table>
           </div>
 
-          <p className="text-sm font-bold text-slate-800 mb-2">Rekap Keuangan</p>
+          <p className="text-base font-bold text-slate-800 mb-2">Rekap Keuangan</p>
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl bg-white border border-slate-200 p-3">
-              <p className="text-[10px] text-slate-500">Total Penjualan</p>
-              <p className="font-extrabold text-sm mt-1">{formatRupiah(report.totalPenjualan)}</p>
+              <p className="text-xs text-slate-500">Total Penjualan</p>
+              <p className="font-extrabold text-base mt-1">{formatRupiah(report.totalPenjualan)}</p>
             </div>
             <div className="rounded-xl bg-white border border-slate-200 p-3">
-              <p className="text-[10px] text-slate-500">Kas Tunai</p>
-              <p className="font-extrabold text-sm mt-1">{formatRupiah(report.kasTunai)}</p>
+              <p className="text-xs text-slate-500">Kas Tunai</p>
+              <p className="font-extrabold text-base mt-1">{formatRupiah(report.kasTunai)}</p>
             </div>
             <div className="rounded-xl bg-white border border-slate-200 p-3">
-              <p className="text-[10px] text-slate-500">Kas QRIS</p>
-              <p className="font-extrabold text-sm mt-1">{formatRupiah(report.kasQris)}</p>
+              <p className="text-xs text-slate-500">Kas QRIS</p>
+              <p className="font-extrabold text-base mt-1">{formatRupiah(report.kasQris)}</p>
             </div>
           </div>
 
@@ -270,12 +264,12 @@ function CheckoutContent() {
             placeholder="Contoh: kondisi stok, kendala, atau catatan lainnya..."
             rows={3}
             maxLength={500}
-            className={`w-full rounded-xl border px-3 py-2.5 text-sm ${
+            className={`w-full rounded-xl border px-3 py-2.5.5 text-base ${
               adaSelisih && !catatanTerisi ? "border-rose-300 bg-rose-50" : "border-slate-200"
             }`}
           />
           {adaSelisih && !catatanTerisi && (
-            <p className="text-xs text-rose-600 mt-1.5">Ada selisih Stok Fisik — Catatan wajib diisi.</p>
+            <p className="text-sm text-rose-600 mt-1.5">Ada selisih Stok Fisik — Catatan wajib diisi.</p>
           )}
         </div>
 
@@ -302,16 +296,16 @@ function CheckoutContent() {
         <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
           <CheckCircle2 size={22} className="text-emerald-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-emerald-800">Closing sudah lengkap</p>
-            <p className="text-xs text-emerald-700 mt-0.5">
+            <p className="font-bold text-base text-emerald-800">Closing sudah lengkap</p>
+            <p className="text-sm text-emerald-700 mt-0.5">
               Semua data laporan telah diisi dengan benar. Anda siap melakukan check out.
             </p>
           </div>
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-200 p-4">
-          <p className="text-sm font-bold text-slate-800 mb-3">Ringkasan Shift</p>
-          <div className="space-y-2.5 text-xs">
+          <p className="text-base font-bold text-slate-800 mb-3">Ringkasan Shift</p>
+          <div className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Booth</span>
               <span className="font-semibold text-slate-800">{shift.booth.name}</span>
@@ -342,7 +336,7 @@ function CheckoutContent() {
         </div>
 
         <div>
-          <p className="text-sm font-bold text-slate-800 mb-2">Konfirmasi Kehadiran</p>
+          <p className="text-base font-bold text-slate-800 mb-2">Konfirmasi Kehadiran</p>
           <AttendanceCapture location={location} onLocation={setLocation} photoFile={photoFile} onPhoto={(f) => setPhotoFile(f)} />
         </div>
       </div>
@@ -360,7 +354,7 @@ function CheckoutContent() {
           type="button"
           onClick={() => setStep("LAPORAN")}
           disabled={submitting}
-          className="w-full text-center text-sm font-bold py-1"
+          className="w-full text-center text-base font-bold py-1"
           style={{ color: GREEN }}
         >
           Kembali ke Laporan

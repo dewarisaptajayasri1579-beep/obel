@@ -331,7 +331,7 @@ function StokContent() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-xs font-bold"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold"
             style={
               tab === key
                 ? { backgroundColor: GREEN, color: "white" }
@@ -353,27 +353,27 @@ function StokContent() {
           <div className="grid grid-cols-4 gap-2 mb-4">
             <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <Package size={16} style={{ color: GREEN }} />
-              <p className="text-[10px] text-slate-600 mt-1.5">Total Item</p>
+              <p className="text-xs text-slate-600 mt-1.5">Total Item</p>
               <p className="text-lg font-extrabold text-slate-900">{ringkasan.total}</p>
-              <p className="text-[9px] text-slate-400">produk</p>
+              <p className="text-[11px] text-slate-400">produk</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <CheckCircle2 size={16} style={{ color: GREEN }} />
-              <p className="text-[10px] mt-1.5" style={{ color: GREEN }}>Aman</p>
+              <p className="text-xs mt-1.5" style={{ color: GREEN }}>Aman</p>
               <p className="text-lg font-extrabold" style={{ color: GREEN }}>{ringkasan.aman}</p>
-              <p className="text-[9px] text-slate-400">produk</p>
+              <p className="text-[11px] text-slate-400">produk</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FFF3E0" }}>
               <AlertTriangle size={16} style={{ color: "#C2740C" }} />
-              <p className="text-[10px] mt-1.5" style={{ color: "#C2740C" }}>Kritis</p>
+              <p className="text-xs mt-1.5" style={{ color: "#C2740C" }}>Kritis</p>
               <p className="text-lg font-extrabold" style={{ color: "#C2740C" }}>{ringkasan.kritis}</p>
-              <p className="text-[9px] text-slate-400">produk</p>
+              <p className="text-[11px] text-slate-400">produk</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FEE2E2" }}>
               <Ban size={16} style={{ color: "#D21919" }} />
-              <p className="text-[10px] mt-1.5" style={{ color: "#D21919" }}>Habis</p>
+              <p className="text-xs mt-1.5" style={{ color: "#D21919" }}>Habis</p>
               <p className="text-lg font-extrabold" style={{ color: "#D21919" }}>{ringkasan.habis}</p>
-              <p className="text-[9px] text-slate-400">produk</p>
+              <p className="text-[11px] text-slate-400">produk</p>
             </div>
           </div>
 
@@ -384,14 +384,14 @@ function StokContent() {
                 value={cari}
                 onChange={(e) => setCari(e.target.value)}
                 placeholder="Cari produk..."
-                className="flex-1 min-w-0 text-sm outline-none placeholder:text-slate-400"
+                className="flex-1 min-w-0 text-base outline-none placeholder:text-slate-400"
               />
             </div>
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setFilterOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border px-3 h-10 text-xs font-bold"
+                className="flex items-center gap-1.5 rounded-xl border px-3 h-10 text-sm font-bold"
                 style={
                   filterStatus !== "SEMUA"
                     ? { backgroundColor: GREEN, borderColor: GREEN, color: "white" }
@@ -411,7 +411,7 @@ function StokContent() {
                         setFilterStatus(o.value);
                         setFilterOpen(false);
                       }}
-                      className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold"
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold"
                       style={filterStatus === o.value ? { backgroundColor: OBBEL_SCALE[50], color: GREEN } : { color: "#475569" }}
                     >
                       {o.label}
@@ -424,7 +424,7 @@ function StokContent() {
 
           <div className="flex flex-col gap-2.5">
             {stockTersaring.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-10">Tidak ada produk yang cocok.</p>
+              <p className="text-base text-slate-500 text-center py-10">Tidak ada produk yang cocok.</p>
             ) : (
               stockTersaring.map((s) => {
                 const style = STATUS_STYLE[s.status];
@@ -442,24 +442,29 @@ function StokContent() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-slate-900 truncate">{s.productName}</p>
-                      <p className="text-[11px] text-slate-400 truncate">
+                      <p className="font-bold text-base text-slate-900 truncate">{s.productName}</p>
+                      <p className="text-sm text-slate-400 truncate">
                         {s.categoryName ?? "Tanpa Kategori"} / {s.boothName}
                       </p>
+                      {s.dalamProsesKembali > 0 && (
+                        <p className="text-xs font-bold text-sky-600 mt-0.5">
+                          {s.dalamProsesKembali} cup Proses Kembali ke Gudang
+                        </p>
+                      )}
                     </div>
 
                     <div className="w-24 shrink-0">
-                      <p className="text-sm font-extrabold text-right" style={{ color: style.fg }}>
+                      <p className="text-base font-extrabold text-right" style={{ color: style.fg }}>
                         {s.qtyOnHand} cup
                       </p>
                       <div className="h-1.5 rounded-full bg-slate-100 mt-1.5 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: style.bar }} />
                       </div>
-                      <p className="text-[10px] text-slate-400 text-right mt-1">Min. {s.minimumQty} cup</p>
+                      <p className="text-xs text-slate-400 text-right mt-1">Min. {s.minimumQty} cup</p>
                     </div>
 
                     <span
-                      className="flex items-center gap-1 text-[11px] font-bold rounded-full px-2.5 py-1.5 shrink-0"
+                      className="flex items-center gap-1 text-sm font-bold rounded-full px-2.5 py-2 shrink-0"
                       style={{ backgroundColor: style.bg, color: style.fg }}
                     >
                       <Icon size={12} />
@@ -478,9 +483,9 @@ function StokContent() {
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-sm text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
-              <p className="text-[11px] text-slate-500">Butuh Restock Hari Ini</p>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+              <p className="font-extrabold text-base text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
+              <p className="text-sm text-slate-500">Butuh Restock Hari Ini</p>
+              <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
                 <Calendar size={11} /> {formatTanggalJakarta(new Date().toISOString())}
               </p>
             </div>
@@ -490,23 +495,23 @@ function StokContent() {
             <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
               <FileText size={16} style={{ color: GREEN }} />
               <p className="text-lg font-extrabold text-slate-900 mt-1.5">{itemDiajukan}</p>
-              <p className="text-[10px] text-slate-500">item diajukan</p>
+              <p className="text-xs text-slate-500">item diajukan</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FFF3E0" }}>
               <AlertTriangle size={16} style={{ color: "#C2740C" }} />
               <p className="text-lg font-extrabold mt-1.5" style={{ color: "#C2740C" }}>{itemKritisRestock}</p>
-              <p className="text-[10px] text-slate-500">item kritis</p>
+              <p className="text-xs text-slate-500">item kritis</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E1EEFB" }}>
               <Package size={16} style={{ color: "#1D63D8" }} />
               <p className="text-lg font-extrabold mt-1.5" style={{ color: "#1D63D8" }}>{totalCupDiajukan}</p>
-              <p className="text-[10px] text-slate-500">estimasi total cup</p>
+              <p className="text-xs text-slate-500">estimasi total cup</p>
             </div>
           </div>
 
           <div className="flex items-center justify-between mb-2.5">
-            <p className="text-sm font-extrabold text-slate-900">Pilih Produk untuk Direstock</p>
-            <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer" style={{ color: GREEN }}>
+            <p className="text-base font-extrabold text-slate-900">Pilih Produk untuk Direstock</p>
+            <label className="flex items-center gap-1.5 text-sm font-semibold cursor-pointer" style={{ color: GREEN }}>
               Pilih Semua
               <input
                 type="checkbox"
@@ -536,10 +541,10 @@ function StokContent() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-slate-900 truncate">{p.name}</p>
-                    <p className="text-[11px] text-slate-500 mb-1">Stok saat ini {stockRow?.qtyOnHand ?? 0} cup</p>
+                    <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
+                    <p className="text-sm text-slate-500 mb-1">Stok saat ini {stockRow?.qtyOnHand ?? 0} cup</p>
                     <span
-                      className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5"
+                      className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1"
                       style={{ backgroundColor: style.bg, color: style.fg }}
                     >
                       <Icon size={10} />
@@ -548,7 +553,7 @@ function StokContent() {
                   </div>
 
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <p className="text-[10px] text-slate-400 whitespace-nowrap">
+                    <p className="text-xs text-slate-400 whitespace-nowrap">
                       Saran restock <span className="font-bold text-slate-600">{hitungSaranRestock({
                         qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
                         minimumQty: p.minimumQty,
@@ -560,19 +565,19 @@ function StokContent() {
                       })} cup</span>
                     </p>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => changeRequestQty(p.id, -1)} className="w-7 h-7 rounded-full border flex items-center justify-center">
-                        <Minus size={14} />
+                      <button type="button" onClick={() => changeRequestQty(p.id, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                        <Minus size={18} />
                       </button>
-                      <span className="w-8 text-center text-sm font-bold rounded-lg py-1" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
+                      <span className="w-10 text-center text-base font-bold rounded-lg py-1.5" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
                         {qty}
                       </span>
                       <button
                         type="button"
                         onClick={() => changeRequestQty(p.id, 1)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white"
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white active:opacity-80"
                         style={{ backgroundColor: GREEN }}
                       >
-                        <Plus size={14} />
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>
@@ -584,18 +589,18 @@ function StokContent() {
           <div className="fixed bottom-4 inset-x-4 z-20">
             <div className="max-w-md mx-auto bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 p-3 flex items-center gap-2.5">
               <div className="flex items-center gap-2 shrink-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                   <Package size={14} style={{ color: GREEN }} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold text-slate-900 leading-tight">{itemDiajukan} item dipilih</p>
-                  <p className="text-[10px] text-slate-500 leading-tight">Total {totalCupDiajukan} cup</p>
+                  <p className="text-sm font-bold text-slate-900 leading-tight">{itemDiajukan} item dipilih</p>
+                  <p className="text-xs text-slate-500 leading-tight">Total {totalCupDiajukan} cup</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleSimpanDraft}
-                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2.5 text-xs font-bold shrink-0"
+                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2.5.5 text-sm font-bold shrink-0"
                 style={{ borderColor: GREEN, color: GREEN }}
               >
                 <Bookmark size={14} /> Draft
@@ -604,7 +609,7 @@ function StokContent() {
                 type="button"
                 onClick={handleSubmitRestock}
                 disabled={submitting || totalCupDiajukan === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5.5 text-sm font-bold text-white disabled:opacity-50"
                 style={{ backgroundColor: GREEN }}
               >
                 {submitting ? <Spinner size="sm" color="white" /> : (
@@ -623,19 +628,19 @@ function StokContent() {
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-sm text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
-              <p className="text-[11px] text-slate-500">Pilih produk untuk melihat riwayat stok</p>
+              <p className="font-extrabold text-base text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
+              <p className="text-sm text-slate-500">Pilih produk untuk melihat riwayat stok</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 mb-4">
             <div>
-              <p className="text-[11px] font-semibold text-slate-500 mb-1">Pilih Stok</p>
+              <p className="text-sm font-semibold text-slate-500 mb-1">Pilih Stok</p>
               <div className="relative">
                 <select
                   value={ledgerProductId ?? ""}
                   onChange={(e) => setLedgerProductId(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5 text-sm font-semibold text-slate-800"
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5.5 text-base font-semibold text-slate-800"
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -647,12 +652,12 @@ function StokContent() {
               </div>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-slate-500 mb-1">Periode</p>
+              <p className="text-sm font-semibold text-slate-500 mb-1">Periode</p>
               <div className="relative">
                 <select
                   value={ledgerPeriode}
                   onChange={(e) => setLedgerPeriode(e.target.value as Periode)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5 text-sm font-semibold text-slate-800"
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5.5 text-base font-semibold text-slate-800"
                 >
                   {(Object.keys(PERIODE_LABEL) as Periode[]).map((p) => (
                     <option key={p} value={p}>
@@ -674,32 +679,32 @@ function StokContent() {
               <div className="grid grid-cols-4 gap-2 mb-5">
                 <div className="rounded-xl p-2.5 bg-slate-50 border border-slate-100">
                   <Package size={15} className="text-slate-500" />
-                  <p className="text-[10px] text-slate-500 mt-1.5">Stok Awal</p>
+                  <p className="text-xs text-slate-500 mt-1.5">Stok Awal</p>
                   <p className="text-base font-extrabold text-slate-900">{ledger.ringkasan.stokAwal}</p>
                 </div>
                 <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                   <ArrowUp size={15} style={{ color: GREEN }} />
-                  <p className="text-[10px] mt-1.5" style={{ color: GREEN }}>Masuk</p>
+                  <p className="text-xs mt-1.5" style={{ color: GREEN }}>Masuk</p>
                   <p className="text-base font-extrabold" style={{ color: GREEN }}>{ledger.ringkasan.masuk}</p>
                 </div>
                 <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FEE2E2" }}>
                   <ArrowDown size={15} style={{ color: "#D21919" }} />
-                  <p className="text-[10px] mt-1.5" style={{ color: "#D21919" }}>Keluar</p>
+                  <p className="text-xs mt-1.5" style={{ color: "#D21919" }}>Keluar</p>
                   <p className="text-base font-extrabold" style={{ color: "#D21919" }}>{ledger.ringkasan.keluar}</p>
                 </div>
                 <div className="rounded-xl p-2.5 bg-slate-50 border border-slate-100">
                   <Package size={15} className="text-slate-500" />
-                  <p className="text-[10px] text-slate-500 mt-1.5">Stok Akhir</p>
+                  <p className="text-xs text-slate-500 mt-1.5">Stok Akhir</p>
                   <p className="text-base font-extrabold text-slate-900">{ledger.ringkasan.stokAkhir}</p>
                 </div>
               </div>
 
-              <p className="text-sm font-extrabold text-slate-900">Riwayat Mutasi Stok</p>
-              <p className="text-[11px] text-slate-500 mb-3">Catatan masuk dan keluar stok produk terpilih</p>
+              <p className="text-base font-extrabold text-slate-900">Riwayat Mutasi Stok</p>
+              <p className="text-sm text-slate-500 mb-3">Catatan masuk dan keluar stok produk terpilih</p>
 
               <div className="flex flex-col gap-2 mb-4">
                 {ledger.rows.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-10">Belum ada mutasi pada periode ini.</p>
+                  <p className="text-base text-slate-500 text-center py-10">Belum ada mutasi pada periode ini.</p>
                 ) : (
                   ledger.rows
                     .slice()
@@ -715,21 +720,21 @@ function StokContent() {
                       return (
                         <div key={r.id} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
                           <div className="w-20 shrink-0">
-                            <p className="text-xs font-bold text-slate-800">{formatTanggalJakarta(r.tanggal)}</p>
-                            <p className="text-[10px] text-slate-400">{formatJamJakarta(r.tanggal)}</p>
+                            <p className="text-sm font-bold text-slate-800">{formatTanggalJakarta(r.tanggal)}</p>
+                            <p className="text-xs text-slate-400">{formatJamJakarta(r.tanggal)}</p>
                           </div>
                           <span
-                            className="flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 shrink-0"
+                            className="flex items-center gap-1 text-xs font-bold rounded-full px-2 py-1 shrink-0"
                             style={{ backgroundColor: jenisStyle.bg, color: jenisStyle.fg }}
                           >
                             <JenisIcon size={10} />
                             {r.jenis === "MASUK" ? "Masuk" : r.jenis === "KELUAR" ? "Keluar" : "Penyesuaian"}
                           </span>
-                          <p className="text-sm font-extrabold w-14 text-right shrink-0" style={{ color: jenisStyle.fg }}>
+                          <p className="text-base font-extrabold w-14 text-right shrink-0" style={{ color: jenisStyle.fg }}>
                             {r.qty > 0 ? "+" : ""}{r.qty}
                           </p>
-                          <p className="text-xs font-bold text-slate-700 w-10 text-right shrink-0">{r.stokAkhir}</p>
-                          <p className="text-[11px] text-slate-500 flex-1 min-w-0 truncate">{r.keterangan}</p>
+                          <p className="text-sm font-bold text-slate-700 w-10 text-right shrink-0">{r.stokAkhir}</p>
+                          <p className="text-sm text-slate-500 flex-1 min-w-0 truncate">{r.keterangan}</p>
                         </div>
                       );
                     })
@@ -738,27 +743,27 @@ function StokContent() {
 
               <div className="rounded-2xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
                     <ArrowUp size={14} style={{ color: GREEN }} />
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-500 leading-tight">Total Masuk</p>
-                    <p className="text-sm font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.masuk} cup</p>
+                    <p className="text-xs text-slate-500 leading-tight">Total Masuk</p>
+                    <p className="text-base font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.masuk} cup</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FEE2E2" }}>
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FEE2E2" }}>
                     <ArrowDown size={14} style={{ color: "#D21919" }} />
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-500 leading-tight">Total Keluar</p>
-                    <p className="text-sm font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.keluar} cup</p>
+                    <p className="text-xs text-slate-500 leading-tight">Total Keluar</p>
+                    <p className="text-base font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.keluar} cup</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleExportRiwayat}
-                  className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 shrink-0"
+                  className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 shrink-0"
                 >
                   <Download size={13} /> Export
                 </button>

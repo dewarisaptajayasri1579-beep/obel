@@ -61,7 +61,7 @@ function RiwayatPenjualanContent() {
             key={key}
             type="button"
             onClick={() => setFilter(key)}
-            className="flex-1 rounded-full py-2 text-xs font-bold"
+            className="flex-1 rounded-full py-2.5 text-sm font-bold"
             style={
               filter === key
                 ? { backgroundColor: GREEN, color: "white" }
@@ -81,11 +81,11 @@ function RiwayatPenjualanContent() {
         <div className="p-4">
           <div className="rounded-2xl bg-white border border-slate-200 p-4 flex justify-between items-center mb-4">
             <div>
-              <p className="text-xs text-slate-500">Total Transaksi</p>
+              <p className="text-sm text-slate-500">Total Transaksi</p>
               <p className="font-extrabold text-xl mt-0.5">{filtered.length}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500">Total Omzet</p>
+              <p className="text-sm text-slate-500">Total Omzet</p>
               <p className="font-extrabold text-xl mt-0.5" style={{ color: GREEN }}>
                 {formatRupiah(totalOmzet)}
               </p>
@@ -94,17 +94,17 @@ function RiwayatPenjualanContent() {
 
           <div className="flex flex-col gap-2.5">
             {filtered.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-10">Belum ada transaksi pada periode ini.</p>
+              <p className="text-base text-slate-500 text-center py-10">Belum ada transaksi pada periode ini.</p>
             )}
             {filtered.map((s) => (
               <div key={s.id} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-sm text-slate-900">{s.saleNo}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="font-semibold text-base text-slate-900">{s.saleNo}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">
                     {formatTanggalJakarta(s.paidAt ?? s.createdAt)} • {formatJamJakarta(s.paidAt ?? s.createdAt)} • {s.paymentMethod === "CASH" ? "Tunai" : "QRIS"}
                   </p>
                 </div>
-                <p className="font-extrabold text-sm">{formatRupiah(s.total)}</p>
+                <p className="font-extrabold text-base">{formatRupiah(s.total)}</p>
               </div>
             ))}
           </div>

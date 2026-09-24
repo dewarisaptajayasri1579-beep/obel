@@ -110,7 +110,7 @@ export class DashboardService {
     const todayStart = startOfTodayJakarta();
     const yesterdayStart = startOfDayJakarta(new Date(todayStart.getTime() - 1));
 
-    const [booths, openShifts, salesTodayRaw, salesYesterdayRaw, boothStocks, thresholds, pendingDistributions] = await Promise.all([
+    const [booths, openShifts, salesTodayRaw, salesYesterdayRaw, boothStocks, thresholds, pendingDistributions, pendingReturns] = await Promise.all([
       this.prisma.booth.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.shiftSession.findMany({
         where: { status: { in: [ShiftStatus.OPEN, ShiftStatus.CLOSING] } },
@@ -137,6 +137,15 @@ export class DashboardService {
         select: { boothId: true, distributionNo: true, sentAt: true },
         orderBy: { sentAt: 'asc' },
       }),
+      // Sisa Stok Fisik yang otomatis diajukan sebagai Return ke Gudang saat
+      // Check-Out, tapi belum di-approve Admin (status SUBMITTED) — dipakai
+      // kartu "Proses Kembali" di Booth Aktif, supaya stok 0 pasca Check-Out
+      // tidak salah dibaca sebagai "Habis" biasa.
+      this.prisma.stockReturn.findMany({
+        where: { status: ReturnStatus.SUBMITTED },
+        select: { boothId: true, returnNo: true, submittedAt: true, items: { select: { qtySubmitted: true } } },
+        orderBy: { submittedAt: 'asc' },
+      }),
     ]);
 
     const shiftByBoothId = new Map(openShifts.map((s) => [s.boothId, s]));
@@ -147,6 +156,18 @@ export class DashboardService {
       const existing = pendingDistributionByBoothId.get(d.boothId);
       if (existing) existing.count += 1;
       else pendingDistributionByBoothId.set(d.boothId, { distributionNo: d.distributionNo, sentAt: d.sentAt, count: 1 });
+    }
+
+    const pendingReturnByBoothId = new Map<string, { returnNo: string; submittedAt: Date; count: number; qty: number }>();
+    for (const r of pendingReturns) {
+      const qty = r.items.reduce((sum, i) => sum + i.qtySubmitted, 0);
+      const existing = pendingReturnByBoothId.get(r.boothId);
+      if (existing) {
+        existing.count += 1;
+        existing.qty += qty;
+      } else {
+        pendingReturnByBoothId.set(r.boothId, { returnNo: r.returnNo, submittedAt: r.submittedAt, count: 1, qty });
+      }
     }
 
     // TX-14 & DC-003: hanya versi efektif per transaction_group_id yang
@@ -188,6 +209,7 @@ export class DashboardService {
       );
 
       const pendingDistribution = pendingDistributionByBoothId.get(booth.id) ?? null;
+      const pendingReturn = pendingReturnByBoothId.get(booth.id) ?? null;
 
       const boothStockRows = stocksByBoothId.get(booth.id) ?? [];
       const stockQty = boothStockRows.reduce((sum, s) => sum + s.qtyOnHand, 0);
@@ -220,6 +242,14 @@ export class DashboardService {
               distributionNo: pendingDistribution.distributionNo,
               sentAt: pendingDistribution.sentAt,
               count: pendingDistribution.count,
+            }
+          : null,
+        pendingReturn: pendingReturn
+          ? {
+              returnNo: pendingReturn.returnNo,
+              submittedAt: pendingReturn.submittedAt,
+              count: pendingReturn.count,
+              qty: pendingReturn.qty,
             }
           : null,
         topStock: boothStockRows.slice(0, TOP_STOCK_PRODUCTS_LIMIT).map((s) => ({

@@ -50,7 +50,7 @@ export default function PetugasLoginPage() {
           <Image src="/logo.png" alt="Obbel" width={66} height={66} className="object-contain" priority />
         </div>
         <h1 className="text-white font-extrabold text-[26px] tracking-tight">Obbel Petugas Booth</h1>
-        <p className="text-white/75 text-sm mt-1.5 font-medium">Check-In, Kasir, dan aktivitas harian Anda</p>
+        <p className="text-white/75 text-base mt-1.5 font-medium">Check-In, Kasir, dan aktivitas harian Anda</p>
       </div>
 
       <form
@@ -58,7 +58,7 @@ export default function PetugasLoginPage() {
         className="w-full max-w-sm bg-white rounded-[28px] shadow-[0_24px_60px_-15px_rgba(0,0,0,0.35)] p-7 flex flex-col gap-4"
       >
         <div>
-          <label className="text-xs font-bold uppercase tracking-wide text-slate-400 block mb-2">Username</label>
+          <label className="text-sm font-bold uppercase tracking-wide text-slate-400 block mb-2">Username</label>
           <div className="relative">
             <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -67,13 +67,13 @@ export default function PetugasLoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
-              className="w-full rounded-2xl border border-slate-200 pl-10 pr-4 py-3.5 text-sm font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
+              className="w-full rounded-2xl border border-slate-200 pl-10 pr-4 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
               placeholder="Masukkan username"
             />
           </div>
         </div>
         <div>
-          <label className="text-xs font-bold uppercase tracking-wide text-slate-400 block mb-2">Password</label>
+          <label className="text-sm font-bold uppercase tracking-wide text-slate-400 block mb-2">Password</label>
           <div className="relative">
             <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -81,7 +81,7 @@ export default function PetugasLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-2xl border border-slate-200 pl-10 pr-10 py-3.5 text-sm font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
+              className="w-full rounded-2xl border border-slate-200 pl-10 pr-10 py-3.5 text-base font-medium outline-none transition focus:border-[#0B5D34] focus:ring-4 focus:ring-[#0B5D34]/10"
               placeholder="Masukkan password"
             />
             <button
@@ -96,7 +96,7 @@ export default function PetugasLoginPage() {
         </div>
 
         {error && (
-          <div className="rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 font-medium">
+          <div className="rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-base px-4 py-3 font-medium">
             {error}
           </div>
         )}
@@ -110,12 +110,12 @@ export default function PetugasLoginPage() {
           {submitting ? <Spinner size="sm" color="white" /> : "MASUK"}
         </button>
 
-        <button type="button" className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 mt-1">
+        <button type="button" className="flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-400 mt-1">
           <LifeBuoy size={13} /> Butuh bantuan?
         </button>
       </form>
 
-      <p className="text-white/60 text-xs mt-8 text-center font-medium">Obbel Coffee &amp; Milk — Good Coffee, Good Mood</p>
+      <p className="text-white/60 text-sm mt-8 text-center font-medium">Obbel Coffee &amp; Milk — Good Coffee, Good Mood</p>
     </div>
   );
 }

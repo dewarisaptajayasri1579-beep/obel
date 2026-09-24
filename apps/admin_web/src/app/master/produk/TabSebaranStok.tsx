@@ -87,6 +87,7 @@ export function TabSebaranStok() {
     if (urutBerdasarkan === "TOTAL") return r.total;
     if (urutBerdasarkan === "GUDANG") return r.gudang;
     if (urutBerdasarkan === "IN_PROSES") return r.inProses;
+    if (urutBerdasarkan === "IN_PROSES_KEMBALI") return r.inProsesKembali;
     return r.perBooth.find((b) => b.boothId === urutBerdasarkan)?.qty ?? 0;
   }
 
@@ -102,8 +103,10 @@ export function TabSebaranStok() {
       : urutBerdasarkan === "GUDANG"
         ? "Gudang"
         : urutBerdasarkan === "IN_PROSES"
-          ? "In Proses"
-          : (data?.booths.find((b) => b.boothId === urutBerdasarkan)?.boothName ?? "");
+          ? "Proses Kirim"
+          : urutBerdasarkan === "IN_PROSES_KEMBALI"
+            ? "Proses Kembali"
+            : (data?.booths.find((b) => b.boothId === urutBerdasarkan)?.boothName ?? "");
 
   const KELAS_SEL = "py-2.5 px-3 text-center tabular-nums whitespace-nowrap";
   const KELAS_HEAD_SEL = "py-3 px-3 text-center whitespace-nowrap";
@@ -130,6 +133,7 @@ export function TabSebaranStok() {
   // tabel lagi difilter.
   const totalGudang = data?.rows.reduce((s, r) => s + r.gudang, 0) ?? 0;
   const totalInProses = data?.rows.reduce((s, r) => s + r.inProses, 0) ?? 0;
+  const totalInProsesKembali = data?.rows.reduce((s, r) => s + r.inProsesKembali, 0) ?? 0;
   const totalPerBooth =
     data?.booths.map((b) => ({
       boothId: b.boothId,
@@ -254,7 +258,13 @@ export function TabSebaranStok() {
                     className={`border-b border-slate-200/80 dark:border-line ${urutBerdasarkan === "IN_PROSES" ? "bg-brand-100/60 dark:bg-brand-500/15" : ""}`}
                     style={{ minWidth: LEBAR_KOLOM }}
                   >
-                    <HeaderUrut kunci="IN_PROSES" label="In Proses" />
+                    <HeaderUrut kunci="IN_PROSES" label="Proses Kirim" />
+                  </th>
+                  <th
+                    className={`border-b border-slate-200/80 dark:border-line ${urutBerdasarkan === "IN_PROSES_KEMBALI" ? "bg-brand-100/60 dark:bg-brand-500/15" : ""}`}
+                    style={{ minWidth: LEBAR_KOLOM }}
+                  >
+                    <HeaderUrut kunci="IN_PROSES_KEMBALI" label="Proses Kembali" />
                   </th>
                   {urutanBooth.map((b) => (
                     <th
@@ -295,6 +305,9 @@ export function TabSebaranStok() {
                     <td className={`${KELAS_SEL} ${r.inProses > 0 ? "font-bold text-amber-600 dark:text-amber-400" : "text-slate-300 dark:text-fg-disabled"}`}>
                       {angka(r.inProses)}
                     </td>
+                    <td className={`${KELAS_SEL} ${r.inProsesKembali > 0 ? "font-bold text-sky-600 dark:text-sky-400" : "text-slate-300 dark:text-fg-disabled"}`}>
+                      {angka(r.inProsesKembali)}
+                    </td>
                     {urutanBooth.map((booth) => {
                       const b = r.perBooth.find((x) => x.boothId === booth.boothId);
                       return (
@@ -315,7 +328,7 @@ export function TabSebaranStok() {
 
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={4 + (data.booths.length ?? 0)} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
+                    <td colSpan={5 + (data.booths.length ?? 0)} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
                       Tidak ada produk yang cocok.
                     </td>
                   </tr>
@@ -332,6 +345,7 @@ export function TabSebaranStok() {
                     </td>
                     <td className={`${KELAS_SEL} text-slate-700 dark:text-fg-secondary`}>{angka(totalGudang)}</td>
                     <td className={`${KELAS_SEL} text-amber-600 dark:text-amber-400`}>{angka(totalInProses)}</td>
+                    <td className={`${KELAS_SEL} text-sky-600 dark:text-sky-400`}>{angka(totalInProsesKembali)}</td>
                     {urutanBooth.map((booth) => {
                       const b = totalPerBooth.find((x) => x.boothId === booth.boothId);
                       return (
@@ -375,6 +389,21 @@ export function TabSebaranStok() {
             <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-line shrink-0" />
             <span className="font-bold text-slate-500 dark:text-fg-muted">Abu-abu</span>
             <span className="text-slate-500 dark:text-fg-muted">— Belum pernah diserahterimakan ke Booth ini, bukan masalah stok</span>
+          </span>
+        </div>
+        <p className="text-[11px] font-bold text-slate-500 dark:text-fg-muted uppercase tracking-wide mt-4 mb-2.5">
+          Keterangan kolom Proses
+        </p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px]">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+            <span className="font-bold text-amber-600 dark:text-amber-400">Proses Kirim</span>
+            <span className="text-slate-500 dark:text-fg-muted">— sudah dikirim dari Gudang, belum dikonfirmasi diterima Booth</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
+            <span className="font-bold text-sky-600 dark:text-sky-400">Proses Kembali</span>
+            <span className="text-slate-500 dark:text-fg-muted">— sisa stok Booth sudah diajukan Return saat Check-Out, belum di-approve Admin</span>
           </span>
         </div>
       </div>

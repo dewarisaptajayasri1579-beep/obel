@@ -12,6 +12,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ReasonCode } from '@prisma/client';
+import { TINDAK_LANJUT_VALUES, type TindakLanjutSelisih } from '../../../common/tindak-lanjut';
+
+export type { TindakLanjutSelisih } from '../../../common/tindak-lanjut';
 
 export class DistributionItemQtyDto {
   @IsUUID()
@@ -21,19 +24,6 @@ export class DistributionItemQtyDto {
   @Min(0)
   qty!: number;
 }
-
-/// Tindak lanjut Admin per baris produk yang selisih saat Koreksi Penerimaan
-/// (lihat distributions.service.ts correctReceipt()):
-/// - RUSAK: qty tetap dikurangi dari stok, ditandai utk Laporan Stok Rusak.
-/// - SALAH_HITUNG: qty dikembalikan/dikoreksi, tidak lagi dianggap kerugian.
-/// - GANTI_RUGI_PETUGAS: dicatat sebagai StaffLiability dibebankan ke
-///   Petugas yang menerima (distribution.receivedById), belum ada alur
-///   pelunasan.
-/// - LAINNYA: tidak ada aksi stok/liability otomatis, cuma catatan bebas
-///   (tindakLanjutNote) yang masuk activity log — buat kasus di luar 3 di
-///   atas.
-export type TindakLanjutSelisih = 'RUSAK' | 'SALAH_HITUNG' | 'GANTI_RUGI_PETUGAS' | 'LAINNYA';
-const TINDAK_LANJUT_VALUES: TindakLanjutSelisih[] = ['RUSAK', 'SALAH_HITUNG', 'GANTI_RUGI_PETUGAS', 'LAINNYA'];
 
 export class CorrectReceiptItemDto extends DistributionItemQtyDto {
   @IsOptional()

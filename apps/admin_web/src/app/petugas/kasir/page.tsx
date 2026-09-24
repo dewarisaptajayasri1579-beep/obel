@@ -367,13 +367,13 @@ function KasirContent() {
         <div className="print:hidden flex flex-col items-center gap-3 w-full">
           <CheckCircle2 size={64} style={{ color: GREEN }} />
           <p className="font-extrabold text-2xl text-slate-900">Transaksi Berhasil</p>
-          <p className="text-sm text-slate-500">Terima kasih telah melayani dengan sepenuh hati!</p>
+          <p className="text-base text-slate-500">Terima kasih telah melayani dengan sepenuh hati!</p>
         </div>
 
         {/* Nota cetak — HANYA terlihat di dialog print (window.print()),
             disembunyikan di layar normal supaya tidak dobel dgn kartu di
             bawah. Print browser tidak butuh backend/PDF generator. */}
-        <div className="hidden print:block text-left w-full text-sm">
+        <div className="hidden print:block text-left w-full text-base">
           <p className="font-extrabold text-base">Obbel Coffee & Milk</p>
           <p>No. Invoice: {result.saleNo}</p>
           <p>Booth: {shift?.booth.name}</p>
@@ -383,7 +383,7 @@ function KasirContent() {
           <p>Metode: {result.paymentMethod === "SPLIT" ? "Split" : result.paymentMethod === "CASH" ? "Tunai" : "QRIS"}</p>
         </div>
 
-        <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 mt-2 text-sm text-left flex flex-col gap-1.5">
+        <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 mt-2 text-base text-left flex flex-col gap-1.5">
           <div className="flex justify-between">
             <span className="text-slate-400">No. Invoice</span>
             <span className="font-semibold">{result.saleNo}</span>
@@ -398,7 +398,7 @@ function KasirContent() {
           </div>
         </div>
 
-        <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 text-sm text-left flex flex-col gap-1.5">
+        <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 text-base text-left flex flex-col gap-1.5">
           <p className="font-bold text-slate-800 mb-1">Detail Pembayaran</p>
           <div className="flex justify-between">
             <span className="text-slate-400">Subtotal</span>
@@ -434,7 +434,7 @@ function KasirContent() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-sm"
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-base"
             style={{ borderColor: GREEN, color: GREEN }}
           >
             <Printer size={16} /> Cetak Nota
@@ -442,7 +442,7 @@ function KasirContent() {
           <button
             type="button"
             onClick={handleKirimWhatsapp}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-sm"
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-base"
             style={{ borderColor: "#25D366", color: "#128C4A" }}
           >
             <MessageCircle size={16} /> Kirim WA
@@ -473,7 +473,7 @@ function KasirContent() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari menu..."
-            className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#0B5D34]"
+            className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-2.5.5 text-base outline-none focus:border-[#0B5D34]"
           />
         </div>
         <button
@@ -485,7 +485,7 @@ function KasirContent() {
           <FileText size={18} className="text-slate-600" />
           {drafts.length > 0 && (
             <span
-              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-extrabold flex items-center justify-center"
+              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-xs font-extrabold flex items-center justify-center"
               style={{ backgroundColor: OBBEL.accentOrange }}
             >
               {drafts.length}
@@ -501,7 +501,7 @@ function KasirContent() {
               key={c}
               type="button"
               onClick={() => setActiveCategory(c)}
-              className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold"
+              className="shrink-0 rounded-full px-3.5 py-2 text-sm font-bold"
               style={
                 activeCategory === c
                   ? { backgroundColor: GREEN, color: "white" }
@@ -533,13 +533,13 @@ function KasirContent() {
                   <Coffee size={32} className="text-slate-300" />
                 )}
                 {!p.active && (
-                  <span className="absolute top-2 left-2 bg-slate-700 text-white text-[9px] font-extrabold rounded-full px-2 py-0.5">
+                  <span className="absolute top-2 left-2 bg-slate-700 text-white text-[11px] font-extrabold rounded-full px-2.5 py-1">
                     Nonaktif
                   </span>
                 )}
                 {habis && (
                   <span
-                    className="absolute top-2 left-2 text-white text-[9px] font-extrabold rounded-full px-2 py-0.5"
+                    className="absolute top-2 left-2 text-white text-[11px] font-extrabold rounded-full px-2.5 py-1"
                     style={{ backgroundColor: OBBEL.accentRed }}
                   >
                     Stok Habis
@@ -547,17 +547,17 @@ function KasirContent() {
                 )}
               </div>
               <div className="p-3">
-                <p className="font-bold text-sm text-slate-900 truncate">{p.name}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Stok {stock} pack</p>
+                <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
+                <p className="text-sm text-slate-500 mt-0.5">Stok {stock} pack</p>
                 <div className="flex items-end justify-between mt-1.5">
-                  <p className="font-extrabold text-sm" style={{ color: GREEN }}>
+                  <p className="font-extrabold text-base" style={{ color: GREEN }}>
                     {formatRupiah(p.sellPrice)}
                   </p>
                   <button
                     type="button"
                     disabled={!bisaDitambah}
                     onClick={() => addToCart(p)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white disabled:opacity-30 shrink-0"
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-30 shrink-0"
                     style={{ backgroundColor: GREEN }}
                   >
                     <Plus size={16} />
@@ -568,7 +568,7 @@ function KasirContent() {
           );
         })}
         {filteredProducts.length === 0 && (
-          <p className="col-span-2 text-sm text-slate-500 text-center py-10">Produk tidak ditemukan.</p>
+          <p className="col-span-2 text-base text-slate-500 text-center py-10">Produk tidak ditemukan.</p>
         )}
       </div>
 
@@ -576,15 +576,15 @@ function KasirContent() {
         <div className="fixed bottom-4 inset-x-4 z-20">
           <div className="max-w-md mx-auto flex items-center justify-between bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 px-4 py-3">
             <div>
-              <p className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
+              <p className="text-sm text-slate-500 font-semibold flex items-center gap-1.5">
                 <ShoppingCart size={14} /> {totalItems} pack{activeDraftId ? " · Draft" : ""}
               </p>
-              <p className="font-extrabold text-sm text-slate-900">{formatRupiah(total)}</p>
+              <p className="font-extrabold text-base text-slate-900">{formatRupiah(total)}</p>
             </div>
             <button
               type="button"
               onClick={() => setSheet("cart")}
-              className="rounded-xl px-4 py-2.5 font-bold text-sm text-white"
+              className="rounded-xl px-4 py-2.5.5 font-bold text-base text-white"
               style={{ backgroundColor: GREEN }}
             >
               Lihat Keranjang
@@ -611,13 +611,13 @@ function KasirContent() {
                   <Spinner />
                 </div>
               ) : drafts.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-10">Belum ada draft tersimpan.</p>
+                <p className="text-base text-slate-500 text-center py-10">Belum ada draft tersimpan.</p>
               ) : (
                 drafts.map((d) => (
                   <div key={d.id} className="rounded-2xl border border-slate-200 p-3.5 flex items-center justify-between gap-3">
                     <button type="button" onClick={() => openDraft(d)} className="flex-1 text-left">
-                      <p className="font-bold text-sm text-slate-900">{d.saleNo}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="font-bold text-base text-slate-900">{d.saleNo}</p>
+                      <p className="text-sm text-slate-500 mt-0.5">
                         {d.items.reduce((sum, i) => sum + i.qty, 0)} pack · {formatRupiah(d.total)}
                       </p>
                     </button>
@@ -640,7 +640,7 @@ function KasirContent() {
           >
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <p className="font-extrabold text-slate-900">Keranjang Transaksi{activeDraftId ? " (Draft)" : ""}</p>
-              <button type="button" onClick={() => setSheet(null)} className="text-slate-400 text-sm">
+              <button type="button" onClick={() => setSheet(null)} className="text-slate-400 text-base">
                 Tutup
               </button>
             </div>
@@ -656,19 +656,19 @@ function KasirContent() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-slate-900 truncate">{l.product.name}</p>
-                    <p className="text-xs text-slate-500">{formatRupiah(l.product.sellPrice)}</p>
+                    <p className="font-semibold text-base text-slate-900 truncate">{l.product.name}</p>
+                    <p className="text-sm text-slate-500">{formatRupiah(l.product.sellPrice)}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button type="button" onClick={() => changeQty(l.product.id, -1)} className="w-7 h-7 rounded-full border flex items-center justify-center">
-                      <Minus size={14} />
+                    <button type="button" onClick={() => changeQty(l.product.id, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                      <Minus size={18} />
                     </button>
-                    <span className="w-5 text-center text-sm font-semibold">{l.qty}</span>
-                    <button type="button" onClick={() => changeQty(l.product.id, 1)} className="w-7 h-7 rounded-full border flex items-center justify-center">
-                      <Plus size={14} />
+                    <span className="w-6 text-center text-base font-semibold">{l.qty}</span>
+                    <button type="button" onClick={() => changeQty(l.product.id, 1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                      <Plus size={18} />
                     </button>
-                    <button type="button" onClick={() => changeQty(l.product.id, -l.qty)} className="ml-1" style={{ color: OBBEL.accentRed }}>
-                      <Trash2 size={16} />
+                    <button type="button" onClick={() => changeQty(l.product.id, -l.qty)} className="w-10 h-10 flex items-center justify-center ml-1" style={{ color: OBBEL.accentRed }}>
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
@@ -676,15 +676,15 @@ function KasirContent() {
             </div>
             <div className="p-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-500">Subtotal ({totalItems} pack)</span>
-                <span className="text-sm font-semibold">{formatRupiah(subtotal)}</span>
+                <span className="text-base text-slate-500">Subtotal ({totalItems} pack)</span>
+                <span className="text-base font-semibold">{formatRupiah(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between mb-3 gap-3">
-                <span className="text-sm text-slate-500 shrink-0">Diskon (Rp)</span>
+                <span className="text-base text-slate-500 shrink-0">Diskon (Rp)</span>
                 <RibuanInput
                   value={discountInput}
                   onChange={setDiscountInput}
-                  className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-right"
+                  className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-base text-right"
                 />
               </div>
               <div className="flex justify-between mb-3 pt-2 border-t border-slate-100">
@@ -727,26 +727,26 @@ function KasirContent() {
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
               <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-                <p className="text-xs font-semibold text-slate-600">Total Pembayaran</p>
+                <p className="text-sm font-semibold text-slate-600">Total Pembayaran</p>
                 <p className="font-extrabold text-2xl mt-1" style={{ color: GREEN }}>
                   {formatRupiah(total)}
                 </p>
                 {discount > 0 && (
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-sm text-slate-500 mt-1">
                     Subtotal {formatRupiah(subtotal)} - Diskon {formatRupiah(discount)}
                   </p>
                 )}
               </div>
 
               <div>
-                <p className="text-sm font-bold text-slate-700 mb-2">Metode Pembayaran</p>
+                <p className="text-base font-bold text-slate-700 mb-2">Metode Pembayaran</p>
                 <div className="grid grid-cols-3 gap-2">
                   {(["CASH", "QRIS", "SPLIT"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setPaymentMethod(m)}
-                      className="rounded-xl py-3 text-sm font-bold border-2"
+                      className="rounded-xl py-3 text-base font-bold border-2"
                       style={
                         paymentMethod === m
                           ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
@@ -761,15 +761,15 @@ function KasirContent() {
 
               {(paymentMethod === "QRIS" || paymentMethod === "SPLIT") && (
                 <div>
-                  <p className="text-sm font-bold text-slate-700 mb-2">Kode QRIS Booth</p>
+                  <p className="text-base font-bold text-slate-700 mb-2">Kode QRIS Booth</p>
                   {qrisImageUrl ? (
                     <div className="rounded-2xl border border-slate-200 p-4 flex flex-col items-center gap-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={qrisImageUrl} alt="Kode QRIS" className="w-48 h-48 object-contain" />
-                      <p className="text-xs text-slate-500 text-center">Tunjukkan ke pelanggan untuk dipindai.</p>
+                      <p className="text-sm text-slate-500 text-center">Tunjukkan ke pelanggan untuk dipindai.</p>
                     </div>
                   ) : (
-                    <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 font-medium">
+                    <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
                       Kode QRIS Booth ini belum diunggah Admin. Hubungi Admin untuk mengaturnya di Data Booth.
                     </div>
                   )}
@@ -778,14 +778,14 @@ function KasirContent() {
 
               {paymentMethod === "CASH" && (
                 <div>
-                  <p className="text-sm font-bold text-slate-700 mb-2">Nominal Diterima (Tunai)</p>
+                  <p className="text-base font-bold text-slate-700 mb-2">Nominal Diterima (Tunai)</p>
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {nominalCepat(total).map((n) => (
                       <button
                         key={n}
                         type="button"
                         onClick={() => setNominalTunai(n)}
-                        className="rounded-xl py-2.5 text-xs font-bold border-2"
+                        className="rounded-xl py-2.5.5 text-sm font-bold border-2"
                         style={
                           nominalTunai === n
                             ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
@@ -799,7 +799,7 @@ function KasirContent() {
                   <RibuanInput
                     value={nominalTunai}
                     onChange={setNominalTunai}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0B5D34]"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
                     placeholder="Masukkan nominal lain"
                   />
                 </div>
@@ -808,23 +808,23 @@ function KasirContent() {
               {paymentMethod === "SPLIT" && (
                 <div className="flex flex-col gap-3">
                   <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1.5">Bagian Tunai</p>
+                    <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian Tunai</p>
                     <RibuanInput
                       value={splitTunai}
                       onChange={setSplitTunai}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0B5D34]"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
                     />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1.5">Bagian QRIS</p>
+                    <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian QRIS</p>
                     <RibuanInput
                       value={splitQris}
                       onChange={setSplitQris}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0B5D34]"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
                     />
                   </div>
                   {sisaSplit !== 0 && (
-                    <p className="text-xs font-semibold" style={{ color: OBBEL.accentRed }}>
+                    <p className="text-sm font-semibold" style={{ color: OBBEL.accentRed }}>
                       {sisaSplit > 0 ? `Kurang ${formatRupiah(sisaSplit)}` : `Lebih ${formatRupiah(-sisaSplit)}`} dari total.
                     </p>
                   )}
@@ -832,7 +832,7 @@ function KasirContent() {
               )}
 
               {paymentMethod === "CASH" && (
-                <div className="rounded-2xl bg-slate-50 p-4 flex flex-col gap-1.5 text-sm">
+                <div className="rounded-2xl bg-slate-50 p-4 flex flex-col gap-1.5 text-base">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Total Pembayaran</span>
                     <span className="font-semibold">{formatRupiah(total)}</span>
@@ -851,7 +851,7 @@ function KasirContent() {
               )}
 
               {paymentMethod === "CASH" && kembalianAtauKurang < 0 && (
-                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 font-medium">
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
                   Nominal masih kurang. Mohon masukkan nominal yang sesuai.
                 </div>
               )}

@@ -108,14 +108,14 @@ export const MAIN_NAV: NavGroup[] = [
             bottomBar: true,
           },
           {
-            label: "Laporan Kembali",
+            label: "Setor & Pengembalian Stok",
             href: "/transaksi-laporan-kembali",
             icon: ClipboardList,
             bottomBar: false,
           },
           {
-            label: "Laporan Stok Rusak",
-            href: "/laporan/stok-rusak",
+            label: "Rekap Stok Selisih",
+            href: "/laporan/stok-selisih",
             icon: AlertTriangle,
             bottomBar: false,
           },

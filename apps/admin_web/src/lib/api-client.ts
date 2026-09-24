@@ -216,6 +216,10 @@ export interface BarisSebaranStok {
   category: string | null;
   gudang: number;
   inProses: number;
+  /// Sisa Stok Fisik Booth yang sudah diajukan sebagai Return ke Gudang saat
+  /// Check-Out tapi belum di-approve Admin — "hilang sementara" dari saldo
+  /// Booth maupun Gudang, jadi ditampilkan terpisah supaya total tetap benar.
+  inProsesKembali: number;
   perBooth: BarisSebaranStokBooth[];
   total: number;
 }
@@ -460,30 +464,36 @@ export interface FilterLaporanSerahTerima {
   status?: StockHandover["status"]
 }
 
-export interface FilterLaporanStokRusak {
+export interface FilterLaporanStokSelisih {
   dateFrom?: string
   dateTo?: string
   boothId?: string
 }
 
-export interface BarisStokRusak {
-  distributionId: string
-  distributionNo: string
+export type JenisStokSelisih = "KIRIM_STOK" | "PENGEMBALIAN_STOK"
+export type TindakLanjutStokSelisih = "RUSAK" | "GANTI_RUGI_PETUGAS" | "LAINNYA"
+
+export interface BarisStokSelisih {
+  id: string
+  jenis: JenisStokSelisih
+  docNo: string
+  tanggal: string
   boothName: string
   staffName: string | null
   productName: string
-  qtySent: number
-  qtyReceived: number
-  qtyRusak: number
-  receivedAt: string
-  reasonNote: string | null
+  qtyDiajukan: number | null
+  qtyDiterima: number | null
+  selisih: number
+  tindakLanjut: TindakLanjutStokSelisih
+  catatan: string | null
 }
 
-export interface StokRusakData {
-  rows: BarisStokRusak[]
-  totalQtyRusak: number
+export interface StokSelisihData {
+  rows: BarisStokSelisih[]
+  totalSelisih: number
   totalKejadian: number
-  perProduk: { productName: string; totalQtyRusak: number; kejadian: number }[]
+  totalGantiRugi: number
+  perProduk: { productName: string; totalSelisih: number; kejadian: number }[]
 }
 
 /// Stok yang masih Diproses (in-transit) — belum dikonfirmasi diterima
@@ -660,6 +670,7 @@ export interface BoothAktifCard {
   stockQty: number
   stockStatus: "Aman" | "Menipis" | "Kritis" | "Habis"
   pendingDistribution: { distributionNo: string; sentAt: string | null; count: number } | null
+  pendingReturn: { returnNo: string; submittedAt: string | null; count: number; qty: number } | null
   topStock: { productName: string; qty: number }[]
 }
 
@@ -673,6 +684,10 @@ export interface BoothStockRow {
   qtyOnHand: number
   minimumQty: number
   status: "Aman" | "Menipis" | "Kritis" | "Habis"
+  /// Sisa Stok Fisik yang sudah diajukan Return ke Gudang saat Check-Out,
+  /// belum di-approve Admin — qtyOnHand bisa 0 padahal bukan benar-benar
+  /// habis kalau angka ini > 0.
+  dalamProsesKembali: number
 }
 
 export type SalePaymentMethod = "CASH" | "QRIS" | "SPLIT"
@@ -1027,8 +1042,13 @@ export interface ShiftReportTransaksi {
 export interface ShiftReportReturItem {
   productId: string
   productName: string
+  sellPrice: number
   qtySubmitted: number
   qtyReceived: number | null
+  stokFisikPetugas: number | null
+  catatanPetugas: string | null
+  discrepancyReasonCode: "LEBIH" | "KURANG" | "RUSAK" | "LAINNYA" | null
+  discrepancyNote: string | null
 }
 
 export interface ShiftReportRetur {
@@ -1349,22 +1369,22 @@ export const api = {
     return res.blob()
   },
 
-  getStockDamageReport: (filter: FilterLaporanStokRusak = {}) => {
+  getStockDiscrepancyReport: (filter: FilterLaporanStokSelisih = {}) => {
     const params = new URLSearchParams()
     if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
     if (filter.dateTo) params.set("dateTo", filter.dateTo)
     if (filter.boothId) params.set("boothId", filter.boothId)
     const qs = params.toString()
-    return request<StokRusakData>(`/reports/stock-damage${qs ? `?${qs}` : ""}`)
+    return request<StokSelisihData>(`/reports/stock-discrepancy${qs ? `?${qs}` : ""}`)
   },
-  getStockDamageReportFile: async (format: "pdf" | "excel", filter: FilterLaporanStokRusak = {}) => {
+  getStockDiscrepancyReportFile: async (format: "pdf" | "excel", filter: FilterLaporanStokSelisih = {}) => {
     const params = new URLSearchParams()
     if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
     if (filter.dateTo) params.set("dateTo", filter.dateTo)
     if (filter.boothId) params.set("boothId", filter.boothId)
     const qs = params.toString()
 
-    const res = await fetch(`${BASE_URL}/reports/stock-damage/${format}${qs ? `?${qs}` : ""}`, {
+    const res = await fetch(`${BASE_URL}/reports/stock-discrepancy/${format}${qs ? `?${qs}` : ""}`, {
       headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     })
     if (!res.ok) {
@@ -1384,8 +1404,10 @@ export const api = {
   },
 
   getReturns: () => request<StockReturn[]>("/returns"),
-  receiveReturn: (id: string, items: { productId: string; qtyReceived: number }[], note?: string) =>
-    request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items, note } }),
+  receiveReturn: (
+    id: string,
+    items: { productId: string; qtyReceived: number; tindakLanjut?: TindakLanjutSelisih; tindakLanjutNote?: string }[],
+  ) => request<StockReturn>(`/returns/${id}/receive`, { method: "POST", body: { items } }),
   cancelReturn: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request<StockReturn>(`/returns/${id}/cancel`, { method: "POST", body: input }),
   reviseReturn: (

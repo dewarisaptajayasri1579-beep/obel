@@ -20,13 +20,28 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
-import { api, ApiError, type Booth, type ShiftAdminHistoryItem, type ShiftReport, type UserAccount } from "@/lib/api-client";
+import {
+  api,
+  ApiError,
+  type Booth,
+  type ShiftAdminHistoryItem,
+  type ShiftReport,
+  type TindakLanjutSelisih,
+  type UserAccount,
+} from "@/lib/api-client";
 import { TRANSAKSI_BOOTH_FILTER_KEYS, usePersistedFilter } from "@/lib/use-persisted-filter";
+import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 
 type Tab = "SEMUA" | "PERLU_APPROVE" | "SELISIH";
 
 function formatRupiah(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
+}
+
+function kelasAngka(n: number | null) {
+  return n === 0 || n === null
+    ? "text-slate-400 dark:text-fg-muted font-normal"
+    : "text-slate-800 dark:text-fg font-bold";
 }
 
 function waktuJakarta(iso: string | null) {
@@ -35,16 +50,23 @@ function waktuJakarta(iso: string | null) {
 }
 
 const RETUR_BADGE: Record<string, { label: string; kelas: string }> = {
-  SUBMITTED: { label: "Stok Kembali: Menunggu", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
+  SUBMITTED: { label: "Stok Kembali: Dalam Proses", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
   RECEIVED: { label: "Stok Kembali: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DISCREPANCY: { label: "Stok Kembali: Selisih", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
   CANCELLED: { label: "Stok Kembali: Dibatalkan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
 
 const SETORAN_BADGE: Record<string, { label: string; kelas: string }> = {
-  PENDING: { label: "Setor Uang: Menunggu", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
+  PENDING: { label: "Setor Uang: Dalam Proses", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
   CONFIRMED: { label: "Setor Uang: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DISCREPANCY: { label: "Setor Uang: Selisih", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
+};
+
+const TINDAK_LANJUT_LABEL: Record<TindakLanjutSelisih, string> = {
+  RUSAK: "Rusak",
+  SALAH_HITUNG: "Salah Hitung",
+  GANTI_RUGI_PETUGAS: "Ganti Rugi Petugas",
+  LAINNYA: "Lainnya",
 };
 
 function needsApproval(r: ShiftAdminHistoryItem): boolean {
@@ -68,30 +90,45 @@ function LaporanDetail({
   const setoran = report.setoran;
 
   const [returQty, setReturQty] = useState<Record<string, number>>(
-    Object.fromEntries((retur?.items ?? []).map((i) => [i.productId, i.qtySubmitted])),
+    Object.fromEntries((retur?.items ?? []).map((i) => [i.productId, i.stokFisikPetugas ?? i.qtySubmitted])),
   );
-  const [returNote, setReturNote] = useState("");
+  const [tindakLanjut, setTindakLanjut] = useState<Record<string, TindakLanjutSelisih>>({});
+  const [tindakLanjutNote, setTindakLanjutNote] = useState<Record<string, string>>({});
   const [submittingRetur, setSubmittingRetur] = useState(false);
 
   const [depositAmount, setDepositAmount] = useState<number>(setoran?.expectedAmount ?? 0);
   const [depositNote, setDepositNote] = useState("");
   const [submittingSetoran, setSubmittingSetoran] = useState(false);
 
-  const returAdaBeda = retur ? retur.items.some((i) => (returQty[i.productId] ?? i.qtySubmitted) !== i.qtySubmitted) : false;
+  const returItemSelisih = retur ? retur.items.filter((i) => (returQty[i.productId] ?? i.qtySubmitted) !== i.qtySubmitted) : [];
+  const returAdaBeda = returItemSelisih.length > 0;
+  const returTindakLanjutLengkap = returItemSelisih.every((i) => {
+    const t = tindakLanjut[i.productId];
+    if (!t) return false;
+    return t !== "LAINNYA" || (tindakLanjutNote[i.productId] ?? "").trim().length > 0;
+  });
   const setoranAdaBeda = setoran ? depositAmount !== setoran.expectedAmount : false;
 
   async function approveRetur() {
     if (!retur) return;
-    if (returAdaBeda && !returNote.trim()) {
-      toast.warning("Catatan wajib diisi kalau qty Stok Kembali yang diterima berbeda dari yang diajukan.");
+    if (returAdaBeda && !returTindakLanjutLengkap) {
+      toast.warning("Pilih Tindak Lanjut untuk setiap produk yang Stok Dikembalikan-nya berbeda dari Stok Sistem.");
       return;
     }
     setSubmittingRetur(true);
     try {
       await api.receiveReturn(
         retur.id,
-        retur.items.map((i) => ({ productId: i.productId, qtyReceived: returQty[i.productId] ?? i.qtySubmitted })),
-        returNote.trim() || undefined,
+        retur.items.map((i) => {
+          const qtyReceived = returQty[i.productId] ?? i.qtySubmitted;
+          const beda = qtyReceived !== i.qtySubmitted;
+          return {
+            productId: i.productId,
+            qtyReceived,
+            tindakLanjut: beda ? tindakLanjut[i.productId] : undefined,
+            tindakLanjutNote: beda && tindakLanjut[i.productId] === "LAINNYA" ? tindakLanjutNote[i.productId]?.trim() : undefined,
+          };
+        }),
       );
       toast.success("Stok Kembali di-approve.");
       onChanged();
@@ -142,14 +179,22 @@ function LaporanDetail({
               {report.items.map((it) => (
                 <tr key={it.productId}>
                   <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{it.productName}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{it.stokAwal}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{it.restock}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{it.terjual}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{it.retur}</td>
-                  <td className="py-2 px-3 text-center tabular-nums font-semibold">{it.sisaSistem}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{it.stokFisik ?? "-"}</td>
+                  <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.stokAwal)}`}>{it.stokAwal}</td>
+                  <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.restock)}`}>{it.restock}</td>
+                  <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.terjual)}`}>{it.terjual}</td>
+                  <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.retur)}`}>{it.retur}</td>
+                  <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.sisaSistem)}`}>{it.sisaSistem}</td>
+                  <td className="py-2 px-3 text-center">
+                    {it.selisih !== 0 ? (
+                      <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-bold tabular-nums px-2 py-0.5">
+                        {it.stokFisik ?? "-"}
+                      </span>
+                    ) : (
+                      <span className={`tabular-nums text-sm ${kelasAngka(it.stokFisik)}`}>{it.stokFisik ?? "-"}</span>
+                    )}
+                  </td>
                   <td
-                    className={`py-2 px-3 text-center tabular-nums font-semibold ${
+                    className={`py-2 px-3 text-center tabular-nums text-sm font-bold ${
                       it.selisih === 0 ? "text-slate-400 dark:text-fg-muted" : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
@@ -185,57 +230,119 @@ function LaporanDetail({
               <table className="w-full text-xs">
                 <thead className="bg-slate-100/70 dark:bg-surface-hover text-[11px] font-bold text-slate-600 dark:text-fg-secondary">
                   <tr>
-                    <th className="py-2 px-3 text-left">Produk</th>
-                    <th className="py-2 px-3 text-center">Diajukan</th>
-                    <th className="py-2 px-3 text-center">{retur.status === "SUBMITTED" ? "Diterima (edit jika beda)" : "Diterima"}</th>
+                    <th className={`py-2 px-3 text-left ${retur.status === "SUBMITTED" ? "w-40" : ""}`}>Produk</th>
+                    <th className="py-2 px-3 text-right w-24">Stok Sistem</th>
+                    <th className="py-2 px-3 text-right w-40">Stok Dikembalikan</th>
+                    <th className="py-2 px-3 text-right w-20">Selisih</th>
+                    {retur.status === "SUBMITTED" && <th className="py-2 px-3 text-left">Tindak Lanjut</th>}
+                    {retur.status !== "SUBMITTED" && <th className="py-2 px-3 text-left">Catatan</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-line">
-                  {retur.items.map((item) => (
-                    <tr key={item.productId}>
-                      <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{item.productName}</td>
-                      <td className="py-2 px-3 text-center tabular-nums">{item.qtySubmitted}</td>
-                      <td className="py-2 px-3 text-center">
+                  {retur.items.map((item) => {
+                    const diterima = returQty[item.productId] ?? item.stokFisikPetugas ?? item.qtySubmitted;
+                    const selisih =
+                      retur.status === "SUBMITTED" ? diterima - item.qtySubmitted : (item.qtyReceived ?? item.qtySubmitted) - item.qtySubmitted;
+                    const qtyRugi = item.qtySubmitted - diterima;
+                    return (
+                      <tr key={item.productId} className={selisih !== 0 ? "bg-rose-50/60 dark:bg-rose-900/10" : undefined}>
+                        <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${retur.status === "SUBMITTED" ? "max-w-[160px]" : ""}`}>
+                          <span className="break-words">{item.productName}</span>
+                          {selisih !== 0 && item.catatanPetugas && (
+                            <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
+                              Alasan Petugas: {item.catatanPetugas}
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-fg">{item.qtySubmitted}</td>
+                        <td className="py-2 px-3 text-right">
+                          {retur.status === "SUBMITTED" ? (
+                            <div className="flex justify-end">
+                              <QuantityStepperInline
+                                value={diterima}
+                                onChange={(v) => setReturQty((prev) => ({ ...prev, [item.productId]: v }))}
+                              />
+                            </div>
+                          ) : (
+                            <span className="tabular-nums font-semibold text-slate-600 dark:text-fg-secondary">{item.qtyReceived ?? "-"}</span>
+                          )}
+                        </td>
+                        <td
+                          className={`py-2 px-3 text-right tabular-nums font-semibold ${
+                            selisih !== 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-fg-muted"
+                          }`}
+                        >
+                          {selisih === 0 ? "0" : selisih > 0 ? `+${selisih}` : selisih}
+                        </td>
                         {retur.status === "SUBMITTED" ? (
-                          <input
-                            type="number"
-                            min={0}
-                            value={returQty[item.productId] ?? item.qtySubmitted}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) =>
-                              setReturQty((prev) => ({ ...prev, [item.productId]: Math.max(0, Number(e.target.value) || 0) }))
-                            }
-                            className={`w-20 mx-auto block rounded-lg border px-2 py-1 text-xs text-center ${
-                              (returQty[item.productId] ?? item.qtySubmitted) !== item.qtySubmitted
-                                ? "border-amber-300 bg-amber-50 dark:bg-amber-900/10"
-                                : "border-slate-200 dark:border-line"
-                            }`}
-                          />
+                          <td className="py-2 px-3 align-top">
+                            {selisih !== 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <div className="flex flex-wrap gap-1">
+                                  {(["RUSAK", "SALAH_HITUNG", "GANTI_RUGI_PETUGAS", "LAINNYA"] as TindakLanjutSelisih[]).map((opt) => {
+                                    const aktif = tindakLanjut[item.productId] === opt;
+                                    return (
+                                      <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setTindakLanjut((prev) => ({ ...prev, [item.productId]: opt }))}
+                                        className={`text-[10px] font-bold rounded-full px-2 py-1 border cursor-pointer transition-colors ${
+                                          aktif
+                                            ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)]"
+                                            : "bg-white dark:bg-surface text-slate-600 dark:text-fg-secondary border-slate-200 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
+                                        }`}
+                                      >
+                                        {TINDAK_LANJUT_LABEL[opt]}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {tindakLanjut[item.productId] === "GANTI_RUGI_PETUGAS" && qtyRugi > 0 && (
+                                  <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                                    Beban: {qtyRugi} x {formatRupiah(item.sellPrice ?? 0)} = {formatRupiah(qtyRugi * (item.sellPrice ?? 0))}
+                                  </span>
+                                )}
+                                {tindakLanjut[item.productId] === "LAINNYA" && (
+                                  <input
+                                    type="text"
+                                    value={tindakLanjutNote[item.productId] ?? ""}
+                                    onChange={(e) => setTindakLanjutNote((prev) => ({ ...prev, [item.productId]: e.target.value }))}
+                                    placeholder="Catatan tindak lanjut (wajib)..."
+                                    className="w-full rounded-lg border border-slate-200 dark:border-line px-2 py-1 text-[11px]"
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 dark:text-fg-disabled">-</span>
+                            )}
+                          </td>
                         ) : (
-                          <span className="tabular-nums font-semibold">{item.qtyReceived ?? "-"}</span>
+                          <td className="py-2 px-3 align-top text-slate-500 dark:text-fg-muted">
+                            {item.discrepancyReasonCode
+                              ? `${TINDAK_LANJUT_LABEL[item.discrepancyReasonCode as TindakLanjutSelisih] ?? item.discrepancyReasonCode}${
+                                  item.discrepancyNote ? ` — ${item.discrepancyNote}` : ""
+                                }`
+                              : "-"}
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {retur.status === "SUBMITTED" ? (
               <>
-                <textarea
-                  value={returNote}
-                  onChange={(e) => setReturNote(e.target.value)}
-                  placeholder={returAdaBeda ? "Catatan wajib diisi — ada qty yang berbeda dari diajukan..." : "Catatan (opsional)..."}
-                  rows={2}
-                  className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand-700)]/10 ${
-                    returAdaBeda ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : "border-slate-200 dark:border-line"
-                  }`}
-                />
+                {returAdaBeda && !returTindakLanjutLengkap && (
+                  <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 text-right">
+                    Pilih Tindak Lanjut untuk setiap produk yang Stok Dikembalikan-nya berbeda sebelum approve.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={approveRetur}
-                  disabled={submittingRetur || (returAdaBeda && !returNote.trim())}
+                  disabled={submittingRetur || (returAdaBeda && !returTindakLanjutLengkap)}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--brand-700)] text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
                 >
                   {submittingRetur ? <Spinner size="sm" color="white" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
@@ -469,7 +576,7 @@ function TransaksiLaporanKembaliContent() {
 
   return (
     <div className="space-y-5">
-      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi Booth" }, { label: "Laporan Kembali" }]} />
+      <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Transaksi Booth" }, { label: "Setor & Pengembalian Stok" }]} />
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
@@ -478,7 +585,7 @@ function TransaksiLaporanKembaliContent() {
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight">
-              Transaksi Booth - Laporan Kembali
+              Transaksi Booth - Setor & Pengembalian Stok
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
               Laporan stok &amp; kas dari Check Out Petugas Booth. Sisa Stok Fisik otomatis masuk sebagai Return ke Gudang —

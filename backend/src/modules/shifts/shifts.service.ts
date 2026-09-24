@@ -11,6 +11,7 @@ import { CorrectionsService } from '../corrections/corrections.service';
 import { ReturnsService } from '../returns/returns.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CheckInDto } from './dto/check-in.dto';
+import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
@@ -166,6 +167,33 @@ export class ShiftsService {
 
     const locationWarning = this.computeLocationWarning(dto.latitude, dto.longitude, booth);
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId), locationWarning);
+  }
+
+  /// Ping lokasi berkala (apps/booth_pwa_flutter, action `gps.start`) — cuma
+  /// overwrite titik terakhir di ShiftSession, bukan transaksi yang perlu
+  /// correction/reversal (lihat komentar di schema.prisma). Ditolak kalau
+  /// shift bukan milik staff ybs atau sudah CLOSED, supaya booth otomatis
+  /// "hilang" dari peta realtime begitu checkout — sesuai requirement, native
+  /// app juga sudah stop kirim ping duluan, ini validasi sisi server-nya.
+  async recordLocationPing(user: JwtPayload, shiftId: string, dto: LocationPingDto) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftId } });
+    if (!shift || shift.staffId !== user.sub) {
+      throw new NotFoundException('Shift tidak ditemukan.');
+    }
+    if (shift.status !== ShiftStatus.OPEN && shift.status !== ShiftStatus.CLOSING) {
+      throw new DomainError('SHIFT_NOT_ACTIVE', 'Shift ini sudah ditutup, ping lokasi tidak diterima.');
+    }
+
+    const capturedAt = dto.capturedAt ? new Date(dto.capturedAt) : new Date();
+    await this.prisma.shiftSession.update({
+      where: { id: shiftId },
+      data: {
+        lastLocationLatitude: dto.latitude,
+        lastLocationLongitude: dto.longitude,
+        lastLocationAt: capturedAt,
+      },
+    });
+    return { ok: true, capturedAt };
   }
 
   /// Soft-check lokasi Check-In/Check-Out terhadap Booth.latitude/longitude —
@@ -337,6 +365,14 @@ export class ShiftsService {
         const actualQty = input?.actualQty ?? item.expectedQty;
         const discrepancyQty = actualQty - item.expectedQty;
 
+        // Selisih Stok Fisik vs Sisa Sistem SENGAJA TIDAK langsung
+        // menyesuaikan BoothStock di sini — alasan Petugas (reasonCode/
+        // reasonNote) cuma dicatat sebagai konteks, bukan keputusan final.
+        // BoothStock (= qty sistem) tetap utuh sampai Return otomatis di
+        // bawah mengajukannya ke Gudang dengan qty SISTEM (bukan qty fisik),
+        // supaya selisihnya baru benar-benar diputuskan Admin (Rusak/Ganti
+        // Rugi Petugas/Salah Hitung/Lainnya) saat approve Stok Kembali —
+        // bukan diserap diam-diam oleh alasan sepihak Petugas saat Check-Out.
         await tx.shiftStockCountItem.update({
           where: { id: item.id },
           data: {
@@ -346,31 +382,6 @@ export class ShiftsService {
             reasonNote: input?.reasonNote,
           },
         });
-
-        if (discrepancyQty !== 0) {
-          await tx.boothStock.update({
-            where: { boothId_productId: { boothId: shift.boothId, productId: item.productId } },
-            data: { qtyOnHand: actualQty, version: { increment: 1 } },
-          });
-
-          await tx.stockMovement.create({
-            data: {
-              movementNo: await nomorMovementBerikutnya(tx, 'ADJ'),
-              movementType: StockMovementType.ADJUSTMENT,
-              productId: item.productId,
-              qty: Math.abs(discrepancyQty),
-              fromBoothId: discrepancyQty < 0 ? shift.boothId : null,
-              toBoothId: discrepancyQty > 0 ? shift.boothId : null,
-              referenceType: 'shift_closing',
-              referenceId: count.id,
-              shiftSessionId,
-              businessDate,
-              occurredAt: closedAt,
-              createdBy: user.sub,
-              note: input?.reasonNote ?? input?.reasonCode ?? 'Selisih closing shift',
-            },
-          });
-        }
       }
 
       await tx.shiftStockCount.update({
@@ -390,11 +401,12 @@ export class ShiftsService {
       });
     });
 
-    // Sisa Stok Fisik Booth (sudah disesuaikan ke actualQty di atas) OTOMATIS
-    // diajukan sebagai Return ke Gudang begitu Check-Out — BR-013 "Return qty
-    // default = actual stock setelah closing". Admin approve di Laporan
-    // Kembali (bukan menu Return terpisah), lihat ReturnsService.create dgn
-    // shiftSessionIdOverride yang menandai asal-usulnya.
+    // Sisa Stok SISTEM Booth (BoothStock belum disentuh oleh selisih Stok
+    // Fisik, lihat komentar di atas) OTOMATIS diajukan sebagai Return ke
+    // Gudang begitu Check-Out — qty yang diajukan = qty sistem, bukan qty
+    // fisik, supaya selisihnya kelihatan & wajib Tindak Lanjut Admin saat
+    // approve Stok Kembali (lihat ReturnsService.create dgn
+    // shiftSessionIdOverride yang menandai asal-usulnya).
     const sisaStok = await this.prisma.boothStock.count({ where: { boothId: shift.boothId, qtyOnHand: { gt: 0 } } });
     if (sisaStok > 0) {
       await this.returnsService.create(
@@ -628,9 +640,14 @@ export class ShiftsService {
     }
 
     const items = Array.from(byProduct.entries()).map(([productId, v]) => {
-      const sisaSistem = qtyOnHandByProduct.get(productId) ?? 0;
-      const stokAwal = sisaSistem - v.restock + v.terjual + v.retur - v.adjustmentNet;
       const closingItem = closingItemByProduct.get(productId);
+      // "Sisa Sistem" HARUS dibaca dari snapshot expectedQty saat closing
+      // dimulai (ShiftStockCount), bukan BoothStock.qtyOnHand live —
+      // begitu Check-Out selesai, sisa Stok Fisik otomatis diajukan sebagai
+      // Return ke Gudang (lihat confirmClosing) yang men-nol-kan BoothStock,
+      // jadi qtyOnHand live tidak lagi merepresentasikan kondisi shift ini.
+      const sisaSistem = closingItem?.expectedQty ?? qtyOnHandByProduct.get(productId) ?? 0;
+      const stokAwal = sisaSistem - v.restock + v.terjual + v.retur - v.adjustmentNet;
       return {
         productId,
         productName: v.productName,
@@ -645,6 +662,10 @@ export class ShiftsService {
         reasonNote: closingItem?.reasonNote ?? null,
       };
     });
+    // Urut abjad nama produk — sebelumnya ikut urutan insersi Map (movement
+    // pertama yang ditemui per produk), yang beda-beda tiap shift dan bikin
+    // urutan baris di Rekap Stok Produk vs Stok Kembali tidak sinkron.
+    items.sort((a, b) => a.productName.localeCompare(b.productName));
 
     // Dihitung dari baris Payment (bukan Sale.paymentMethod langsung) —
     // sale Split py bisa punya DUA baris Payment (Tunai + QRIS) yang harus
@@ -698,12 +719,26 @@ export class ShiftsService {
             receiveNote: stockReturn.receiveNote,
             submittedAt: stockReturn.submittedAt,
             receivedAt: stockReturn.receivedAt,
-            items: stockReturn.items.map((i) => ({
-              productId: i.productId,
-              productName: i.product.name,
-              qtySubmitted: i.qtySubmitted,
-              qtyReceived: i.qtyReceived,
-            })),
+            items: stockReturn.items
+              .map((i) => {
+                const closingItem = closingItemByProduct.get(i.productId);
+                return {
+                  productId: i.productId,
+                  productName: i.product.name,
+                  sellPrice: Number(i.product.sellPrice),
+                  qtySubmitted: i.qtySubmitted,
+                  qtyReceived: i.qtyReceived,
+                  // Stok Fisik yang dihitung Petugas saat Check-Out — dipakai
+                  // FE sebagai saran awal "Stok Dikembalikan" (qtySubmitted
+                  // di atas itu qty SISTEM, bukan qty fisik, lihat
+                  // confirmClosing).
+                  stokFisikPetugas: closingItem?.actualQty ?? null,
+                  catatanPetugas: closingItem?.reasonNote ?? null,
+                  discrepancyReasonCode: i.discrepancyReasonCode,
+                  discrepancyNote: i.discrepancyNote,
+                };
+              })
+              .sort((a, b) => a.productName.localeCompare(b.productName)),
           }
         : null,
       setoran: cashDeposit

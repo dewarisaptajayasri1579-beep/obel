@@ -27,6 +27,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CheckInDto } from './dto/check-in.dto';
+import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
@@ -73,6 +74,16 @@ export class ShiftsController {
   @Roles(UserRole.BOOTH_STAFF)
   checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {
     return this.shiftsService.checkIn(user, dto);
+  }
+
+  @Post(':id/location-ping')
+  @Roles(UserRole.BOOTH_STAFF)
+  recordLocationPing(
+    @Param('id') id: string,
+    @Body() dto: LocationPingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.shiftsService.recordLocationPing(user, id, dto);
   }
 
   @Post('attendance/photo')
