@@ -325,8 +325,11 @@ export class ShiftsService {
   }
 
   /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
-  /// "expected", lalu ubah shift ke CLOSING. Idempotent — kalau closing
-  /// draft sudah ada, kembalikan yang itu (bukan bikin snapshot baru).
+  /// "expected". Shift TETAP OPEN (kasir masih boleh jualan) sampai
+  /// confirmClosing sukses — status DRAFT di ShiftStockCount inilah yang
+  /// menandai closing sedang berjalan, bukan ShiftSession.status.
+  /// Idempotent — kalau closing draft sudah ada, kembalikan yang itu
+  /// (bukan bikin snapshot baru).
   async startClosing(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
 
@@ -350,7 +353,7 @@ export class ShiftsService {
     const count = await this.prisma.$transaction(async (tx) => {
       await tx.shiftSession.update({
         where: { id: shiftSessionId },
-        data: { status: ShiftStatus.CLOSING, closingStartedAt: new Date() },
+        data: { closingStartedAt: new Date() },
       });
 
       return tx.shiftStockCount.create({
@@ -397,8 +400,8 @@ export class ShiftsService {
         }))!,
       );
     }
-    if (shift.status !== ShiftStatus.CLOSING) {
-      throw new DomainError('SHIFT_NOT_CLOSING', 'Shift ini tidak sedang dalam proses closing.');
+    if (shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk konfirmasi checkout.');
     }
 
     const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));

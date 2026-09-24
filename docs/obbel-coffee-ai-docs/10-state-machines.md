@@ -5,16 +5,19 @@
 SCHEDULED
   ↓ open
 OPEN
-  ↓ start closing
-CLOSING
-  ↓ confirm count
+  ↓ start closing (snapshot stok utk hitung fisik; status TETAP OPEN)
+  ↓ confirm checkout (wajib lokasi + foto + rekap stok/uang)
 CLOSED
 ```
 Alternative terminal: CANCELLED sebelum OPEN.
 
+Shift tetap OPEN sepanjang proses closing berlangsung (petugas masih boleh
+transaksi normal) — baru berpindah langsung ke CLOSED begitu checkout
+dikonfirmasi sukses. "Sedang proses closing" ditandai oleh
+`ShiftStockCount.status = DRAFT`, bukan status ShiftSession.
+
 Invalid:
 - CLOSED → OPEN tanpa audited admin reversal.
-- CLOSING → sale normal.
 
 ## 2. Distribution
 ```text

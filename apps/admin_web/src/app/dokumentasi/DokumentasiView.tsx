@@ -150,9 +150,9 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     diterima: "Admin Pusat & Sistem Audit",
     efekGudang: "Tidak ada efek",
     efekBooth: "Membuka / Mengunci Scope Transaksi",
-    efekLedger: "Shift Lifecycle (SCHEDULED → OPEN → CLOSING → CLOSED)",
+    efekLedger: "Shift Lifecycle (SCHEDULED → OPEN → CLOSED)",
     deskripsi:
-      "Penetapan rentang waktu dinas petugas di gerobak tertentu (Shift 1 / Shift 2). Mengunci transaksi penjualan saat status beralih ke CLOSING dan CLOSED untuk persiapan hitung fisik.",
+      "Penetapan rentang waktu dinas petugas di gerobak tertentu (Shift 1 / Shift 2). Shift tetap OPEN dan transaksi tetap boleh berjalan selama proses hitung fisik/checkout berlangsung — baru terkunci (CLOSED) setelah checkout benar-benar dikonfirmasi (wajib lokasi, foto, dan rekap stok/uang).",
   },
   {
     prefix: "CNT",
@@ -915,15 +915,16 @@ export const DokumentasiView: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="p-4 rounded-xl bg-white dark:bg-surface border border-slate-200/80 dark:border-line space-y-2">
                       <span className="text-[11px] font-bold text-slate-500 uppercase">
-                        Tahap 1: Lock Kasir
+                        Tahap 1: Mulai Checkout
                       </span>
                       <h4 className="text-sm font-bold text-slate-900 dark:text-fg">
-                        Kunci Transaksi
+                        Snapshot Stok
                       </h4>
                       <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                        Begitu status berpindah ke CLOSING, kasir tidak bisa
-                        menjual lagi. Saldo uang tunai dihitung dan disiapkan
-                        untuk disetor.
+                        Sistem mengambil snapshot stok sistem sebagai
+                        pembanding hitung fisik. Shift tetap OPEN — kasir
+                        masih boleh menjual selama checkout (lokasi + foto +
+                        rekap) belum dikonfirmasi sukses.
                       </p>
                     </div>
 
@@ -949,9 +950,11 @@ export const DokumentasiView: React.FC = () => {
                         Kembalikan ke Gudang
                       </h4>
                       <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                        Sisa cup fisik dibawa kembali ke Gudang Pusat. Begitu
-                        Admin Gudang klik Terima, stok gerobak menjadi 0 dan
-                        shift CLOSED.
+                        Sisa cup fisik dibawa kembali ke Gudang Pusat,
+                        diajukan otomatis sebagai Stok Kembali saat checkout
+                        dikonfirmasi (shift sudah CLOSED di titik ini).
+                        Begitu Admin Gudang klik Terima, stok gerobak
+                        menjadi 0.
                       </p>
                     </div>
                   </div>

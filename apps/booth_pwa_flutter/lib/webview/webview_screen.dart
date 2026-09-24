@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -59,9 +60,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
       // check-in/out) punya prompt izin terpisah dari izin media di atas dan
       // dari izin lokasi OS — tanpa callback ini WebView Android menolak
       // semua request geolocation secara default, walau izin lokasi HP aktif.
+      // Meng-allow prompt WebView saja TIDAK CUKUP kalau izin lokasi level OS
+      // (Permission.locationWhenInUse) belum pernah diminta/di-grant untuk
+      // app ini — getCurrentPosition akan tetap gagal diam-diam. Minta izin
+      // OS dulu tepat di titik ini, baru jawab prompt WebView sesuai hasilnya
+      // supaya PWA dapat PositionError yang jelas (bukan macet menunggu).
       platform.setGeolocationPermissionsPromptCallbacks(
-        onShowPrompt: (request) async =>
-            const GeolocationPermissionsResponse(allow: true, retain: true),
+        onShowPrompt: (request) async {
+          final status = await Permission.locationWhenInUse.request();
+          return GeolocationPermissionsResponse(allow: status.isGranted, retain: status.isGranted);
+        },
       );
       // `<input type="file">` (fallback "Pilih foto dari galeri" di
       // AttendanceCapture.tsx saat getUserMedia gagal/ditolak) butuh callback

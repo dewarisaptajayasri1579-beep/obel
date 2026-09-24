@@ -22,11 +22,12 @@ import { DomainExceptionFilter } from '../src/common/filters/http-exception.filt
 ///   tidak deterministik untuk dijadikan e2e assertion yang stabil.
 /// - AC-13/AC-14/AC-15 (closing discrepancy reason, closed-shift sale
 ///   rejection) — satu-satunya shift aktif di seed dipakai bersama oleh
-///   spec lain di suite ini. `POST /shifts/:id/closing/start` sendiri
-///   sudah memindahkan status shift dari OPEN ke CLOSING tanpa cara
-///   membatalkannya lewat API — memanggilnya di sini akan merusak setiap
-///   test lain yang butuh shift OPEN untuk sisa run ini. Tidak ada endpoint
-///   untuk membuat shift session baru yang disposable lewat API.
+///   spec lain di suite ini. `POST /shifts/:id/closing/confirm` (bukan lagi
+///   `closing/start`, yang sekarang tidak mengubah status shift) memindahkan
+///   shift ke CLOSED tanpa cara membatalkannya lewat API — memanggilnya di
+///   sini akan merusak setiap test lain yang butuh shift OPEN untuk sisa run
+///   ini. Tidak ada endpoint untuk membuat shift session baru yang disposable
+///   lewat API.
 /// - AC-20 (void tidak menghapus sale) — sudah dicover oleh
 ///   correction-flows.e2e-spec.ts (COR-01).
 /// - AC-21/22/23 (print failure UX, PWA responsive, loading/error state) —

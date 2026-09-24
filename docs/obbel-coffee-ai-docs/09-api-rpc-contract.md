@@ -107,7 +107,9 @@ Update Booth stock + movements.
 ## 8. Start closing
 ### `start_shift_closing`
 Returns server snapshot expected stock per product.
-Sets shift to CLOSING.
+Shift status stays OPEN — staff can still transact normally until checkout
+is confirmed. "Closing in progress" is tracked via ShiftStockCount.status
+(DRAFT), not the shift status.
 
 ## 9. Confirm closing count
 ### `confirm_shift_closing`
