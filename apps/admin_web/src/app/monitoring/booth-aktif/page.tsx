@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge, type StatusBadgeType } from "@/components/ui/StatusBadge";
-import { BASE_URL, getToken, type BoothAktifCard } from "@/lib/api-client";
+import { api, ApiError, BASE_URL, getToken, type BoothAktifCard, type ShiftJourney } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { formatJakartaTime } from "@/lib/datetime";
 import { kategoriBooth, type KategoriKartu } from "./kategori";
 import {
@@ -447,7 +448,10 @@ const FILTER_OPTIONS: { value: KategoriKartu | "semua"; label: string }[] = [
   { value: "nonaktif", label: "Nonaktif" },
 ];
 
+const INTERVAL_OPTIONS = [15, 30, 60, 180, 300] as const;
+
 function BoothAktifContent() {
+  const toast = useToast();
   const [data, setData] = useState<BoothAktifCard[] | null>(null);
   const [status, setStatus] = useState<SocketStatus>("connecting");
   const [now, setNow] = useState(new Date());
@@ -457,6 +461,65 @@ function BoothAktifContent() {
   const [filter, setFilter] = useState<KategoriKartu | "semua">("semua");
   const [filterOpen, setFilterOpen] = useState(false);
   const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
+  const [sumberLokasi, setSumberLokasi] = useState<"booth" | "realtime">("booth");
+  const [journey, setJourney] = useState<ShiftJourney | null>(null);
+  const [loadingJourney, setLoadingJourney] = useState(false);
+  const [gpsIntervalDetik, setGpsIntervalDetik] = useState<number | null>(null);
+
+  // Interval ping GPS petugas — pengaturan global (AppSettings), diubah dari
+  // sini karena ini satu-satunya tempat efeknya langsung kelihatan (jalur
+  // Realtime jadi lebih/kurang rapat). Dibaca sekali saat mount; app petugas
+  // (booth_pwa_flutter) baca nilai yang sama saat mulai kirim GPS.
+  useEffect(() => {
+    api.getAppSettings().then((s) => setGpsIntervalDetik(s.gpsPingIntervalSeconds)).catch(() => {});
+  }, []);
+
+  async function ubahIntervalGps(detik: number) {
+    const sebelum = gpsIntervalDetik;
+    setGpsIntervalDetik(detik); // optimistic
+    try {
+      await api.updateAppSettings({ gpsPingIntervalSeconds: detik });
+    } catch (err) {
+      setGpsIntervalDetik(sebelum);
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengubah interval ping GPS.");
+    }
+  }
+
+  // Jalur perjalanan booth yang disorot — cuma di-fetch saat mode Realtime
+  // DAN ada booth terpilih dengan shift aktif. Dibersihkan begitu salah satu
+  // syarat itu tidak lagi terpenuhi, supaya garis lama tidak nyangkut di peta
+  // ketika Admin pindah mode atau ganti booth.
+  useEffect(() => {
+    if (sumberLokasi !== "realtime" || !selectedId) {
+      setJourney(null);
+      return;
+    }
+    const booth = data?.find((b) => b.boothId === selectedId);
+    if (!booth?.shiftSessionId) {
+      setJourney(null);
+      return;
+    }
+    let batal = false;
+    setLoadingJourney(true);
+    api
+      .getShiftJourney(booth.shiftSessionId)
+      .then((j) => {
+        if (!batal) setJourney(j);
+      })
+      .catch((err) => {
+        if (!batal) {
+          setJourney(null);
+          toast.error(err instanceof ApiError ? err.message : "Gagal memuat jalur perjalanan booth.");
+        }
+      })
+      .finally(() => {
+        if (!batal) setLoadingJourney(false);
+      });
+    return () => {
+      batal = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sumberLokasi, selectedId]);
 
   // Push dari backend lewat WebSocket (backend/src/modules/dashboard/booth-aktif.gateway.ts)
   // — bukan polling client. Server broadcast snapshot terbaru tiap ~5 detik
@@ -569,6 +632,49 @@ function BoothAktifContent() {
             ))}
           </div>
 
+          {tab === "map" && (
+            <div className="flex items-center gap-4 flex-wrap text-xs font-semibold text-slate-600 dark:text-fg-secondary">
+              {(
+                [
+                  { value: "booth" as const, label: "By Lokasi Booth (saat ini)" },
+                  { value: "realtime" as const, label: "By Realtime Lokasi" },
+                ]
+              ).map(({ value, label }) => (
+                <label key={value} className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="sumber-lokasi"
+                    value={value}
+                    checked={sumberLokasi === value}
+                    onChange={() => setSumberLokasi(value)}
+                    className="w-3.5 h-3.5 accent-brand-700"
+                  />
+                  {label}
+                </label>
+              ))}
+              {sumberLokasi === "realtime" && (
+                <label className="flex items-center gap-1.5 text-slate-500 dark:text-fg-muted">
+                  Interval ping GPS
+                  <select
+                    value={gpsIntervalDetik ?? ""}
+                    onChange={(e) => ubahIntervalGps(Number(e.target.value))}
+                    disabled={gpsIntervalDetik === null}
+                    className="h-7 rounded-lg border border-slate-200/90 dark:border-line bg-white dark:bg-surface px-2 text-xs font-bold text-slate-700 dark:text-fg-secondary cursor-pointer disabled:opacity-50"
+                  >
+                    {INTERVAL_OPTIONS.map((detik) => (
+                      <option key={detik} value={detik}>
+                        {detik < 60 ? `${detik} detik` : `${detik / 60} menit`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {selectedId && sumberLokasi === "realtime" && loadingJourney && (
+                <span className="text-slate-400 dark:text-fg-disabled">Memuat jalur perjalanan…</span>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <KartuRingkasan icon={Store} label="Total Booth" value={ringkasan.total} caption="Seluruh lokasi" warna="brand" />
             <KartuRingkasan icon={Store} label="Booth Aktif" value={ringkasan.aktif} caption={`${ringkasan.pctAktif}% dari total`} warna="emerald" />
@@ -656,6 +762,8 @@ function BoothAktifContent() {
                 booths={filtered}
                 selectedId={selectedId}
                 onSelect={(boothId) => setSelectedId(boothId === selectedId ? null : boothId)}
+                sumberLokasi={sumberLokasi}
+                journey={journey}
               />
             )}
 

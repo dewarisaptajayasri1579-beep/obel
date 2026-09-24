@@ -369,6 +369,38 @@ export interface RingkasStokResponse {
   rows: RingkasStokProduk[]
 }
 
+export interface AppSettings {
+  id: string
+  /** Detik antar ping GPS dari app petugas — lihat gpsPingIntervalSeconds di schema.prisma. */
+  gpsPingIntervalSeconds: number
+  updatedAt: string
+}
+
+export interface ShiftJourneyPoint {
+  latitude: number
+  longitude: number
+  capturedAt: string
+}
+
+export interface ShiftJourneySale {
+  saleId: string
+  saleNo: string
+  latitude: number
+  longitude: number
+  capturedAt: string
+  qty: number
+  total: number
+}
+
+export interface ShiftJourney {
+  shiftId: string
+  checkInAt: string | null
+  checkInLatitude: number | null
+  checkInLongitude: number | null
+  path: ShiftJourneyPoint[]
+  sales: ShiftJourneySale[]
+}
+
 export interface CompanyProfile {
   id: string
   name: string
@@ -660,6 +692,14 @@ export interface BoothAktifCard {
   locationName: string | null
   latitude: number | null
   longitude: number | null
+  /** Titik GPS terakhir dari ping berkala petugas (beda dari latitude/longitude
+   *  di atas yang lokasi TETAP booth) — null kalau belum ada ping. */
+  lastLocationLatitude: number | null
+  lastLocationLongitude: number | null
+  lastLocationAt: string | null
+  /** Dipakai manggil getShiftJourney(shiftSessionId) saat booth disorot di peta
+   *  Realtime — null kalau tidak ada shift aktif. */
+  shiftSessionId: string | null
   isActive: boolean
   staffName: string | null
   shiftLabel: string | null
@@ -1221,6 +1261,12 @@ export const api = {
   getCompanyProfile: () => request<CompanyProfile>("/company-profile"),
   updateCompanyProfile: (input: { name: string; legalName?: string; address?: string; phone?: string; logoUrl?: string }) =>
     request<CompanyProfile>("/company-profile", { method: "PATCH", body: input }),
+
+  getAppSettings: () => request<AppSettings>("/app-settings"),
+  updateAppSettings: (input: { gpsPingIntervalSeconds: number }) =>
+    request<AppSettings>("/app-settings", { method: "PATCH", body: input }),
+
+  getShiftJourney: (shiftId: string) => request<ShiftJourney>(`/shifts/${shiftId}/journey`),
   uploadCompanyLogo: async (file: File) => {
     const token = getToken()
     const body = new FormData()

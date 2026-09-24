@@ -40,6 +40,7 @@ class WebBridge {
             authToken: req.payload['authToken'] as String,
             shiftId: req.payload['shiftId'] as String,
             locationPath: (req.payload['locationPath'] as String?) ?? 'shifts/{shiftId}/location-ping',
+            intervalSeconds: (req.payload['intervalSeconds'] as num?)?.toInt() ?? 60,
           );
           return ok
               ? BridgeResponse.ok(req.id, {'tracking': true})

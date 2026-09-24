@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
+import { Prisma, SaleStatus, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
@@ -169,12 +169,16 @@ export class ShiftsService {
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId), locationWarning);
   }
 
-  /// Ping lokasi berkala (apps/booth_pwa_flutter, action `gps.start`) — cuma
-  /// overwrite titik terakhir di ShiftSession, bukan transaksi yang perlu
-  /// correction/reversal (lihat komentar di schema.prisma). Ditolak kalau
-  /// shift bukan milik staff ybs atau sudah CLOSED, supaya booth otomatis
-  /// "hilang" dari peta realtime begitu checkout — sesuai requirement, native
-  /// app juga sudah stop kirim ping duluan, ini validasi sisi server-nya.
+  /// Ping lokasi berkala (apps/booth_pwa_flutter, action `gps.start`) — dua
+  /// tulisan sekaligus dalam satu transaksi: (1) overwrite titik terakhir di
+  /// ShiftSession (dipakai marker cepat di peta, tanpa perlu query histori),
+  /// dan (2) insert baris baru ke ShiftLocationPing (append-only, dipakai
+  /// gambar jalur perjalanan booth — lihat getShiftJourney). Bukan transaksi
+  /// yang perlu correction/reversal (lihat komentar di schema.prisma).
+  /// Ditolak kalau shift bukan milik staff ybs atau sudah CLOSED, supaya
+  /// booth otomatis "hilang" dari peta realtime begitu checkout — sesuai
+  /// requirement, native app juga sudah stop kirim ping duluan, ini validasi
+  /// sisi server-nya.
   async recordLocationPing(user: JwtPayload, shiftId: string, dto: LocationPingDto) {
     const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftId } });
     if (!shift || shift.staffId !== user.sub) {
@@ -185,15 +189,69 @@ export class ShiftsService {
     }
 
     const capturedAt = dto.capturedAt ? new Date(dto.capturedAt) : new Date();
-    await this.prisma.shiftSession.update({
-      where: { id: shiftId },
-      data: {
-        lastLocationLatitude: dto.latitude,
-        lastLocationLongitude: dto.longitude,
-        lastLocationAt: capturedAt,
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.shiftSession.update({
+        where: { id: shiftId },
+        data: {
+          lastLocationLatitude: dto.latitude,
+          lastLocationLongitude: dto.longitude,
+          lastLocationAt: capturedAt,
+        },
+      }),
+      this.prisma.shiftLocationPing.create({
+        data: { shiftSessionId: shiftId, latitude: dto.latitude, longitude: dto.longitude, capturedAt },
+      }),
+    ]);
     return { ok: true, capturedAt };
+  }
+
+  /// Jalur perjalanan satu shift, dari Check-In sampai sekarang (atau sampai
+  /// Check-Out kalau shift sudah CLOSED) — gabungan 2 sumber titik, diurut
+  /// bersama secara kronologis:
+  /// 1. Ping GPS berkala (ShiftLocationPing) — garis jalurnya.
+  /// 2. Titik penjualan (Sale.latitude/longitude, sudah ada sejak fitur
+  ///    Monitoring Real-Time — lihat docs 26 §5/§7) — supaya kelihatan DI
+  ///    TITIK MANA booth itu jualan & berapa cup, bukan cuma rute geraknya.
+  /// Dipakai peta Monitoring > Booth Aktif > Realtime saat Admin klik/pilih
+  /// satu booth (garis timeline cuma muncul utk booth yang lagi disorot).
+  async getShiftJourney(shiftId: string) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      throw new NotFoundException('Shift tidak ditemukan.');
+    }
+
+    const [pings, sales] = await Promise.all([
+      this.prisma.shiftLocationPing.findMany({
+        where: { shiftSessionId: shiftId },
+        orderBy: { capturedAt: 'asc' },
+      }),
+      this.prisma.sale.findMany({
+        where: { shiftSessionId: shiftId, status: SaleStatus.PAID, latitude: { not: null }, longitude: { not: null } },
+        include: { items: true },
+        orderBy: { paidAt: 'asc' },
+      }),
+    ]);
+
+    return {
+      shiftId,
+      checkInAt: shift.openedAt,
+      checkInLatitude: shift.checkInLatitude == null ? null : Number(shift.checkInLatitude),
+      checkInLongitude: shift.checkInLongitude == null ? null : Number(shift.checkInLongitude),
+      path: pings.map((p) => ({
+        latitude: Number(p.latitude),
+        longitude: Number(p.longitude),
+        capturedAt: p.capturedAt,
+      })),
+      sales: sales.map((s) => ({
+        saleId: s.id,
+        saleNo: s.saleNo,
+        latitude: Number(s.latitude),
+        longitude: Number(s.longitude),
+        capturedAt: s.locationCapturedAt ?? s.paidAt ?? s.createdAt,
+        qty: s.items.reduce((sum, i) => sum + i.qty, 0),
+        total: Number(s.total),
+      })),
+    };
   }
 
   /// Soft-check lokasi Check-In/Check-Out terhadap Booth.latitude/longitude —

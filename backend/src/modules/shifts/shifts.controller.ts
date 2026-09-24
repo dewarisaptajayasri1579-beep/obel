@@ -86,6 +86,12 @@ export class ShiftsController {
     return this.shiftsService.recordLocationPing(user, id, dto);
   }
 
+  @Get(':id/journey')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  getJourney(@Param('id') id: string) {
+    return this.shiftsService.getShiftJourney(id);
+  }
+
   @Post('attendance/photo')
   @Roles(UserRole.BOOTH_STAFF)
   @UseInterceptors(

@@ -12,6 +12,7 @@ import { TopBar } from "../_components/TopBar";
 import { QtyStepper } from "../_components/QtyStepper";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
+import { stopGpsTracking } from "../_lib/native-bridge";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -132,6 +133,7 @@ function CheckoutContent() {
         checkOutPhotoUrl: photoUrl,
       });
       if (result.locationWarning) toast.warning(result.locationWarning);
+      stopGpsTracking();
       toast.success("Check-Out berhasil. Sampai jumpa di shift berikutnya!");
       router.replace("/petugas/check-in");
     } catch (err) {

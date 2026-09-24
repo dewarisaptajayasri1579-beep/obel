@@ -8,6 +8,7 @@ import { api, ApiError, type Booth, type MyBoothShiftAssignment } from "@/lib/ap
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
+import { startGpsTracking } from "../_lib/native-bridge";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -74,6 +75,7 @@ export default function CheckInPage() {
       });
       if (result.accessToken) updateToken(result.accessToken);
       if (result.locationWarning) toast.warning(result.locationWarning);
+      startGpsTracking(result.shiftSessionId);
       toast.success("Check-In berhasil. Selamat bekerja!");
       router.replace("/petugas");
     } catch (err) {

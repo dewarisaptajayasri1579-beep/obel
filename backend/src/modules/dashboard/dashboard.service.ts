@@ -228,6 +228,18 @@ export class DashboardService {
         locationName: booth.locationName,
         latitude: booth.latitude === null ? null : Number(booth.latitude),
         longitude: booth.longitude === null ? null : Number(booth.longitude),
+        // Titik GPS terakhir dari ping berkala petugas (lihat
+        // ShiftsService.recordLocationPing) — beda dari latitude/longitude di
+        // atas yang lokasi TETAP booth. Null kalau shift belum kirim ping
+        // sama sekali (baru check-in, belum genap 1 menit) atau tidak ada
+        // shift aktif.
+        lastLocationLatitude: shift?.lastLocationLatitude == null ? null : Number(shift.lastLocationLatitude),
+        lastLocationLongitude: shift?.lastLocationLongitude == null ? null : Number(shift.lastLocationLongitude),
+        lastLocationAt: shift?.lastLocationAt ?? null,
+        // Dipakai FE manggil GET /shifts/:id/journey (jalur perjalanan) saat
+        // booth ini disorot/klik di peta Realtime — null kalau tidak ada
+        // shift aktif (booth nonaktif tidak punya jalur utk ditampilkan).
+        shiftSessionId: shift?.id ?? null,
         isActive: shift !== null,
         staffName: shift?.staff.fullName ?? null,
         shiftLabel: shift?.shiftTemplate.name ?? null,

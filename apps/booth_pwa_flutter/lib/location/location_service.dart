@@ -19,10 +19,12 @@ class LocationBridgeService {
   LocationBridgeService._();
   static final instance = LocationBridgeService._();
 
-  bool _initialized = false;
-
-  void _ensureInit() {
-    if (_initialized) return;
+  /// Dipanggil ulang tiap `start()` (bukan sekali seumur app) — supaya
+  /// interval ping (AppSettings.gpsPingIntervalSeconds, diatur Admin dari
+  /// peta Booth Aktif > Realtime) bisa berubah antar shift tanpa perlu
+  /// restart app. `init()` aman dipanggil berkali-kali, ia cuma menyimpan
+  /// konfigurasi utk dipakai `startService()`/`restartService()` berikutnya.
+  void _init(int intervalSeconds) {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'obel_location_channel',
@@ -32,13 +34,12 @@ class LocationBridgeService {
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
       foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(60000), // 1 menit, sesuai kesepakatan
+        eventAction: ForegroundTaskEventAction.repeat(intervalSeconds * 1000),
         autoRunOnBoot: false,
         allowWakeLock: true,
         allowWifiLock: false,
       ),
     );
-    _initialized = true;
   }
 
   /// true kalau izin lengkap (lokasi + "izinkan selalu" + notifikasi Android 13+).
@@ -63,6 +64,10 @@ class LocationBridgeService {
     required String authToken,
     required String shiftId,
     String locationPath = 'shifts/{shiftId}/location-ping',
+    /// Detik antar ping — dikirim PWA dari AppSettings.gpsPingIntervalSeconds
+    /// (diatur Admin di peta Booth Aktif > Realtime). 60 dipakai kalau PWA
+    /// gagal mengambil setting itu (lihat native-bridge.ts sisi web).
+    int intervalSeconds = 60,
   }) async {
     final granted = await requestPermissions();
     if (!granted) return false;
@@ -73,7 +78,7 @@ class LocationBridgeService {
     await prefs.setString(prefShiftId, shiftId);
     await prefs.setString(prefLocationPath, locationPath);
 
-    _ensureInit();
+    _init(intervalSeconds);
 
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.restartService();
@@ -83,7 +88,7 @@ class LocationBridgeService {
     final result = await FlutterForegroundTask.startService(
       serviceId: 256,
       notificationTitle: 'Obbel — lokasi aktif',
-      notificationText: 'Mengirim lokasi booth tiap 1 menit selama shift berjalan',
+      notificationText: 'Mengirim lokasi booth tiap $intervalSeconds detik selama shift berjalan',
       callback: startLocationCallback,
     );
     return result is ServiceRequestSuccess;

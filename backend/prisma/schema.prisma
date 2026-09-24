@@ -531,21 +531,23 @@ model ShiftSession {
   checkOutLatitude  Decimal?      @map("check_out_latitude") @db.Decimal(9, 6)
   checkOutLongitude Decimal?      @map("check_out_longitude") @db.Decimal(9, 6)
   checkOutPhotoUrl  String?       @map("check_out_photo_url")
-  // Ping lokasi berkala (tiap ~1 menit) selama shift OPEN/CLOSING, dikirim
-  // app petugas — lihat ShiftsService.recordLocationPing. Cuma menyimpan
-  // titik TERAKHIR (overwrite), bukan histori — dipakai murni utk marker
-  // "Realtime Booth" di peta Monitoring > Booth Aktif, bukan transaksi yang
-  // butuh jejak audit, jadi tidak melanggar aturan append-only StockMovement.
+  // Ping lokasi berkala (interval diatur AppSettings.gpsPingIntervalSeconds)
+  // selama shift OPEN/CLOSING, dikirim app petugas — lihat
+  // ShiftsService.recordLocationPing. Kolom ini cuma titik TERAKHIR
+  // (overwrite) — akses cepat utk marker "Realtime Booth" di peta Monitoring
+  // > Booth Aktif tanpa query histori. Jejak lengkapnya ada di
+  // ShiftLocationPing (append-only) utk fitur jalur perjalanan booth.
   lastLocationLatitude  Decimal?  @map("last_location_latitude") @db.Decimal(9, 6)
   lastLocationLongitude Decimal?  @map("last_location_longitude") @db.Decimal(9, 6)
   lastLocationAt        DateTime? @map("last_location_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  sales        Sale[]
-  stockCount   ShiftStockCount?
-  stockReturns StockReturn[]
-  cashDeposit  ShiftCashDeposit?
+  sales         Sale[]
+  stockCount    ShiftStockCount?
+  stockReturns  StockReturn[]
+  cashDeposit   ShiftCashDeposit?
+  locationPings ShiftLocationPing[]
 
   @@index([staffId, status])
   @@index([boothId, status])
@@ -1023,6 +1025,43 @@ model StockOpnameItem {
   @@unique([stockOpnameId, productId])
   @@index([productId])
   @@map("stock_opname_items")
+}
+
+/// Jejak lengkap ping GPS petugas selama satu shift (append-only) — dipakai
+/// buat gambar jalur perjalanan booth (garis/polyline) di peta Monitoring >
+/// Booth Aktif > Realtime, dari titik Check-In sampai sekarang. Beda dari
+/// ShiftSession.lastLocation* (cuma titik terakhir): tabel ini adalah HISTORI,
+/// satu baris per ping (lihat ShiftsService.recordLocationPing).
+model ShiftLocationPing {
+  id             String       @id @default(uuid())
+  shiftSessionId String       @map("shift_session_id")
+  shiftSession   ShiftSession @relation(fields: [shiftSessionId], references: [id])
+  latitude       Decimal      @db.Decimal(9, 6)
+  longitude      Decimal      @db.Decimal(9, 6)
+  capturedAt     DateTime     @map("captured_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([shiftSessionId, capturedAt])
+  @@map("shift_location_pings")
+}
+
+/// Pengaturan global aplikasi — SATU baris singleton (`id: 'default'`), pola
+/// sama persis dengan CompanyProfile di bawah. Baru berisi satu field
+/// (interval ping GPS petugas, lihat 24 di atas), tapi dibuat sbg model
+/// terpisah dari CompanyProfile karena beda domain (operasional, bukan
+/// identitas cetak perusahaan) — supaya tidak campur aduk kalau salah satunya
+/// nanti tumbuh sendiri-sendiri.
+model AppSettings {
+  id                     String   @id @default("default")
+  /// Detik antar ping GPS dari app petugas (booth_pwa_flutter) selama shift
+  /// aktif. Trade-off eksplisit: makin kecil, makin akurat & live jalur
+  /// perjalanan booth, tapi makin boros baterai (GPS chip lebih sering
+  /// dibangunkan) — lihat diskusi di percakapan, belum ada angka baku,
+  /// default 60 dipilih sebagai titik tengah aman.
+  gpsPingIntervalSeconds Int      @default(60) @map("gps_ping_interval_seconds")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
 }
 
 /// Identitas perusahaan yang dipajang di kop semua dokumen cetak (PDF/Excel
