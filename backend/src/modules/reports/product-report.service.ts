@@ -63,11 +63,17 @@ export class ProductReportService {
         deletedAt: null,
         ...(filter.kategoriId ? { categoryId: filter.kategoriId } : {}),
         ...(filter.status ? { active: filter.status === 'active' } : {}),
+        // Sinkron dengan pencarian di layar (TabMain.tsx: `${sku} ${name}
+        // ${category}`.includes(q)) — dulu kategori tidak ikut dicari di sini,
+        // jadi cari lewat nama kategori di layar menampilkan baris yang
+        // TIDAK ikut ke berkas PDF/Excel-nya (file jadi tidak sesuai filter
+        // yang lagi aktif di layar).
         ...(filter.q
           ? {
               OR: [
                 { sku: { contains: filter.q, mode: 'insensitive' as const } },
                 { name: { contains: filter.q, mode: 'insensitive' as const } },
+                { category: { name: { contains: filter.q, mode: 'insensitive' as const } } },
               ],
             }
           : {}),
