@@ -69,7 +69,17 @@ class WebBridge {
 
         case 'printer.list':
           final printers = await _printer.listPaired();
-          return BridgeResponse.ok(req.id, {'printers': printers});
+          // permissionPermanentlyDenied dikirim SEKALIAN (bukan cuma pas
+          // gagal) supaya PWA bisa bedain "beneran belum ada printer
+          // paired" dari "izin Bluetooth ditolak, list-nya nggak akan
+          // pernah keisi tanpa buka Settings dulu" — dua kondisi itu
+          // kelihatan SAMA PERSIS (list kosong) kalau cuma lihat array-nya.
+          final permanentlyDenied = await _printer.isPermissionPermanentlyDenied;
+          return BridgeResponse.ok(req.id, {'printers': printers, 'permissionPermanentlyDenied': permanentlyDenied});
+
+        case 'printer.openSettings':
+          final opened = await _printer.openAppSettings();
+          return BridgeResponse.ok(req.id, {'opened': opened});
 
         case 'printer.select':
           await _printer.select(req.payload['name'] as String, req.payload['macAddress'] as String);
