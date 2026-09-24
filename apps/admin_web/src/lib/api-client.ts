@@ -1785,6 +1785,19 @@ export const api = {
     request<StockLedgerResponse>(
       `/stock-movements/rinci-mine?productId=${params.productId}&from=${params.from}&to=${params.to}`,
     ),
+  /// Versi Excel dari getMyStockLedger di atas — data sama persis, cuma
+  /// dituang jadi berkas. Blob lewat fetch ber-Authorization sama seperti
+  /// getProductReport (lihat komentarnya), bukan <a href> langsung.
+  getMyStockLedgerExcel: async (params: { productId: string; from: string; to: string }) => {
+    const res = await fetch(
+      `${BASE_URL}/stock-movements/rinci-mine/excel?productId=${params.productId}&from=${params.from}&to=${params.to}`,
+      { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) } },
+    )
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat berkas Excel. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
 
   getMyProfile: () => request<UserAccount>("/users/me"),
   updateMyProfile: (input: { fullName?: string }) => request<UserAccount>("/users/me", { method: "PATCH", body: input }),

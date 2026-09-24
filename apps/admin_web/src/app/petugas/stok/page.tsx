@@ -155,6 +155,7 @@ function StokContent() {
   const [ledgerPeriode, setLedgerPeriode] = useState<Periode>("7_HARI");
   const [ledger, setLedger] = useState<StockLedgerResponse | null>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [riwayatRestock, setRiwayatRestock] = useState<RestockRequest[]>([]);
 
   useEffect(() => {
@@ -238,20 +239,23 @@ function StokContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, ledgerProductId, ledgerPeriode]);
 
-  function handleExportRiwayat() {
-    if (!ledger) return;
-    const header = "Tanggal/Jam,Jenis Mutasi,Qty,Stok Akhir,Keterangan";
-    const baris = ledger.rows.map((r) =>
-      [formatTanggalJakarta(r.tanggal), r.jenis, r.qty, r.stokAkhir, `"${r.keterangan.replace(/"/g, '""')}"`].join(","),
-    );
-    const csv = [header, ...baris].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `riwayat-stok-${ledger.product.name}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleExportRiwayat() {
+    if (!ledger || !ledgerProductId) return;
+    setExportingExcel(true);
+    try {
+      const { from, to } = rentangPeriode(ledgerPeriode);
+      const blob = await api.getMyStockLedgerExcel({ productId: ledgerProductId, from, to });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `riwayat-stok-${ledger.product.name}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengekspor Excel.");
+    } finally {
+      setExportingExcel(false);
+    }
   }
 
   function changeRequestQty(productId: string, delta: number) {
@@ -828,9 +832,11 @@ function StokContent() {
                 <button
                   type="button"
                   onClick={handleExportRiwayat}
-                  className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 shrink-0"
+                  disabled={exportingExcel}
+                  className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 shrink-0 disabled:opacity-50"
                 >
-                  <Download size={13} /> Export
+                  {exportingExcel ? <Spinner size="sm" /> : <Download size={13} />}
+                  {exportingExcel ? "Menyiapkan..." : "Ekspor Excel"}
                 </button>
               </div>
             </>

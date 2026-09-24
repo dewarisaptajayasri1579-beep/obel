@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -61,6 +62,32 @@ export class StockMovementsController {
       throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
     }
     return this.service.rinciUntukBooth({ boothId: user.boothId, productId, dari: new Date(from), sampai: new Date(to) });
+  }
+
+  @Get('rinci-mine/excel')
+  @Roles(UserRole.BOOTH_STAFF)
+  async rinciMineExcel(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('productId') productId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!user.boothId) {
+      throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
+    }
+    const buffer = await this.service.rinciUntukBoothExcel({
+      boothId: user.boothId,
+      productId,
+      dari: new Date(from),
+      sampai: new Date(to),
+    });
+    const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="riwayat-stok-${jakarta}.xlsx"`,
+    });
+    return new StreamableFile(buffer);
   }
 
   @Get('rekap')

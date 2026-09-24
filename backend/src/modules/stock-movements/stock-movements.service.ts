@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, StockMovement, StockMovementType } from '@prisma/client';
+import ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { resolveStockStatus } from '../../common/stock-status';
@@ -596,6 +597,94 @@ export class StockMovementsService {
       ringkasan: { stokAwal, masuk, keluar, stokAkhir: saldo },
       rows,
     };
+  }
+
+  /// Ekspor Excel dari data yang SAMA dengan rinciUntukBooth() di atas — tidak
+  /// ada rumus saldo kedua yang beda, cuma dituang ke workbook. Dipakai tab
+  /// "Riwayat Stok" Petugas (sebelumnya cuma bisa CSV klien, lihat AGENTS.md
+  /// riwayat perbaikan E2E Testing baris 48).
+  async rinciUntukBoothExcel(params: { boothId: string; productId: string; dari: Date; sampai: Date }): Promise<Buffer> {
+    const [data, booth] = await Promise.all([
+      this.rinciUntukBooth(params),
+      this.prisma.booth.findUnique({ where: { id: params.boothId }, select: { name: true } }),
+    ]);
+
+    const buku = new ExcelJS.Workbook();
+    buku.created = new Date();
+    const lembar = buku.addWorksheet('Riwayat Stok', { views: [{ showGridLines: false }] });
+
+    lembar.columns = [{ width: 20 }, { width: 26 }, { width: 14 }, { width: 10 }, { width: 12 }, { width: 40 }];
+
+    lembar.mergeCells('A1:F1');
+    lembar.getCell('A1').value = `Riwayat Stok — ${data.product.name}`;
+    lembar.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF0F172A' } };
+
+    lembar.getCell('A2').value = 'Booth';
+    lembar.getCell('A2').font = { bold: true, size: 10 };
+    lembar.getCell('B2').value = booth?.name ?? '-';
+
+    lembar.getCell('A3').value = 'Periode';
+    lembar.getCell('A3').font = { bold: true, size: 10 };
+    lembar.getCell('B3').value = `${this.tanggalJakarta(params.dari)} s.d. ${this.tanggalJakarta(params.sampai)}`;
+
+    const barisKepala = 5;
+    const kepala = lembar.getRow(barisKepala);
+    kepala.values = ['Tanggal/Jam', 'Keterangan', 'No. Mutasi', 'Jenis', 'Qty', 'Stok Akhir'];
+    kepala.eachCell((sel) => {
+      sel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B5D34' } };
+      sel.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    });
+
+    lembar.getRow(barisKepala + 1).values = [
+      'Saldo Awal',
+      '',
+      '',
+      '',
+      '',
+      data.ringkasan.stokAwal,
+    ];
+    lembar.getRow(barisKepala + 1).getCell(1).font = { bold: true };
+    lembar.getRow(barisKepala + 1).getCell(6).font = { bold: true };
+
+    data.rows.forEach((r, i) => {
+      const baris = lembar.getRow(barisKepala + 2 + i);
+      baris.values = [
+        this.tanggalJamJakarta(new Date(r.tanggal)),
+        r.keterangan,
+        r.movementNo,
+        r.jenis === 'MASUK' ? 'Masuk' : r.jenis === 'KELUAR' ? 'Keluar' : 'Penyesuaian',
+        r.qty,
+        r.stokAkhir,
+      ];
+      baris.getCell(5).numFmt = '+#,##0;-#,##0';
+    });
+
+    const barisTotal = barisKepala + 2 + data.rows.length;
+    lembar.getRow(barisTotal).values = ['Total Masuk', '', '', '', data.ringkasan.masuk, ''];
+    lembar.getRow(barisTotal + 1).values = ['Total Keluar', '', '', '', -data.ringkasan.keluar, ''];
+    lembar.getRow(barisTotal + 2).values = ['Stok Akhir', '', '', '', '', data.ringkasan.stokAkhir];
+    [barisTotal, barisTotal + 1, barisTotal + 2].forEach((i) => {
+      lembar.getRow(i).getCell(1).font = { bold: true };
+      lembar.getRow(i).getCell(5).font = { bold: true };
+      lembar.getRow(i).getCell(6).font = { bold: true };
+    });
+
+    return Buffer.from(await buku.xlsx.writeBuffer());
+  }
+
+  private tanggalJakarta(d: Date): string {
+    return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(d);
+  }
+
+  private tanggalJamJakarta(d: Date): string {
+    return new Intl.DateTimeFormat('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Jakarta',
+    }).format(d);
   }
 
   /// `StockMovement.createdBy` cuma menyimpan UUID mentah (tidak ada relasi
