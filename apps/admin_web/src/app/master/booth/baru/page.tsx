@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Keyboard, Store } from "lucide-react";
@@ -8,14 +8,36 @@ import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
+import { api } from "@/lib/api-client";
 import { BoothForm } from "../BoothForm";
-import { nilaiAwalBooth } from "../form-values";
+import { nilaiAwalBooth, nomorBoothBerikutnya, type BoothFormValues } from "../form-values";
 
 /// Tambah Booth — halaman tersendiri (bukan modal): lihat alasannya di `BoothForm`.
 function BoothBaruContent() {
   const searchParams = useSearchParams();
   const back = searchParams.get("back") ?? "";
   const kembali = `/master/booth${back ? `?${back}` : ""}`;
+
+  // Kode & Nama Booth diisi otomatis lanjut nomor urut terbesar yang sudah
+  // ada (lihat nomorBoothBerikutnya) — form baru dirender setelah nomor ini
+  // didapat, bukan sesudah (BoothForm cuma baca `initial` sekali lewat
+  // useState, prop yang berubah belakangan tidak akan kepakai).
+  const [initial, setInitial] = useState<BoothFormValues | null>(null);
+
+  useEffect(() => {
+    let batal = false;
+    api
+      .getBooths()
+      .then((booths) => {
+        if (!batal) setInitial(nilaiAwalBooth(nomorBoothBerikutnya(booths)));
+      })
+      .catch(() => {
+        if (!batal) setInitial(nilaiAwalBooth());
+      });
+    return () => {
+      batal = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
@@ -54,7 +76,13 @@ function BoothBaruContent() {
       </div>
 
       <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
-        <BoothForm mode="create" initial={nilaiAwalBooth()} back={back} />
+        {initial ? (
+          <BoothForm mode="create" initial={initial} back={back} />
+        ) : (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useHotkey } from "@/hooks/useHotkey";
 import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError } from "@/lib/api-client";
-import { nilaiAwalBooth, type BoothFormValues } from "./form-values";
+import { nilaiAwalBooth, nomorDariKode, type BoothFormValues } from "./form-values";
 import { KodeQrisInput } from "./KodeQrisInput";
 
 const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
@@ -121,9 +121,11 @@ export const BoothForm: React.FC<{
         latitude: parseKoordinat(form.latitude),
         longitude: parseKoordinat(form.longitude),
       };
+      let nomorBerikutnya: number | undefined;
       if (mode === "create") {
         const dibuat = await api.createBooth({ code: form.code.trim(), ...payload });
         toast.success(`Booth "${dibuat.name}" ditambahkan`);
+        nomorBerikutnya = nomorDariKode(dibuat.code) + 1;
       } else {
         // `code` sengaja TIDAK ikut dikirim saat edit — sama seperti SKU Produk,
         // kode ini bisa sudah terpakai di dokumen/laporan yang sudah terbit.
@@ -136,7 +138,7 @@ export const BoothForm: React.FC<{
       }
 
       if (lanjutIsiLagi) {
-        setForm(nilaiAwalBooth());
+        setForm(nilaiAwalBooth(nomorBerikutnya));
         requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>("input")?.focus());
         return;
       }

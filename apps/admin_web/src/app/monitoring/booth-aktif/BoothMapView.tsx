@@ -13,12 +13,22 @@ function formatRupiah(n: number): string {
 
 export type SumberLokasi = "booth" | "realtime";
 
+/// Nomor booth dari angka terakhir di boothName (mis. "BOOTH 016" → "16"),
+/// fallback ke boothCode kalau nama tidak punya angka sama sekali (data
+/// lama/uji coba yang kodenya bebas teks). Dipad 2 digit ("1" → "01") biar
+/// konsisten di marker, tapi tidak dipotong kalau lebih dari 2 digit.
+function nomorBooth(booth: BoothAktifCard): string {
+  const angka = booth.boothName.match(/(\d+)(?!.*\d)/)?.[1] ?? booth.boothCode.match(/(\d+)(?!.*\d)/)?.[1];
+  if (!angka) return booth.boothCode.slice(0, 3).toUpperCase();
+  return String(parseInt(angka, 10)).padStart(2, "0");
+}
+
 /// Ikon custom lewat DivIcon (bukan marker default Leaflet) — dua alasan:
 /// (1) marker default Leaflet butuh file gambar yang path-nya sering patah di
 /// bundler Next.js/webpack, DivIcon murni HTML+CSS jadi tidak punya masalah
 /// itu; (2) supaya warna & animasinya bisa pakai kelas Tailwind yang sama
 /// dengan kartu di tab Card (konsisten satu bahasa visual).
-function buatIkon(kategori: KategoriKartu): L.DivIcon {
+function buatIkon(kategori: KategoriKartu, label: string): L.DivIcon {
   const warna: Record<KategoriKartu, string> = {
     normal: "bg-emerald-500",
     kritis: "bg-amber-500",
@@ -35,14 +45,14 @@ function buatIkon(kategori: KategoriKartu): L.DivIcon {
 
   return L.divIcon({
     html: `
-      <div class="relative w-7 h-7 flex items-center justify-center">
+      <div class="relative w-8 h-8 flex items-center justify-center">
         ${adaPing ? `<span class="absolute inline-flex h-full w-full rounded-full ${cincin[kategori]} opacity-60 animate-ping"></span>` : ""}
-        <span class="relative inline-flex rounded-full h-4 w-4 ${warna[kategori]} border-2 border-white shadow-md"></span>
+        <span class="relative inline-flex items-center justify-center rounded-full h-7 w-7 ${warna[kategori]} border-2 border-white shadow-md text-[10px] font-bold text-white leading-none">${label}</span>
       </div>
     `,
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
 }
 
@@ -208,7 +218,7 @@ export function BoothMapView({
           <Marker
             key={booth.boothId}
             position={koordinatOf(booth)}
-            icon={buatIkon(kategoriBooth(booth))}
+            icon={buatIkon(kategoriBooth(booth), nomorBooth(booth))}
             eventHandlers={{ click: () => onSelect(booth.boothId) }}
             opacity={selectedId && selectedId !== booth.boothId ? 0.35 : 1}
           >

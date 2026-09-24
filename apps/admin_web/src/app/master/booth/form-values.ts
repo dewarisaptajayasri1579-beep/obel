@@ -12,11 +12,25 @@ export interface BoothFormValues {
   isActive: boolean;
 }
 
-export function nilaiAwalBooth(): BoothFormValues {
+/// Angka terakhir dalam sebuah teks kode/nama Booth (mis. "BOOTH-016" → 16),
+/// 0 kalau tidak ada angka sama sekali.
+export function nomorDariKode(teks: string): number {
+  return parseInt(teks.match(/(\d+)(?!.*\d)/)?.[1] ?? "0", 10);
+}
+
+/// Nomor urut Booth berikutnya (angka terbesar dari kode Booth yang sudah
+/// ada + 1) — dipakai supaya Kode & Nama Booth baru langsung terisi lanjut
+/// urutan, bukan diketik manual bebas (sumber kode tidak konsisten seperti
+/// "BOOTH-PG03200" / "BOOTH-TEST75807" di data lama).
+export function nomorBoothBerikutnya(booths: Booth[]): number {
+  return booths.reduce((max, b) => Math.max(max, nomorDariKode(b.code)), 0) + 1;
+}
+
+export function nilaiAwalBooth(nomorUrut?: number): BoothFormValues {
   return {
     id: "",
-    code: "",
-    name: "",
+    code: nomorUrut ? `BOOTH-${String(nomorUrut).padStart(2, "0")}` : "",
+    name: nomorUrut ? `BOOTH ${String(nomorUrut).padStart(3, "0")}` : "",
     locationName: "",
     address: "",
     latitude: "",
