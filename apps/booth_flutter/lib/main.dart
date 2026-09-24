@@ -1,23 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'app_state.dart';
-import 'screens/check_in_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/main_shell.dart';
-import 'screens/inbound_screen.dart';
-import 'screens/checkout_screen.dart';
-import 'screens/closing_count_screen.dart';
-import 'screens/printer_settings_screen.dart';
-import 'screens/splash_screen.dart';
+import 'screens/pwa_shell_screen.dart';
 import 'theme.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: const ObbelBoothApp(),
-    ),
-  );
+  runApp(const ObbelBoothApp());
 }
 
 class ObbelBoothApp extends StatelessWidget {
@@ -29,17 +15,7 @@ class ObbelBoothApp extends StatelessWidget {
       title: 'Obbel Petugas Booth',
       theme: ObbelTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      initialRoute: '/splash',
-      routes: {
-        '/splash': (context) => const SplashScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/check-in': (context) => const CheckInScreen(),
-        '/home': (context) => const MainShell(),
-        '/inbound': (context) => const InboundScreen(),
-        '/checkout': (context) => const CheckoutScreen(),
-        '/closing': (context) => const ClosingCountScreen(),
-        '/printer-settings': (context) => const PrinterSettingsScreen(),
-      },
+      home: const PwaShellScreen(),
     );
   }
 }
