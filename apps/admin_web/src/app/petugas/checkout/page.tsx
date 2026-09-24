@@ -293,7 +293,7 @@ function CheckoutContent() {
 
   return (
     <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto pb-32">
-      <TopBar title="Konfirmasi Check Out" back="/petugas/checkout" />
+      <TopBar title="Konfirmasi Check Out" onBack={() => setStep("LAPORAN")} />
       <div className="p-4 space-y-4">
         <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
           <CheckCircle2 size={22} className="text-emerald-600 shrink-0 mt-0.5" />

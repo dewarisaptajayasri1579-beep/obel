@@ -179,7 +179,7 @@ function TerimaStokContent() {
     const editable = selected.status === "SENT";
     return (
       <div className="min-h-screen bg-[#F7F9F6] pb-28">
-        <TopBar title="Detail Penerimaan" back="/petugas/terima-stok" />
+        <TopBar title="Detail Penerimaan" onBack={() => setSelected(null)} />
         <div className="p-4">
           <div className="rounded-2xl bg-white border border-slate-200 p-4 mb-4">
             <div className="flex items-center justify-between mb-2">

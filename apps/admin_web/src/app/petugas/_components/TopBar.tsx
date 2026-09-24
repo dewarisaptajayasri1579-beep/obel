@@ -6,15 +6,33 @@ import { ArrowLeft } from "lucide-react";
 
 /// Header sederhana dipakai layar-layar di dalam grid Home (Kasir, Terima
 /// Stok, Stok, Check-Out, dst) — beda dari Home sendiri yang pakai header
-/// sapaan + notifikasi. `back` opsional: kalau diisi, tombol panah kembali
-/// ke situ; kalau tidak, router.back() biasa.
-export function TopBar({ title, subtitle, back }: { title: string; subtitle?: string; back?: string }) {
+/// sapaan + notifikasi.
+///
+/// `onBack` vs `back`: beberapa layar (mis. Detail Penerimaan di
+/// terima-stok/page.tsx, Konfirmasi Check Out di checkout/page.tsx) toggle
+/// "sub-layar" lewat STATE LOKAL (bukan route terpisah) sementara URL-nya
+/// tetap sama persis dengan layar sebelumnya — `router.push(back)` ke URL
+/// yang sama persis itu no-op di Next.js (tidak ada navigasi berarti apapun
+/// yang berubah), jadi tombol panah kelihatan "tidak berfungsi". Untuk
+/// kasus begitu, pakai `onBack` (clear state lokalnya) bukan `back`. `back`
+/// (string URL) tetap dipakai buat layar yang beneran route terpisah.
+export function TopBar({
+  title,
+  subtitle,
+  back,
+  onBack,
+}: {
+  title: string;
+  subtitle?: string;
+  back?: string;
+  onBack?: () => void;
+}) {
   const router = useRouter();
   return (
     <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 py-3.5 flex items-center gap-3">
       <button
         type="button"
-        onClick={() => (back ? router.push(back) : router.back())}
+        onClick={() => (onBack ? onBack() : back ? router.push(back) : router.back())}
         className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-100 shrink-0"
       >
         <ArrowLeft size={22} className="text-slate-700" />
