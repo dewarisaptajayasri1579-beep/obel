@@ -43,6 +43,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final platform = controller.platform;
     if (platform is AndroidWebViewController) {
       platform.setOnPlatformPermissionRequest((request) => request.grant());
+      // `navigator.geolocation` (dipakai AttendanceCapture.tsx untuk lokasi
+      // check-in/out) punya prompt izin terpisah dari izin media di atas dan
+      // dari izin lokasi OS — tanpa callback ini WebView Android menolak
+      // semua request geolocation secara default, walau izin lokasi HP aktif.
+      platform.setGeolocationPermissionsPromptCallbacks(
+        onShowPrompt: (request) async =>
+            const GeolocationPermissionsResponse(allow: true, retain: true),
+      );
     }
 
     controller.loadRequest(Uri.parse(kPwaUrl));
