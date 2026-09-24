@@ -25,12 +25,15 @@ import {
   type DraftSale,
   type SaleResult,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
+import { useAuth } from "@/lib/auth-context";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
+import { printReceipt, isNativeBridgeAvailable } from "../_lib/native-bridge";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -86,6 +89,7 @@ function nominalCepat(total: number): number[] {
 function KasirContent() {
   const toast = useToast();
   const router = useRouter();
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [shift, setShift] = useState<ActiveShift | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -107,6 +111,12 @@ function KasirContent() {
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SaleResult | null>(null);
+  // Snapshot item keranjang PERSIS sebelum resetTransaksi() di handleBayar()
+  // — SaleResult dari backend tidak bawa daftar item sama sekali, jadi tanpa
+  // snapshot ini struk Bluetooth (butuh item+qty+harga per baris) tidak
+  // punya data buat dicetak begitu cart sudah dikosongkan.
+  const [resultItems, setResultItems] = useState<{ name: string; qty: number; price: number }[]>([]);
+  const [printing, setPrinting] = useState(false);
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
 
@@ -268,7 +278,7 @@ function KasirContent() {
     setSubmitting(true);
     try {
       await api.createDraftSale({
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         shiftSessionId: shift.shiftSessionId,
         items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
         discount,
@@ -310,7 +320,7 @@ function KasirContent() {
       const sale = activeDraftId
         ? await api.payDraftSale(activeDraftId, payload)
         : await api.createSale({
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: randomUUID(),
             shiftSessionId: shift.shiftSessionId,
             items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
             discount,
@@ -318,6 +328,7 @@ function KasirContent() {
           });
 
       setResult(sale);
+      setResultItems(lines.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.sellPrice })));
       resetTransaksi();
       loadDrafts();
     } catch (err) {
@@ -345,6 +356,35 @@ function KasirContent() {
       `Terima kasih telah berbelanja di Obbel Coffee & Milk!`,
     ];
     return lines.join("\n");
+  }
+
+  /// Cetak Bluetooth kalau lagi dibuka di dalam shell booth_pwa_flutter
+  /// (window.ObelBridge ada); fallback window.print() kalau dibuka di
+  /// browser biasa (dev/testing, sesuai perilaku lama) — jangan pernah dua
+  /// duanya sekaligus, satu transaksi cuma perlu satu cara cetak.
+  async function handleCetakNota() {
+    if (!result) return;
+    if (!isNativeBridgeAvailable()) {
+      window.print();
+      return;
+    }
+    setPrinting(true);
+    try {
+      await printReceipt({
+        boothName: shift?.booth.name ?? "-",
+        saleNo: result.saleNo,
+        time: result.paidAt ?? new Date().toISOString(),
+        items: resultItems,
+        total: result.total,
+        paymentMethod: result.paymentMethod === "SPLIT" ? "Split" : result.paymentMethod === "CASH" ? "Tunai" : "QRIS",
+        staffName: session?.profile.fullName,
+      });
+      toast.success("Struk terkirim ke printer.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal cetak struk. Cek printer sudah dipilih & menyala.");
+    } finally {
+      setPrinting(false);
+    }
   }
 
   function handleKirimWhatsapp() {
@@ -433,11 +473,12 @@ function KasirContent() {
         <div className="print:hidden grid grid-cols-2 gap-2 w-full mt-1">
           <button
             type="button"
-            onClick={() => window.print()}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-base"
+            onClick={handleCetakNota}
+            disabled={printing}
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3 font-bold text-base disabled:opacity-60"
             style={{ borderColor: GREEN, color: GREEN }}
           >
-            <Printer size={16} /> Cetak Nota
+            {printing ? <Spinner size="sm" /> : <Printer size={16} />} Cetak Nota
           </button>
           <button
             type="button"
@@ -485,7 +526,7 @@ function KasirContent() {
           <FileText size={18} className="text-slate-600" />
           {drafts.length > 0 && (
             <span
-              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-xs font-extrabold flex items-center justify-center"
+              className="absolute -top-1.5 -right-1.5 min-w-4.5 h-4.5 px-1 rounded-full text-white text-xs font-extrabold flex items-center justify-center"
               style={{ backgroundColor: OBBEL.accentOrange }}
             >
               {drafts.length}
