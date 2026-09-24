@@ -21,12 +21,13 @@ import {
   type SaleDetail,
   type SaleRefund,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { SaleActivityLog } from "../SaleActivityLog";
 import { SaleNotaPreviewModal } from "../SaleNotaPreviewModal";
 
 const STATUS_LABEL: Record<SaleDetail["status"], { label: string; kelas: string }> = {
   PENDING: { label: "Pending", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
-  PAID: { label: "Lunas", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  PAID: { label: "Lunas", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   VOIDED: { label: "Dibatalkan", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
 };
 
@@ -132,7 +133,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     setSubmitting(true);
     try {
       await api.createSaleRefund(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         items,
         condition: refundCondition,
         reasonCode,
@@ -153,7 +154,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     setSubmitting(true);
     try {
       await api.revisePaymentMethod(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         method: paymentMethod,
         reasonCode,
         reasonNote: reasonNote || undefined,
@@ -195,7 +196,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     if (!detail) return;
     setSubmitting(true);
     try {
-      await api.voidSale(detail.id, { idempotencyKey: crypto.randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
+      await api.voidSale(detail.id, { idempotencyKey: randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
       toast.success(`Sale ${detail.saleNo} berhasil dibatalkan.`);
       resetMode();
       await load();
@@ -211,7 +212,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     setSubmitting(true);
     try {
       const result = await api.reviseSale(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         items: Object.entries(reviseQty).map(([productId, qty]) => ({ productId, qty })),
         reasonCode,
         reasonNote: reasonNote || undefined,
@@ -244,12 +245,12 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
         <div className="flex items-start gap-3">
           <Link
             href="/transaksi-kasir"
-            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
             aria-label="Kembali ke daftar Transaksi Booth - Kasir"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <ShoppingCart className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
+          <ShoppingCart className="w-5 h-5 text-(--brand-700) dark:text-brand-400 mt-1.5 shrink-0" />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
@@ -280,11 +281,11 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
         )}
       </div>
 
-      <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs space-y-5">
+      <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs! space-y-5">
         {tidakAda ? (
           <div className="py-10 text-center text-sm text-slate-500 dark:text-fg-muted">
             Transaksi tidak ditemukan.{" "}
-            <Link href="/transaksi-kasir" className="font-semibold text-[var(--brand-700)] hover:underline">
+            <Link href="/transaksi-kasir" className="font-semibold text-(--brand-700) hover:underline">
               Kembali ke daftar
             </Link>
           </div>
@@ -326,7 +327,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
                 href={`https://www.google.com/maps?q=${detail.latitude},${detail.longitude}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
               >
                 <MapPin className="w-3.5 h-3.5" />
                 Lihat lokasi transaksi di peta

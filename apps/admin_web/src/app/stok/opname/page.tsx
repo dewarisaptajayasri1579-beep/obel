@@ -26,6 +26,7 @@ import {
   type ReasonCode,
   type StockOpname,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { Plus, ClipboardCheck } from "lucide-react";
 
 function statusBadgeType(status: StockOpname["status"]) {
@@ -85,7 +86,7 @@ function OpnameContent() {
     setSubmitting(true);
     try {
       await api.confirmStockOpname(active.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         items: active.items.map((i) => ({ productId: i.productId, actualQty: actualByProduct[i.productId] ?? i.actualQty })),
         reasonCode,
         reasonNote: reasonNote || undefined,

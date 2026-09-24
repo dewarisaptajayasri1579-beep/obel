@@ -20,6 +20,7 @@ import {
   type TindakLanjutSelisih,
   type StockHandover,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 import { SerahTerimaActivityLog } from "../SerahTerimaActivityLog";
 import { SerahTerimaNotaPreviewModal } from "../SerahTerimaNotaPreviewModal";
@@ -146,10 +147,10 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
         await api.rejectStockHandover(detail.id, rejectReason.trim());
         toast.success(`"${detail.docNo}" ditolak.`);
       } else if (mode === "cancel") {
-        await api.cancelStockHandover(detail.id, { idempotencyKey: crypto.randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
+        await api.cancelStockHandover(detail.id, { idempotencyKey: randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
         toast.success(`"${detail.docNo}" dibatalkan.`);
       } else if (mode === "revise") {
-        const revisi = await api.reviseStockHandover(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        const revisi = await api.reviseStockHandover(detail.id, { idempotencyKey: randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
         toast.success(`Direvisi menjadi dokumen baru.`);
         window.location.href = `/serah-terima-stok/dist_${revisi.id}`;
         return;
@@ -165,7 +166,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
           tindakLanjutNote: tindakLanjut[i.productId] === "LAINNYA" ? tindakLanjutNote[i.productId]?.trim() : undefined,
         }));
         await api.correctStockHandoverReceipt(detail.id, {
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: randomUUID(),
           items: itemsDenganTindakLanjut,
           reasonCode,
           reasonNote: reasonNote || undefined,

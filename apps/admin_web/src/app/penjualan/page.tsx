@@ -29,6 +29,7 @@ import {
   type SaleListItem,
   type SaleRefund,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { Ban, CreditCard, Pencil, Undo2 } from "lucide-react";
 
 const REFUND_CONDITION_OPTIONS = [
@@ -136,7 +137,7 @@ function PenjualanContent() {
     setSubmitting(true);
     try {
       await api.createSaleRefund(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         items,
         condition: refundCondition,
         reasonCode,
@@ -157,7 +158,7 @@ function PenjualanContent() {
     setSubmitting(true);
     try {
       await api.revisePaymentMethod(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         method: paymentMethod,
         reasonCode,
         reasonNote: reasonNote || undefined,
@@ -199,7 +200,7 @@ function PenjualanContent() {
     if (!detail) return;
     setSubmitting(true);
     try {
-      await api.voidSale(detail.id, { idempotencyKey: crypto.randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
+      await api.voidSale(detail.id, { idempotencyKey: randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
       toast.success(`Sale ${detail.saleNo} berhasil dibatalkan.`);
       setDetail(null);
       await load();
@@ -215,7 +216,7 @@ function PenjualanContent() {
     setSubmitting(true);
     try {
       await api.reviseSale(detail.id, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         items: Object.entries(reviseQty).map(([productId, qty]) => ({ productId, qty })),
         reasonCode,
         reasonNote: reasonNote || undefined,

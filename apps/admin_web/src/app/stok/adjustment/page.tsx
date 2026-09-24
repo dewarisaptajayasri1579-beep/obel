@@ -28,6 +28,7 @@ import {
   type ReasonCode,
   type StockAdjustmentRecord,
 } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { Plus, Undo2 } from "lucide-react";
 
 function ProductName({ productId, products }: { productId: string; products: Product[] }) {
@@ -69,7 +70,7 @@ function AdjustmentContent() {
     setSaving(true);
     try {
       await api.createStockAdjustment({
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         locationType,
         boothId: locationType === "BOOTH" ? boothId : undefined,
         productId,
@@ -93,7 +94,7 @@ function AdjustmentContent() {
   async function handleReverse(record: StockAdjustmentRecord) {
     try {
       await api.reverseStockAdjustment(record.entityId, {
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: randomUUID(),
         reasonCode: "DATA_ENTRY_ERROR",
         reasonNote: "Reverse dari halaman Adjustment",
       });

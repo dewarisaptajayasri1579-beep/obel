@@ -12,11 +12,12 @@ import { useToast } from "@/components/ui/Toast";
 import { useHotkey } from "@/hooks/useHotkey";
 import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError, type Product, type StockReceipt } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 import { PenerimaanLivePreview } from "./PenerimaanLivePreview";
 import { PenerimaanActivityLog } from "./PenerimaanActivityLog";
 
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 const TANPA_KATEGORI = "Tanpa Kategori";
 
@@ -86,7 +87,7 @@ export function PenerimaanForm({
 
   const formRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const idempotencyKey = useRef(randomUUID());
 
   useFokusAwal(formRef, !readOnly);
 
@@ -294,7 +295,7 @@ export function PenerimaanForm({
 
         <div className="w-full flex flex-col gap-1.5">
           <span className={COMPACT_LABEL}>No. Bukti</span>
-          <div className="h-8.5 min-h-[34px] px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
+          <div className="h-8.5 min-h-8.5 px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
             {initial ? (
               <span className="font-mono text-xs font-bold text-slate-700 dark:text-fg-secondary">{initial.receiptNo}</span>
             ) : (
@@ -306,7 +307,7 @@ export function PenerimaanForm({
               Revisi dari{" "}
               <Link
                 href={`/stok/penerimaan/${initial.revisionOf.id}`}
-                className="font-mono font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                className="font-mono font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
               >
                 {initial.revisionOf.receiptNo}
               </Link>
@@ -464,7 +465,7 @@ export function PenerimaanForm({
                 type="button"
                 onClick={() => setKonfirmasi("draft")}
                 disabled={simpanDraft || posting}
-                className="px-3.5 py-1.5 rounded-lg border border-[var(--brand-700)] bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-[var(--brand-700)] dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-1.5 rounded-lg border border-(--brand-700) bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-(--brand-700) dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{simpanDraft ? "Menyimpan..." : "Simpan (Draft)"}</span>
@@ -480,7 +481,7 @@ export function PenerimaanForm({
                   setKonfirmasi("posting");
                 }}
                 disabled={simpanDraft || posting}
-                className="px-4 py-1.5 rounded-lg bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>{posting ? "Memposting..." : "Posting"}</span>
@@ -628,7 +629,7 @@ function RenderKelompokBaris({
                       focusBaris(index + 1);
                     }
                   }}
-                  className="w-24 h-8 px-2 text-right text-xs font-bold tabular-nums rounded-md border border-slate-200 dark:border-line bg-white dark:bg-surface focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10"
+                  className="w-24 h-8 px-2 text-right text-xs font-bold tabular-nums rounded-md border border-slate-200 dark:border-line bg-white dark:bg-surface focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10"
                 />
               )}
             </td>

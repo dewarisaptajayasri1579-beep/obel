@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 import { api, ApiError, REASON_CODE_OPTIONS, type ReasonCode, type StockReturn } from "@/lib/api-client";
+import { randomUUID } from "@/lib/uuid";
 import { Ban, Pencil, PackageCheck, Wrench } from "lucide-react";
 
 const STATUS_CONFIG: Record<StockReturn["status"], { type: StatusBadgeType; label: string }> = {
@@ -70,13 +71,13 @@ function ReturnContent() {
         await api.receiveReturn(detail.id, items.map((i) => ({ productId: i.productId, qtyReceived: i.qty })));
         toast.success(`Return ${detail.returnNo} diterima.`);
       } else if (mode === "cancel") {
-        await api.cancelReturn(detail.id, { idempotencyKey: crypto.randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
+        await api.cancelReturn(detail.id, { idempotencyKey: randomUUID(), reasonCode, reasonNote: reasonNote || undefined });
         toast.success(`Return ${detail.returnNo} dibatalkan.`);
       } else if (mode === "revise") {
-        await api.reviseReturn(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        await api.reviseReturn(detail.id, { idempotencyKey: randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
         toast.success(`Return ${detail.returnNo} direvisi.`);
       } else if (mode === "correct") {
-        await api.correctReturnReceipt(detail.id, { idempotencyKey: crypto.randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
+        await api.correctReturnReceipt(detail.id, { idempotencyKey: randomUUID(), items, reasonCode, reasonNote: reasonNote || undefined });
         toast.success(`Penerimaan Return ${detail.returnNo} dikoreksi.`);
       }
       setDetail(null);
