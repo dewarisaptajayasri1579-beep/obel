@@ -122,14 +122,14 @@ export class StockReceiptReportService {
 
     lembar.columns = [{ width: 5 }, { width: 16 }, { width: 16 }, { width: 34 }, { width: 14 }, { width: 12 }, { width: 12 }];
 
-    if (profil.logoPath && profil.logoExt) {
-      const imageId = buku.addImage({ filename: profil.logoPath, extension: profil.logoExt });
+    if (profil.logoImage && profil.logoExt) {
+      const imageId = buku.addImage({ buffer: profil.logoImage as any, extension: profil.logoExt });
       lembar.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 32, height: 32 } });
       lembar.getRow(1).height = 26;
     }
 
     lembar.mergeCells('A1:C1');
-    lembar.getCell('A1').value = profil.logoPath ? `        ${profil.name}` : profil.name;
+    lembar.getCell('A1').value = profil.logoImage ? `        ${profil.name}` : profil.name;
     lembar.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF0F172A' } };
 
     lembar.mergeCells('D1:G1');
@@ -231,8 +231,8 @@ export class StockReceiptReportService {
       const KIRI = 28;
       const KANAN = 814;
 
-      const teksKiri = profil.logoPath ? KIRI + 42 : KIRI;
-      if (profil.logoPath) doc.image(profil.logoPath, KIRI, 24, { fit: [36, 36] });
+      const teksKiri = profil.logoImage ? KIRI + 42 : KIRI;
+      if (profil.logoImage) doc.image(profil.logoImage, KIRI, 24, { fit: [36, 36] });
       doc.font('Helvetica-Bold').fontSize(13).fillColor('#0F172A').text(profil.name, teksKiri, 28);
       doc.font('Helvetica').fontSize(8).fillColor('#64748B').text(profil.address ?? '', teksKiri, 45);
 
@@ -343,10 +343,10 @@ export class StockReceiptReportService {
       // --- KEPALA: logo + perusahaan SENDIRIAN di barisnya (bukan berbagi baris
       // dengan judul dokumen) — pola nota transaksi jsBerkah (STB/Opname), bukan
       // gaya letterhead surat formal yang dipakai sebelumnya di sini. ---
-      const teksKiri = profil.logoPath ? KIRI + 38 : KIRI;
-      if (profil.logoPath) {
+      const teksKiri = profil.logoImage ? KIRI + 38 : KIRI;
+      if (profil.logoImage) {
         doc.roundedRect(KIRI, 38, 30, 30, 6).lineWidth(1).strokeColor('#E2E8F0').stroke();
-        doc.image(profil.logoPath, KIRI + 3, 41, { fit: [24, 24] });
+        doc.image(profil.logoImage, KIRI + 3, 41, { fit: [24, 24] });
       }
       doc.font('Helvetica-Bold').fontSize(13).fillColor('#0F172A').text(profil.name, teksKiri, 41);
       doc.font('Helvetica').fontSize(8.5).fillColor('#64748B').text(profil.address ?? '', teksKiri, 57);

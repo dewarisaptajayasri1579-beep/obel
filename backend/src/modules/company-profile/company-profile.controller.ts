@@ -8,31 +8,27 @@ import {
   ParseFilePipe,
   Patch,
   Post,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { randomUUID } from 'crypto';
-import { diskStorage } from 'multer';
-import { mkdirSync } from 'fs';
-import { extname, join } from 'path';
-import type { Request } from 'express';
+import { extname } from 'path';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { StorageService } from '../../common/storage/storage.service';
 import { CompanyProfileService } from './company-profile.service';
 import { UpdateCompanyProfileDto } from './dto/update-company-profile.dto';
-
-const logoUploadDir = join(process.cwd(), 'uploads', 'company');
-mkdirSync(logoUploadDir, { recursive: true });
 
 @Controller('company-profile')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CompanyProfileController {
-  constructor(private readonly companyProfile: CompanyProfileService) {}
+  constructor(
+    private readonly companyProfile: CompanyProfileService,
+    private readonly storage: StorageService,
+  ) {}
 
   /// Dibaca semua role — identitas perusahaan dipajang di header layar
   /// (bukan cuma dokumen cetak), Owner & Petugas Booth juga perlu melihatnya.
@@ -52,12 +48,6 @@ export class CompanyProfileController {
   @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: logoUploadDir,
-        filename: (_request, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
-        },
-      }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_request, file, callback) => {
         if (!/^image\/(jpeg|png)$/.test(file.mimetype)) {
@@ -70,7 +60,7 @@ export class CompanyProfileController {
       },
     }),
   )
-  uploadLogo(
+  async uploadLogo(
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -80,9 +70,8 @@ export class CompanyProfileController {
       }),
     )
     file: Express.Multer.File,
-    @Req() request: Request,
   ) {
-    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
-    return { logoUrl: `${publicBaseUrl}/uploads/company/${file.filename}` };
+    const { url } = await this.storage.upload('company', file.buffer, file.mimetype, extname(file.originalname).toLowerCase());
+    return { logoUrl: url };
   }
 }

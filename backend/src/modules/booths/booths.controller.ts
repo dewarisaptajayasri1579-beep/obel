@@ -9,32 +9,28 @@ import {
   ParseFilePipe,
   Patch,
   Post,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { randomUUID } from 'crypto';
-import { diskStorage } from 'multer';
-import { mkdirSync } from 'fs';
-import { extname, join } from 'path';
-import type { Request } from 'express';
+import { extname } from 'path';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { StorageService } from '../../common/storage/storage.service';
 import { CreateBoothDto } from './dto/create-booth.dto';
 import { UpdateBoothDto } from './dto/update-booth.dto';
 import { BoothsService } from './booths.service';
 
-const boothUploadDir = join(process.cwd(), 'uploads', 'booths');
-mkdirSync(boothUploadDir, { recursive: true });
-
 @Controller('booths')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BoothsController {
-  constructor(private readonly boothsService: BoothsService) {}
+  constructor(
+    private readonly boothsService: BoothsService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
@@ -52,12 +48,6 @@ export class BoothsController {
   @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: boothUploadDir,
-        filename: (_request, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
-        },
-      }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_request, file, callback) => {
         if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
@@ -68,7 +58,7 @@ export class BoothsController {
       },
     }),
   )
-  uploadQris(
+  async uploadQris(
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -81,10 +71,9 @@ export class BoothsController {
       }),
     )
     file: Express.Multer.File,
-    @Req() request: Request,
   ) {
-    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
-    return { qrisImageUrl: `${publicBaseUrl}/uploads/booths/${file.filename}` };
+    const { url } = await this.storage.upload('booths', file.buffer, file.mimetype, extname(file.originalname).toLowerCase());
+    return { qrisImageUrl: url };
   }
 
   @Patch(':id')

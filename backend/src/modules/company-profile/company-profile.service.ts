@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { existsSync } from 'fs';
-import { extname, join } from 'path';
+import { extname } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { UpdateCompanyProfileDto } from './dto/update-company-profile.dto';
 
 const DEFAULT_ID = 'default';
@@ -17,15 +17,14 @@ export interface DataCetakPerusahaan {
   legalName: string | null;
   address: string | null;
   phone: string | null;
-  /// Path berkas LOKAL di disk (untuk `doc.image()`/`worksheet.addImage()`),
-  /// bukan URL publik — laporan digenerate di proses backend yang sama
-  /// dengan yang menyimpan berkasnya, jadi dibaca langsung dari disk, tanpa
-  /// request HTTP bolak-balik ke diri sendiri. `null` kalau belum ada logo
-  /// ATAU logoUrl menunjuk ke luar folder uploads/company milik server ini.
-  logoPath: string | null;
+  /// Isi berkas logo diambil dari R2 (untuk `doc.image()`/`worksheet.addImage()`
+  /// yang keduanya menerima Buffer langsung). `null` kalau belum ada logo
+  /// ATAU logoUrl tidak menunjuk ke bucket R2 milik server ini ATAU gagal
+  /// diambil dari storage.
+  logoImage: Buffer | null;
   /// `jpeg`/`png` — dipakai `worksheet.addImage()` (ExcelJS mewajibkan
   /// ekstensi eksplisit). pdfkit tidak butuh ini, dia menebak sendiri dari isi
-  /// berkas. Selalu sejalan dengan `logoPath` (`null` kalau `logoPath` null).
+  /// berkas. Selalu sejalan dengan `logoImage` (`null` kalau `logoImage` null).
   logoExt: 'jpeg' | 'png' | null;
 }
 
@@ -35,7 +34,10 @@ export interface DataCetakPerusahaan {
 /// Admin sempat mengisi Pengaturan → Profil Perusahaan.
 @Injectable()
 export class CompanyProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async get() {
     const existing = await this.prisma.companyProfile.findUnique({ where: { id: DEFAULT_ID } });
@@ -69,19 +71,22 @@ export class CompanyProfileService {
   /// lokal yang bisa langsung dibaca `fs`/pdfkit/exceljs.
   async getForPrint(): Promise<DataCetakPerusahaan> {
     const p = await this.get();
-    let logoPath: string | null = null;
+    let logoImage: Buffer | null = null;
     let logoExt: 'jpeg' | 'png' | null = null;
-    if (p.logoUrl) {
-      const cocok = /\/uploads\/company\/([^/?#]+)/.exec(p.logoUrl);
-      if (cocok) {
-        const kandidat = join(process.cwd(), 'uploads', 'company', cocok[1]);
-        if (existsSync(kandidat)) {
-          logoPath = kandidat;
-          const ext = extname(kandidat).toLowerCase();
-          logoExt = ext === '.png' ? 'png' : ext === '.jpg' || ext === '.jpeg' ? 'jpeg' : null;
+    const key = p.logoUrl ? this.storage.keyFromPublicUrl(p.logoUrl) : null;
+    if (key) {
+      const ext = extname(key).toLowerCase();
+      const kandidatExt = ext === '.png' ? 'png' : ext === '.jpg' || ext === '.jpeg' ? 'jpeg' : null;
+      if (kandidatExt) {
+        try {
+          logoImage = await this.storage.getBuffer(key);
+          logoExt = kandidatExt;
+        } catch {
+          logoImage = null;
+          logoExt = null;
         }
       }
     }
-    return { name: p.name, legalName: p.legalName, address: p.address, phone: p.phone, logoPath, logoExt };
+    return { name: p.name, legalName: p.legalName, address: p.address, phone: p.phone, logoImage, logoExt };
   }
 }
