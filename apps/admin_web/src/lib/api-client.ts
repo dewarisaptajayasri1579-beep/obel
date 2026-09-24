@@ -422,7 +422,12 @@ export interface UserAccount {
   username: string
   fullName: string
   role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
+  /** Booth default saat login (AuthService) — TIDAK sama dengan roster
+   *  Booth+Shift tetap, lihat `assignedBoothId`. */
   defaultBoothId: string | null
+  /** Booth dari roster tetap (BoothShiftAssignment, diatur di Booth → Setting
+   *  Petugas) — ini acuan status "sudah/belum ditugaskan" yang benar. */
+  assignedBoothId: string | null
   active: boolean
 }
 

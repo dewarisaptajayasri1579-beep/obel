@@ -205,14 +205,14 @@ export const PetugasForm: React.FC<{
 
       <div data-field="booth">
         <Select
-          label="Booth Default (opsional)"
+          label="Booth Default Login (opsional, bukan Setting Petugas)"
           options={booths}
           value={form.defaultBoothId}
           onChange={(v) => {
             set("defaultBoothId", v);
             lanjutSetelahPilih("booth");
           }}
-          placeholder="Belum ditugaskan ke Booth manapun"
+          placeholder="Booth awal sebelum Check-In pertama (bukan roster Booth+Shift)"
           sizeVariant="sm"
           className={COMPACT_FIELD}
           labelClassName={COMPACT_LABEL}

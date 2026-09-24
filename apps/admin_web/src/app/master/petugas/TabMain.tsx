@@ -106,7 +106,7 @@ export function TabMain({
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
-      if (q && !`${u.username} ${u.fullName} ${namaBooth(u.defaultBoothId) ?? ""}`.toLowerCase().includes(q))
+      if (q && !`${u.username} ${u.fullName} ${namaBooth(u.assignedBoothId) ?? ""}`.toLowerCase().includes(q))
         return false;
       if (statusFilter === "active" && !u.active) return false;
       if (statusFilter === "inactive" && u.active) return false;
@@ -117,7 +117,7 @@ export function TabMain({
 
   const metrics = useMemo(() => {
     const aktif = filteredRows.filter((u) => u.active);
-    const belumDitugaskan = filteredRows.filter((u) => !u.defaultBoothId);
+    const belumDitugaskan = filteredRows.filter((u) => !u.assignedBoothId);
     return {
       total: filteredRows.length,
       aktif: aktif.length,
@@ -463,10 +463,10 @@ export function TabMain({
                     )}
                     {tampil("booth") && (
                       <td className="py-3 px-3 text-slate-600 dark:text-fg-muted">
-                        {namaBooth(u.defaultBoothId) ? (
+                        {namaBooth(u.assignedBoothId) ? (
                           <span className="inline-flex items-center gap-1.5">
                             <Store className="w-3 h-3 text-slate-400 dark:text-fg-muted flex-shrink-0" />
-                            {namaBooth(u.defaultBoothId)}
+                            {namaBooth(u.assignedBoothId)}
                           </span>
                         ) : (
                           <span className="text-slate-400 dark:text-fg-muted italic">Belum ditugaskan</span>

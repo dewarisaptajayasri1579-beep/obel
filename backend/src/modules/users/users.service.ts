@@ -13,11 +13,24 @@ const SELECT_SAFE_FIELDS = { ...SAFE_PROFILE_SELECT, createdAt: true } as const;
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.profile.findMany({
-      select: SELECT_SAFE_FIELDS,
+  /// `defaultBoothId` (dipakai saat login, lihat AuthService) TIDAK sinkron
+  /// dengan `BoothShiftAssignment` (roster Booth+Shift tetap per staff, diatur
+  /// dari Booth → Setting Petugas, lihat BoothShiftAssignmentsService) — dua
+  /// field/tabel yang beda tujuan. Halaman Petugas menampilkan status
+  /// "sudah/belum ditugaskan" berdasarkan roster (`assignedBoothId`, dari
+  /// BoothShiftAssignment), BUKAN `defaultBoothId`, karena roster itu yang
+  /// jadi acuan operasional sebenarnya (dipakai ShiftsService.checkIn() utk
+  /// nentuin Booth staff) — `defaultBoothId` kosong tidak berarti staff itu
+  /// belum ditugaskan.
+  async findAll() {
+    const rows = await this.prisma.profile.findMany({
+      select: { ...SELECT_SAFE_FIELDS, shiftAssignments: { select: { boothId: true } } },
       orderBy: { fullName: 'asc' },
     });
+    return rows.map(({ shiftAssignments, ...rest }) => ({
+      ...rest,
+      assignedBoothId: shiftAssignments[0]?.boothId ?? null,
+    }));
   }
 
   async create(dto: CreateUserDto) {
