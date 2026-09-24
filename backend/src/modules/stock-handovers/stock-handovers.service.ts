@@ -3,7 +3,6 @@ import { DistributionStatus, Prisma, RestockRequestStatus, ShiftStatus } from '@
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { businessDateKeyJakarta } from '../../common/jakarta-date';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { DistributionsService } from '../distributions/distributions.service';
@@ -286,7 +285,7 @@ export class StockHandoversService {
     ]);
 
     const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
-    const jenisById = this.computeJenisBatch(distributions);
+    const jenisById = await this.computeJenisBatch(distributions);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
     const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null));
@@ -296,21 +295,49 @@ export class StockHandoversService {
 
   /// Jenis (Stok Awal/Re-Stok) untuk SEKUMPULAN distribusi sekaligus — dipakai
   /// findAllForReport() (semua data) dan findAll() (satu window halaman).
-  /// Dikelompokkan per Booth+businessDate Jakarta di antara baris yang
-  /// diberikan SAJA — lihat catatan di findAll() soal batas keakuratannya
-  /// saat dipaginasi.
-  private computeJenisBatch(
+  /// Dikelompokkan per Booth+ShiftSession yang menaungi `sentAt`, SAMA PERSIS
+  /// dengan computeJenisFor() di atas (dulu di sini sempat dikelompokkan per
+  /// businessDate kalender Jakarta — SALAH, dan ketauan dari 2 laporan
+  /// tester yang saling berkebalikan: kiriman awal ke petugas yang baru
+  /// check-in kena label "Re-Stok" kalau boothnya kebetulan sudah dikirimi
+  /// di hari kalender yang sama sebelumnya, sementara restok yang jelas
+  /// bukan kiriman pertama malah kena label "Awal" kalau jatuh di hari
+  /// kalender baru padahal masih 1 sesi shift yang sama, mis. shift Malam
+  /// yang nyeberang tengah malam). Lihat catatan di findAll() soal batas
+  /// keakuratannya saat dipaginasi.
+  private async computeJenisBatch(
     distributions: { id: string; boothId: string; sentAt: Date | null; status: DistributionStatus }[],
-  ): Map<string, 'STOK_AWAL' | 'RE_STOK'> {
+  ): Promise<Map<string, 'STOK_AWAL' | 'RE_STOK'>> {
     const sentDistributions = distributions.filter((d) => d.sentAt && d.status !== DistributionStatus.CANCELLED);
+    const jenisById = new Map<string, 'STOK_AWAL' | 'RE_STOK'>();
+    if (sentDistributions.length === 0) return jenisById;
+
+    const boothIds = [...new Set(sentDistributions.map((d) => d.boothId))];
+    const sessions = await this.prisma.shiftSession.findMany({
+      where: { boothId: { in: boothIds }, openedAt: { not: null } },
+      select: { id: true, boothId: true, openedAt: true, closedAt: true },
+    });
+    const sessionsByBooth = new Map<string, typeof sessions>();
+    for (const s of sessions) {
+      const arr = sessionsByBooth.get(s.boothId) ?? [];
+      arr.push(s);
+      sessionsByBooth.set(s.boothId, arr);
+    }
+
+    // Sesi yang menaungi tiap distribusi ditentukan sama seperti
+    // computeJenisFor() — openedAt <= sentAt <= closedAt (atau masih OPEN) —
+    // ambil yang paling baru dibuka kalau lebih dari satu cocok.
     const groups = new Map<string, typeof sentDistributions>();
     for (const d of sentDistributions) {
-      const key = `${d.boothId}__${businessDateKeyJakarta(d.sentAt!)}`;
+      const sesi = (sessionsByBooth.get(d.boothId) ?? [])
+        .filter((s) => s.openedAt! <= d.sentAt! && (s.closedAt === null || s.closedAt > d.sentAt!))
+        .sort((a, b) => b.openedAt!.getTime() - a.openedAt!.getTime())[0];
+      if (!sesi) continue; // tidak ada sesi yang menaungi -> tidak dilabel, sama seperti computeJenisFor
+      const key = `${d.boothId}__${sesi.id}`;
       const group = groups.get(key) ?? [];
       group.push(d);
       groups.set(key, group);
     }
-    const jenisById = new Map<string, 'STOK_AWAL' | 'RE_STOK'>();
     for (const group of groups.values()) {
       group.sort((a, b) => a.sentAt!.getTime() - b.sentAt!.getTime());
       group.forEach((d, index) => jenisById.set(d.id, index === 0 ? 'STOK_AWAL' : 'RE_STOK'));
@@ -413,7 +440,7 @@ export class StockHandoversService {
     ]);
 
     const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
-    const jenisById = this.computeJenisBatch(distributions);
+    const jenisById = await this.computeJenisBatch(distributions);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
     const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null));

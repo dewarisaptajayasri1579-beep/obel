@@ -46,7 +46,7 @@ const TINDAK_LANJUT_LABEL: Record<TindakLanjutSelisih, string> = {
 const STATUS_LABEL: Record<StockHandover["status"], { label: string; kelas: string }> = {
   DIAJUKAN: { label: "Diajukan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
   DIPROSES: { label: "Diproses", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
-  DITERIMA: { label: "Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  DITERIMA: { label: "Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DITOLAK: { label: "Ditolak", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
   DIBATALKAN: { label: "Dibatalkan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
@@ -198,12 +198,12 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
         <div className="flex items-start gap-3">
           <Link
             href="/serah-terima-stok"
-            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
             aria-label="Kembali ke daftar Serah Terima Stok"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <Truck className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
+          <Truck className="w-5 h-5 text-(--brand-700) dark:text-brand-400 mt-1.5 shrink-0" />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
@@ -222,11 +222,11 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
         </div>
       </div>
 
-      <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
+      <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs!">
         {tidakAda ? (
           <div className="py-10 text-center text-sm text-slate-500 dark:text-fg-muted">
             Dokumen tidak ditemukan.{" "}
-            <Link href="/serah-terima-stok" className="font-semibold text-[var(--brand-700)] hover:underline">
+            <Link href="/serah-terima-stok" className="font-semibold text-(--brand-700) hover:underline">
               Kembali ke daftar
             </Link>
           </div>
@@ -281,7 +281,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                       <button
                         type="button"
                         onClick={() => setTampilkanSemuaProduk((v) => !v)}
-                        className="text-[11px] font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline cursor-pointer"
+                        className="text-[11px] font-semibold text-(--brand-700) dark:text-brand-400 hover:underline cursor-pointer"
                       >
                         {persempitKeSelisih ? `Tampilkan semua ${detail.items.length} produk` : "Tampilkan yang selisih saja"}
                       </button>
@@ -306,8 +306,8 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                           const qtyRugi = item.qty - (itemQty[item.productId] ?? item.qty);
                           return (
                             <tr key={item.productId} className={selisih !== 0 ? "bg-rose-50/60 dark:bg-rose-900/10" : undefined}>
-                              <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${mode === "correct" ? "max-w-[160px]" : ""}`}>
-                                <span className="break-words">{item.productName}</span>
+                              <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${mode === "correct" ? "max-w-40" : ""}`}>
+                                <span className="wrap-break-word">{item.productName}</span>
                                 {selisih !== 0 && item.discrepancyReasonCode && (
                                   <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
                                     Alasan Petugas: {ALASAN_SELISIH_LABEL[item.discrepancyReasonCode] ?? item.discrepancyReasonCode}
@@ -345,7 +345,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                                               }}
                                               className={`text-[10px] font-bold rounded-full px-2 py-1 border cursor-pointer transition-colors ${
                                                 aktif
-                                                  ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)]"
+                                                  ? "bg-(--brand-700) text-white border-(--brand-700)"
                                                   : "bg-white dark:bg-surface text-slate-600 dark:text-fg-secondary border-slate-200 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
                                               }`}
                                             >
