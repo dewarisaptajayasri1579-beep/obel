@@ -266,7 +266,7 @@ function CheckoutContent() {
             placeholder="Contoh: kondisi stok, kendala, atau catatan lainnya..."
             rows={3}
             maxLength={500}
-            className={`w-full rounded-xl border px-3 py-2.5.5 text-base ${
+            className={`w-full rounded-xl border px-3 py-3 text-base ${
               adaSelisih && !catatanTerisi ? "border-rose-300 bg-rose-50" : "border-slate-200"
             }`}
           />

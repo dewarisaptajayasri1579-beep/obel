@@ -85,6 +85,12 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="whatsapp"/>
         </intent>
+        <!-- wa.me / api.whatsapp.com (https) juga diserahkan ke app luar,
+             lihat _hostEksternal di webview_screen.dart. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="tel"/>

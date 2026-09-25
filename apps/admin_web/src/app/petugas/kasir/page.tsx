@@ -514,7 +514,7 @@ function KasirContent() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari menu..."
-            className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-2.5.5 text-base outline-none focus:border-[#0B5D34]"
+            className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 h-11 text-base outline-none focus:border-[#0B5D34]"
           />
         </div>
         <button
@@ -625,7 +625,7 @@ function KasirContent() {
             <button
               type="button"
               onClick={() => setSheet("cart")}
-              className="rounded-xl px-4 py-2.5.5 font-bold text-base text-white"
+              className="rounded-xl px-4 py-3 font-bold text-base text-white"
               style={{ backgroundColor: GREEN }}
             >
               Lihat Keranjang
@@ -826,7 +826,7 @@ function KasirContent() {
                         key={n}
                         type="button"
                         onClick={() => setNominalTunai(n)}
-                        className="rounded-xl py-2.5.5 text-sm font-bold border-2"
+                        className="rounded-xl py-3 text-sm font-bold border-2"
                         style={
                           nominalTunai === n
                             ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }

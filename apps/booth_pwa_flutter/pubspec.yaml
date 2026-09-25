@@ -61,6 +61,7 @@ dependencies:
   # webview_screen.dart buat serahin ke Android biar app yang sesuai
   # (WhatsApp, Telepon, dst) yang buka, bukan WebView yang nyoba render.
   url_launcher: ^6.3.0
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

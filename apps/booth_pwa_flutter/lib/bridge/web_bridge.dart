@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../camera/camera_service.dart';
@@ -100,6 +101,20 @@ class WebBridge {
           return result == null
               ? BridgeResponse.fail(req.id, 'Dibatalkan user.')
               : BridgeResponse.ok(req.id, result);
+
+        // WebView Android tidak bisa download `blob:` URL (<a download>) sama
+        // sekali — PWA kirim isi file sebagai base64, dibagikan lewat share
+        // sheet Android (Simpan ke Files/Drive, kirim WhatsApp, dst).
+        case 'file.share':
+          final fileName = req.payload['fileName'] as String;
+          final bytes = base64Decode(req.payload['base64'] as String);
+          final result = await SharePlus.instance.share(
+            ShareParams(
+              files: [XFile.fromData(bytes, mimeType: req.payload['mimeType'] as String?)],
+              fileNameOverrides: [fileName],
+            ),
+          );
+          return BridgeResponse.ok(req.id, {'status': result.status.name});
 
         default:
           return BridgeResponse.fail(req.id, 'Action tidak dikenal: ${req.action}');

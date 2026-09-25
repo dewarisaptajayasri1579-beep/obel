@@ -122,6 +122,26 @@ export async function openPrinterSettings(): Promise<void> {
   await callBridge("printer.openSettings", {});
 }
 
+function blobKeBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("Gagal membaca file."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/// WebView Android tidak bisa download `blob:` URL lewat <a download> —
+/// di dalam shell native file dibagikan lewat share sheet Android. Return
+/// false kalau bridge tidak ada (browser biasa): pemanggil pakai download
+/// biasa.
+export async function shareFile(blob: Blob, fileName: string): Promise<boolean> {
+  if (!isNativeBridgeAvailable()) return false;
+  const base64 = await blobKeBase64(blob);
+  await callBridge("file.share", { fileName, mimeType: blob.type || "application/octet-stream", base64 });
+  return true;
+}
+
 export interface ReceiptPayload {
   boothName: string;
   saleNo: string;

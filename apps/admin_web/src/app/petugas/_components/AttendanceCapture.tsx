@@ -92,8 +92,15 @@ export function AttendanceCapture({
       requestAnimationFrame(() => {
         if (videoRef.current) videoRef.current.srcObject = stream;
       });
-    } catch {
-      setCameraError("Tidak bisa mengakses kamera. Izinkan akses kamera di browser, atau pilih foto dari galeri.");
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      setCameraError(
+        name === "NotAllowedError"
+          ? "Izin kamera ditolak. Aktifkan di Pengaturan HP > Aplikasi > Obbel Petugas > Izin > Kamera, atau pilih foto dari galeri."
+          : name === "NotReadableError"
+            ? "Kamera sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi, atau pilih foto dari galeri."
+            : `Tidak bisa mengakses kamera${name ? ` (${name})` : ""}. Coba lagi, atau pilih foto dari galeri.`,
+      );
     }
   }
 
@@ -138,7 +145,7 @@ export function AttendanceCapture({
         <p className="text-sm text-slate-500 mb-3">Pastikan Anda berada di area booth yang benar.</p>
 
         {location ? (
-          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5.5">
+          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
             <div className="text-sm text-slate-700">
               <div className="font-semibold">
                 {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}

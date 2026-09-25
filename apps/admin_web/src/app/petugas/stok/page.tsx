@@ -42,6 +42,7 @@ import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
+import { shareFile } from "../_lib/native-bridge";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -245,10 +246,12 @@ function StokContent() {
     try {
       const { from, to } = rentangPeriode(ledgerPeriode);
       const blob = await api.getMyStockLedgerExcel({ productId: ledgerProductId, from, to });
+      const namaFile = `riwayat-stok-${ledger.product.name}.xlsx`;
+      if (await shareFile(blob, namaFile)) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `riwayat-stok-${ledger.product.name}.xlsx`;
+      a.download = namaFile;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -669,7 +672,7 @@ function StokContent() {
               <button
                 type="button"
                 onClick={handleSimpanDraft}
-                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2.5.5 text-sm font-bold shrink-0"
+                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 text-sm font-bold shrink-0"
                 style={{ borderColor: GREEN, color: GREEN }}
               >
                 <Bookmark size={14} /> Draft
@@ -678,7 +681,7 @@ function StokContent() {
                 type="button"
                 onClick={handleSubmitRestock}
                 disabled={submitting || totalCupDiajukan === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5.5 text-sm font-bold text-white disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-50"
                 style={{ backgroundColor: GREEN }}
               >
                 {submitting ? <Spinner size="sm" color="white" /> : (
@@ -709,7 +712,7 @@ function StokContent() {
                 <select
                   value={ledgerProductId ?? ""}
                   onChange={(e) => setLedgerProductId(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5.5 text-base font-semibold text-slate-800"
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-3 text-base font-semibold text-slate-800"
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -726,7 +729,7 @@ function StokContent() {
                 <select
                   value={ledgerPeriode}
                   onChange={(e) => setLedgerPeriode(e.target.value as Periode)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-2.5.5 text-base font-semibold text-slate-800"
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-3 text-base font-semibold text-slate-800"
                 >
                   {(Object.keys(PERIODE_LABEL) as Periode[]).map((p) => (
                     <option key={p} value={p}>

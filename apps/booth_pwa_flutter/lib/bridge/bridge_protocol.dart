@@ -6,7 +6,7 @@
 ///   id: "string unik per request, dikirim balik apa adanya",
 ///   action: "gps.start | gps.stop | gps.status | gps.openSettings
 ///            | printer.list | printer.select | printer.status | printer.print
-///            | camera.capture",
+///            | printer.openSettings | camera.capture | file.share",
 ///   payload: { /* ...lihat masing-masing service... */ },
 /// }))
 /// ```
