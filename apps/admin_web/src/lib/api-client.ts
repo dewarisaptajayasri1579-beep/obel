@@ -505,6 +505,7 @@ export interface FilterLaporanStokSelisih {
   dateFrom?: string
   dateTo?: string
   boothId?: string
+  jenis?: JenisStokSelisih
 }
 
 export type JenisStokSelisih = "KIRIM_STOK" | "PENGEMBALIAN_STOK"
@@ -1425,6 +1426,7 @@ export const api = {
     if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
     if (filter.dateTo) params.set("dateTo", filter.dateTo)
     if (filter.boothId) params.set("boothId", filter.boothId)
+    if (filter.jenis) params.set("jenis", filter.jenis)
     const qs = params.toString()
     return request<StokSelisihData>(`/reports/stock-discrepancy${qs ? `?${qs}` : ""}`)
   },
@@ -1433,6 +1435,7 @@ export const api = {
     if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
     if (filter.dateTo) params.set("dateTo", filter.dateTo)
     if (filter.boothId) params.set("boothId", filter.boothId)
+    if (filter.jenis) params.set("jenis", filter.jenis)
     const qs = params.toString()
 
     const res = await fetch(`${BASE_URL}/reports/stock-discrepancy/${format}${qs ? `?${qs}` : ""}`, {

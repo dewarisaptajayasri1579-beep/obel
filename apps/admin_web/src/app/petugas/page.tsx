@@ -213,14 +213,14 @@ function HomeContent() {
 
         <div className="px-4 pt-2">
           <div
-            className="rounded-[28px] p-6 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-[190px] flex flex-col items-start justify-center"
+            className="rounded-[28px] p-6 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-47.5 flex flex-col items-start justify-center"
             style={{ background: `linear-gradient(135deg, ${OBBEL.primaryMedium} 0%, ${GREEN} 65%, ${OBBEL_SCALE[800]} 100%)` }}
           >
-            <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-[20deg]" strokeWidth={1} />
+            <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-20" strokeWidth={1} />
             <Coffee size={64} className="absolute right-5 bottom-4 text-white/25" strokeWidth={1.2} />
             <DoorOpen size={28} className="relative text-white/80 mb-2" />
             <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Belum Ada Shift Aktif</p>
-            <p className="relative text-white/80 text-base mt-2 font-medium max-w-[220px]">
+            <p className="relative text-white/80 text-base mt-2 font-medium max-w-55">
               Lakukan Check-In dulu untuk mulai bekerja hari ini.
             </p>
           </div>
@@ -256,7 +256,12 @@ function HomeContent() {
           >
             <Bell size={18} className="text-slate-700" />
             {notifications.length > 0 && (
-              <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full" style={{ backgroundColor: OBBEL.accentRed }} />
+              <span
+                className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center rounded-full text-white text-[11px] font-bold"
+                style={{ backgroundColor: OBBEL.accentRed }}
+              >
+                {notifications.length > 9 ? "9+" : notifications.length}
+              </span>
             )}
           </button>
           <button
@@ -272,16 +277,16 @@ function HomeContent() {
 
       <div className="px-4 pt-2">
         <div
-          className="rounded-[28px] p-5 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-[190px]"
+          className="rounded-[28px] p-5 relative overflow-hidden shadow-[0_18px_40px_-16px_rgba(11,93,52,0.55)] min-h-47.5"
           style={{ background: `linear-gradient(135deg, ${OBBEL.primaryMedium} 0%, ${GREEN} 65%, ${OBBEL_SCALE[800]} 100%)` }}
         >
           {/* Dekorasi daun & cangkir kopi — mengganti ilustrasi foto di mockup
               dengan ikon, supaya tidak butuh aset gambar baru. */}
-          <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-[20deg]" strokeWidth={1} />
-          <Leaf size={56} className="absolute right-10 top-16 text-white/10 -rotate-[15deg]" strokeWidth={1} />
+          <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-20" strokeWidth={1} />
+          <Leaf size={56} className="absolute right-10 top-16 text-white/10 rotate-[-15deg]" strokeWidth={1} />
           <div className="absolute right-5 bottom-4 flex flex-col items-center">
             <Coffee size={64} className="text-white/25" strokeWidth={1.2} />
-            <p className="text-white/30 text-xs italic font-medium mt-1 text-center leading-tight max-w-[70px]">
+            <p className="text-white/30 text-xs italic font-medium mt-1 text-center leading-tight max-w-17.5">
               Satu Kopi Sejuta Cerita
             </p>
           </div>
@@ -396,7 +401,11 @@ function HomeContent() {
                 notifications.map((n) => {
                   const Icon = NOTIF_ICON[n.type];
                   const warna = NOTIF_COLOR[n.type];
-                  const bisaDiklik = n.id.startsWith("distribution:");
+                  const tujuan = n.id.startsWith("distribution:")
+                    ? "/petugas/terima-stok"
+                    : n.id.startsWith("restock-rejected:")
+                      ? "/petugas/stok?tab=restock"
+                      : null;
                   const isi = (
                     <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50">
                       <span
@@ -411,8 +420,8 @@ function HomeContent() {
                       </div>
                     </div>
                   );
-                  return bisaDiklik ? (
-                    <Link key={n.id} href="/petugas/terima-stok" onClick={() => setShowNotifPanel(false)}>
+                  return tujuan ? (
+                    <Link key={n.id} href={tujuan} onClick={() => setShowNotifPanel(false)}>
                       {isi}
                     </Link>
                   ) : (

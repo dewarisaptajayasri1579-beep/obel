@@ -52,7 +52,7 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
       <button onClick={() => setOpen((v) => !v)} className={`${iconButtonClass} relative`} aria-label="Notifikasi" title="Notifikasi">
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold">
+          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -72,7 +72,7 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
                 dismissedIds.has(n.id) ? "opacity-60" : ""
               }`}
             >
-              <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${TYPE_DOT[n.type]}`} />
+              <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${TYPE_DOT[n.type]}`} />
               <span className="flex-1 min-w-0">
                 <span className="block text-xs font-bold text-slate-800 dark:text-fg">{n.title}</span>
                 <span className="block text-[11px] text-slate-500 dark:text-fg-muted mt-0.5">{n.message}</span>

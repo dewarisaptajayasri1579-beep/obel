@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
+
+export const BOOTH_STOCK_TERLIHAT = {
+  OR: [{ product: { active: true } }, { qtyOnHand: { gt: 0 } }],
+} satisfies Prisma.BoothStockWhereInput;
 
 @Injectable()
 export class BoothStockService {
@@ -12,7 +17,9 @@ export class BoothStockService {
   async findAll(boothId?: string) {
     const [stocks, thresholds, pendingReturnItems] = await Promise.all([
       this.prisma.boothStock.findMany({
-        where: boothId ? { boothId } : undefined,
+        // Produk nonaktif tetap tampil selama masih ada sisa fisik di Booth,
+        // supaya tidak "hilang" saat hitung stok / Check-Out.
+        where: { ...(boothId ? { boothId } : {}), ...BOOTH_STOCK_TERLIHAT },
         include: { booth: true, product: { include: { category: true } } },
         orderBy: [{ booth: { name: 'asc' } }, { product: { sortOrder: 'asc' } }],
       }),

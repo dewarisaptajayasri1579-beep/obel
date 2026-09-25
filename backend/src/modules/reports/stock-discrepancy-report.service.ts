@@ -5,14 +5,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CompanyProfileService } from '../company-profile/company-profile.service';
 import { rangeJakarta } from '../../common/jakarta-date';
 
+export type JenisStokSelisih = 'KIRIM_STOK' | 'PENGEMBALIAN_STOK';
+
 export interface FilterLaporanStokSelisih {
   dateFrom?: string;
   dateTo?: string;
   boothId?: string;
+  jenis?: JenisStokSelisih;
   dicetakOleh?: string;
 }
-
-export type JenisStokSelisih = 'KIRIM_STOK' | 'PENGEMBALIAN_STOK';
 export type TindakLanjutStokSelisih = 'RUSAK' | 'GANTI_RUGI_PETUGAS' | 'LAINNYA';
 
 export interface BarisStokSelisih {
@@ -72,9 +73,11 @@ export class StockDiscrepancyReportService {
 
   private async ambilBaris(filter: FilterLaporanStokSelisih): Promise<BarisStokSelisih[]> {
     const rentang = filter.dateFrom && filter.dateTo ? rangeJakarta(filter.dateFrom, filter.dateTo) : null;
+    const ambilKirim = filter.jenis !== 'PENGEMBALIAN_STOK';
+    const ambilKembali = filter.jenis !== 'KIRIM_STOK';
 
     const [distItems, distLiabilities, returnItems, returnLiabilities] = await Promise.all([
-      this.prisma.stockDistributionItem.findMany({
+      !ambilKirim ? [] : this.prisma.stockDistributionItem.findMany({
         where: {
           discrepancyReasonCode: { in: ['RUSAK', 'LAINNYA'] },
           distribution: {
@@ -84,7 +87,7 @@ export class StockDiscrepancyReportService {
         },
         include: { product: true, distribution: { include: { booth: true, receivedBy: true } } },
       }),
-      this.prisma.staffLiability.findMany({
+      !ambilKirim ? [] : this.prisma.staffLiability.findMany({
         where: {
           distributionId: { not: null },
           distribution: {
@@ -94,7 +97,7 @@ export class StockDiscrepancyReportService {
         },
         include: { product: true, staff: true, distribution: { include: { booth: true } } },
       }),
-      this.prisma.stockReturnItem.findMany({
+      !ambilKembali ? [] : this.prisma.stockReturnItem.findMany({
         where: {
           discrepancyReasonCode: { in: ['RUSAK', 'LAINNYA'] },
           stockReturn: {
@@ -104,7 +107,7 @@ export class StockDiscrepancyReportService {
         },
         include: { product: true, stockReturn: { include: { booth: true, submittedBy: true } } },
       }),
-      this.prisma.staffLiability.findMany({
+      !ambilKembali ? [] : this.prisma.staffLiability.findMany({
         where: {
           stockReturnId: { not: null },
           stockReturn: {
@@ -199,6 +202,7 @@ export class StockDiscrepancyReportService {
     const bagian: string[] = [];
     if (filter.dateFrom && filter.dateTo) bagian.push(`Periode ${filter.dateFrom} s/d ${filter.dateTo}`);
     if (filter.boothId) bagian.push('Booth terpilih');
+    if (filter.jenis) bagian.push(`Jenis ${JENIS_LABEL[filter.jenis]}`);
     return bagian.length ? bagian.join(' · ') : 'Semua periode & Booth';
   }
 

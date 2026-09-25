@@ -180,11 +180,18 @@ export class ReportsController {
     return new StreamableFile(buffer);
   }
 
-  private filterStokSelisihDari(dateFrom?: string, dateTo?: string, boothId?: string, dicetakOleh?: string): FilterLaporanStokSelisih {
+  private filterStokSelisihDari(
+    dateFrom?: string,
+    dateTo?: string,
+    boothId?: string,
+    jenis?: string,
+    dicetakOleh?: string,
+  ): FilterLaporanStokSelisih {
     return {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       boothId: boothId || undefined,
+      jenis: jenis === 'KIRIM_STOK' || jenis === 'PENGEMBALIAN_STOK' ? jenis : undefined,
       dicetakOleh,
     };
   }
@@ -195,8 +202,9 @@ export class ReportsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
+    @Query('jenis') jenis?: string,
   ) {
-    return this.stockDiscrepancyReport.data(this.filterStokSelisihDari(dateFrom, dateTo, boothId));
+    return this.stockDiscrepancyReport.data(this.filterStokSelisihDari(dateFrom, dateTo, boothId, jenis));
   }
 
   @Get('stock-discrepancy/excel')
@@ -207,8 +215,11 @@ export class ReportsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
+    @Query('jenis') jenis?: string,
   ) {
-    const buffer = await this.stockDiscrepancyReport.excel(this.filterStokSelisihDari(dateFrom, dateTo, boothId, user.username));
+    const buffer = await this.stockDiscrepancyReport.excel(
+      this.filterStokSelisihDari(dateFrom, dateTo, boothId, jenis, user.username),
+    );
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${this.namaBerkas('stok-selisih', 'xlsx')}"`,
@@ -224,8 +235,11 @@ export class ReportsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('boothId') boothId?: string,
+    @Query('jenis') jenis?: string,
   ) {
-    const buffer = await this.stockDiscrepancyReport.pdf(this.filterStokSelisihDari(dateFrom, dateTo, boothId, user.username));
+    const buffer = await this.stockDiscrepancyReport.pdf(
+      this.filterStokSelisihDari(dateFrom, dateTo, boothId, jenis, user.username),
+    );
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${this.namaBerkas('stok-selisih', 'pdf')}"`,

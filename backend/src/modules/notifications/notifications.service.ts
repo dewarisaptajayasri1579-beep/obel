@@ -3,6 +3,7 @@ import { DistributionStatus, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
+import { BOOTH_STOCK_TERLIHAT } from '../booth-stock/booth-stock.service';
 
 export interface NotificationItem {
   id: string;
@@ -27,7 +28,7 @@ export class NotificationsService {
 
     const [boothStocks, thresholds, pendingDistributions, pendingRestock, pendingReturns, openCases, closedShiftsToday] =
       await Promise.all([
-        this.prisma.boothStock.findMany({ include: { booth: true, product: true } }),
+        this.prisma.boothStock.findMany({ where: BOOTH_STOCK_TERLIHAT, include: { booth: true, product: true } }),
         this.prisma.boothStockThreshold.findMany(),
         this.prisma.stockDistribution.count({ where: { status: DistributionStatus.SENT } }),
         this.prisma.restockRequest.count({ where: { status: 'REQUESTED' } }),
@@ -120,8 +121,8 @@ export class NotificationsService {
     const now = new Date().toISOString();
     const items: NotificationItem[] = [];
 
-    const [boothStocks, thresholds, pendingDistributions, myRestockRequests] = await Promise.all([
-      this.prisma.boothStock.findMany({ where: { boothId }, include: { product: true } }),
+    const [boothStocks, thresholds, pendingDistributions, myRestockRequests, restockDitolakHariIni] = await Promise.all([
+      this.prisma.boothStock.findMany({ where: { boothId, ...BOOTH_STOCK_TERLIHAT }, include: { product: true } }),
       this.prisma.boothStockThreshold.findMany({ where: { boothId } }),
       this.prisma.stockDistribution.findMany({
         where: { boothId, status: DistributionStatus.SENT },
@@ -130,6 +131,13 @@ export class NotificationsService {
       this.prisma.restockRequest.findMany({
         where: { boothId, status: { in: ['APPROVED'] } },
         select: { id: true, requestNo: true },
+      }),
+      // REJECTED itu status terminal — tanpa batas hari ini, notifnya nongol
+      // selamanya (feed ini diturunkan dari state, bukan log event).
+      this.prisma.restockRequest.findMany({
+        where: { boothId, status: 'REJECTED', updatedAt: { gte: startOfTodayJakarta() } },
+        select: { id: true, requestNo: true, rejectReason: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
       }),
     ]);
 
@@ -175,6 +183,17 @@ export class NotificationsService {
         type: 'success',
         readAt: null,
         createdAt: now,
+      });
+    }
+
+    for (const r of restockDitolakHariIni) {
+      items.push({
+        id: `restock-rejected:${r.id}`,
+        title: 'Restock Ditolak',
+        message: `Permintaan restock ${r.requestNo} ditolak${r.rejectReason ? `: ${r.rejectReason}` : '.'}`,
+        type: 'error',
+        readAt: null,
+        createdAt: r.updatedAt.toISOString(),
       });
     }
 

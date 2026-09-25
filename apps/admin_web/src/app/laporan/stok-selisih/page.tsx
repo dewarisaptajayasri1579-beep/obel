@@ -39,7 +39,12 @@ function StokSelisihContent() {
   const setTab = (v: TabJenis) => setTabRaw(v);
   const [unduhing, setUnduhing] = useState<"pdf" | "excel" | null>(null);
 
-  const filter = { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, boothId: boothId || undefined };
+  const filter = {
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    boothId: boothId || undefined,
+    jenis: tab === "SEMUA" ? undefined : tab,
+  };
 
   useEffect(() => {
     api.getBooths().then(setBooths).catch(() => {});
@@ -55,7 +60,7 @@ function StokSelisihContent() {
         setData({ rows: [], totalSelisih: 0, totalKejadian: 0, totalGantiRugi: 0, perProduk: [] });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, boothId]);
+  }, [dateFrom, dateTo, boothId, tab]);
 
   const filterAktif = dateFrom !== "" || dateTo !== "" || boothId !== "" || tab !== "SEMUA";
 
@@ -66,7 +71,7 @@ function StokSelisihContent() {
     setTab("SEMUA");
   }
 
-  const rows = (data?.rows ?? []).filter((r) => tab === "SEMUA" || r.jenis === tab);
+  const rows = data?.rows ?? [];
 
   async function unduh(format: "pdf" | "excel") {
     setUnduhing(format);
@@ -95,7 +100,7 @@ function StokSelisihContent() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30 shadow-2xs">
             <PackageX className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -131,7 +136,7 @@ function StokSelisihContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30">
             <AlertTriangle className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -142,7 +147,7 @@ function StokSelisihContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
             <Truck className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -153,7 +158,7 @@ function StokSelisihContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0 border border-violet-100 dark:border-violet-900/30">
+          <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0 border border-violet-100 dark:border-violet-900/30">
             <HandCoins className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -184,7 +189,7 @@ function StokSelisihContent() {
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               max={dateTo || undefined}
-              className={`h-9 px-2.5 text-xs font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`h-9 px-2.5 text-xs font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 dateFrom ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -194,7 +199,7 @@ function StokSelisihContent() {
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               min={dateFrom || undefined}
-              className={`h-9 px-2.5 text-xs font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`h-9 px-2.5 text-xs font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 dateTo ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -207,7 +212,7 @@ function StokSelisihContent() {
               onChange={setBoothId}
               placeholder="Semua Booth"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={boothId !== ""}
             />
           </div>
@@ -224,7 +229,7 @@ function StokSelisihContent() {
                 onClick={() => setTab(key)}
                 className={`h-9 px-3 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                   tab === key
-                    ? "bg-[var(--brand-700)] text-white"
+                    ? "bg-(--brand-700) text-white"
                     : "bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-600 dark:text-fg-secondary hover:bg-slate-50 dark:hover:bg-surface-hover"
                 }`}
               >
