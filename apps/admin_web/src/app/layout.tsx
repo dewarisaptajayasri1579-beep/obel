@@ -12,7 +12,8 @@ const THEME_INIT_SCRIPT = `
     var theme = stored && stored.theme === "dark" ? "dark"
       : stored && stored.theme === "light" ? "light"
       : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    if (theme === "dark") document.documentElement.classList.add("dark");
+    // /petugas/* belum punya dark mode — halamannya hardcode background terang.
+    if (theme === "dark" && location.pathname.indexOf("/petugas") !== 0) document.documentElement.classList.add("dark");
     // Accent (palet warna) dipasang di sini juga, bukan cuma di
     // PreferencesProvider — tanpa ini, muatan pertama selalu memakai palet
     // hijau bawaan sekejap sebelum React jalan, lalu "meloncat" ke palet

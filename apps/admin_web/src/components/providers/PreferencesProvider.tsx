@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 export type Theme = "light" | "dark";
 export type NavLayout = "sidebar" | "horizontal";
@@ -76,16 +77,27 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
     accent: "hijau",
   });
 
+  const pathname = usePathname();
+  const [siap, setSiap] = useState(false);
+
   useEffect(() => {
     const stored = readStoredPreferences();
     setPreferences(stored);
-    applyTheme(stored.theme);
     applyAccent(stored.accent);
+    setSiap(true);
   }, []);
+
+  // /petugas/* belum punya dark mode — halamannya hardcode background terang,
+  // jadi teks tanpa warna eksplisit jadi putih-di-atas-putih kalau .dark aktif.
+  // Tunggu `siap` supaya state awal "light" tidak sempat mencopot .dark yang
+  // sudah dipasang THEME_INIT_SCRIPT (kedipan terang di halaman Admin).
+  useEffect(() => {
+    if (!siap) return;
+    applyTheme(pathname?.startsWith("/petugas") ? "light" : preferences.theme);
+  }, [siap, pathname, preferences.theme]);
 
   const persist = (next: Preferences) => {
     setPreferences(next);
-    applyTheme(next.theme);
     applyAccent(next.accent);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
