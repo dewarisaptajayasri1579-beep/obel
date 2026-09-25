@@ -52,14 +52,14 @@ function waktuJakarta(iso: string | null) {
 
 const RETUR_BADGE: Record<string, { label: string; kelas: string }> = {
   SUBMITTED: { label: "Stok Kembali: Dalam Proses", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
-  RECEIVED: { label: "Stok Kembali: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  RECEIVED: { label: "Stok Kembali: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DISCREPANCY: { label: "Stok Kembali: Selisih", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
   CANCELLED: { label: "Stok Kembali: Dibatalkan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
 
 const SETORAN_BADGE: Record<string, { label: string; kelas: string }> = {
   PENDING: { label: "Setor Uang: Dalam Proses", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
-  CONFIRMED: { label: "Setor Uang: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  CONFIRMED: { label: "Setor Uang: Diterima", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DISCREPANCY: { label: "Setor Uang: Selisih", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
 };
 
@@ -187,7 +187,7 @@ function LaporanDetail({
                   <td className={`py-2 px-3 text-center tabular-nums text-sm ${kelasAngka(it.sisaSistem)}`}>{it.sisaSistem}</td>
                   <td className="py-2 px-3 text-center">
                     {it.selisih !== 0 ? (
-                      <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-bold tabular-nums px-2 py-0.5">
+                      <span className="inline-flex items-center justify-center min-w-8 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-bold tabular-nums px-2 py-0.5">
                         {it.stokFisik ?? "-"}
                       </span>
                     ) : (
@@ -256,8 +256,8 @@ function LaporanDetail({
                     const qtyRugi = item.qtySubmitted - diterima;
                     return (
                       <tr key={item.productId} className={selisih !== 0 ? "bg-rose-50/60 dark:bg-rose-900/10" : undefined}>
-                        <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${retur.status === "SUBMITTED" ? "max-w-[160px]" : ""}`}>
-                          <span className="break-words">{item.productName}</span>
+                        <td className={`py-2 px-3 text-slate-800 dark:text-fg font-medium ${retur.status === "SUBMITTED" ? "max-w-40" : ""}`}>
+                          <span className="wrap-break-word">{item.productName}</span>
                           {selisih !== 0 && item.catatanPetugas && (
                             <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
                               Alasan Petugas: {item.catatanPetugas}
@@ -298,7 +298,7 @@ function LaporanDetail({
                                         onClick={() => setTindakLanjut((prev) => ({ ...prev, [item.productId]: opt }))}
                                         className={`text-[10px] font-bold rounded-full px-2 py-1 border cursor-pointer transition-colors ${
                                           aktif
-                                            ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)]"
+                                            ? "bg-(--brand-700) text-white border-(--brand-700)"
                                             : "bg-white dark:bg-surface text-slate-600 dark:text-fg-secondary border-slate-200 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
                                         }`}
                                       >
@@ -353,7 +353,7 @@ function LaporanDetail({
                   type="button"
                   onClick={approveRetur}
                   disabled={submittingRetur || (returAdaBeda && !returTindakLanjutLengkap)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--brand-700)] text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-(--brand-700) text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
                 >
                   {submittingRetur ? <Spinner size="sm" color="white" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
                   Approve Stok Kembali
@@ -460,7 +460,7 @@ function LaporanDetail({
                   onChange={(e) => setDepositNote(e.target.value)}
                   placeholder={setoranAdaBeda ? "Catatan wajib diisi — jumlah setoran berbeda dari seharusnya..." : "Catatan (opsional)..."}
                   rows={2}
-                  className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand-700)]/10 ${
+                  className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-(--brand-700)/10 ${
                     setoranAdaBeda ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : "border-slate-200 dark:border-line"
                   }`}
                 />
@@ -468,7 +468,7 @@ function LaporanDetail({
                   type="button"
                   onClick={approveSetoran}
                   disabled={submittingSetoran || (setoranAdaBeda && !depositNote.trim())}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--brand-700)] text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-(--brand-700) text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
                 >
                   {submittingSetoran ? <Spinner size="sm" color="white" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
                   Approve Setor Uang
@@ -590,7 +590,7 @@ function TransaksiLaporanKembaliContent() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
             <ClipboardList className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -607,7 +607,7 @@ function TransaksiLaporanKembaliContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20">
             <ClipboardList className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -618,7 +618,7 @@ function TransaksiLaporanKembaliContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
             <Clock className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -629,7 +629,7 @@ function TransaksiLaporanKembaliContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30">
             <AlertTriangle className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -640,7 +640,7 @@ function TransaksiLaporanKembaliContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 flex items-center justify-center flex-shrink-0 border border-sky-100 dark:border-sky-900/30">
+          <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/30">
             <Coffee className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -658,7 +658,7 @@ function TransaksiLaporanKembaliContent() {
             onClick={() => setShowPending((v) => !v)}
             className="w-full flex items-center gap-3 p-3.5 text-left cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-200 dark:border-amber-900/40">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-900/40">
               <PackageSearch className="w-4.5 h-4.5" />
             </div>
             <div className="flex-1">
@@ -727,14 +727,14 @@ function TransaksiLaporanKembaliContent() {
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         <div className="flex items-center gap-2.5 flex-wrap mb-3.5">
-          <div className="relative flex items-center flex-1 min-w-[200px] sm:max-w-[280px]">
+          <div className="relative flex items-center flex-1 min-w-50 sm:max-w-70">
             <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari booth atau petugas..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 search.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -757,7 +757,7 @@ function TransaksiLaporanKembaliContent() {
               onChange={setBoothId}
               placeholder="Semua Booth"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={boothId !== ""}
             />
           </div>
@@ -769,7 +769,7 @@ function TransaksiLaporanKembaliContent() {
               onChange={setStaffId}
               placeholder="Semua Petugas"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={staffId !== ""}
             />
           </div>
@@ -786,7 +786,7 @@ function TransaksiLaporanKembaliContent() {
                 onClick={() => setTab(key)}
                 className={`h-9 px-3 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                   tab === key
-                    ? "bg-[var(--brand-700)] text-white"
+                    ? "bg-(--brand-700) text-white"
                     : "bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-600 dark:text-fg-secondary hover:bg-slate-50 dark:hover:bg-surface-hover"
                 }`}
               >

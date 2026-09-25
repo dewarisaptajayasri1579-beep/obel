@@ -102,6 +102,10 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
 function adjustmentGudang(m: StockMovement, qty: number): DampakMutasi {
   if (m.referenceType.endsWith('_in')) return { delta: qty, perluVerifikasi: false };
   if (m.referenceType.endsWith('_out')) return { delta: -qty, perluVerifikasi: false };
+  // Baris lama sebelum sufiks arah dipakai: pembatalan distribusi SELALU
+  // mengembalikan barang ke Gudang. (distribution_revision lama tidak bisa
+  // disimpulkan begini — revisi bisa menambah atau mengurangi qty.)
+  if (m.referenceType === 'distribution_cancel') return { delta: qty, perluVerifikasi: false };
 
   const note = m.note?.toLowerCase() ?? '';
   if (note.includes('penambahan')) return { delta: qty, perluVerifikasi: false };
