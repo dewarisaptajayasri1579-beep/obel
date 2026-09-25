@@ -120,6 +120,8 @@ Jangan hardcode jam 08.00/16.30 atau 15.00/22.00. Gunakan master shift/session.
 ## BR-016 — Active Booth/Product
 Inactive master tidak boleh dipakai transaksi baru, tetapi histori tetap tampil.
 
+Produk hanya boleh dinonaktifkan kalau sudah tidak beredar sama sekali: stok Gudang dan semua Booth 0, tidak ada Serah Terima DRAFT/SENT, Pengembalian Stok SUBMITTED, atau pengajuan restock REQUESTED yang memuat produk itu (error `PRODUCT_STILL_IN_USE`). Menghabiskan menu = biarkan Aktif tanpa menambah pasokan sampai stok 0; produk bermasalah = Adjustment (Rusak) ke 0 dulu, baru nonaktifkan.
+
 ## BR-017 — Idempotency
 Mutation kritis menerima `idempotency_key` client-generated UUID.
 

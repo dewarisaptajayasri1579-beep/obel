@@ -40,6 +40,7 @@ import {
   type RingkasStokProduk,
 } from "@/lib/api-client";
 import { ProdukReportPreviewModal } from "./ProdukReportPreviewModal";
+import { NonaktifDiblokirModal, rincianNonaktifDiblokir, type RincianNonaktifDiblokir } from "./NonaktifDiblokirModal";
 
 function formatRupiah(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
@@ -107,6 +108,7 @@ export function TabMain({
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [diblokir, setDiblokir] = useState<{ nama: string; rincian: RincianNonaktifDiblokir } | null>(null);
   const [hapusTarget, setHapusTarget] = useState<Product | null>(null);
   const [menghapus, setMenghapus] = useState(false);
   const router = useRouter();
@@ -340,6 +342,8 @@ export function TabMain({
       await onReload();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal mengubah status Produk.");
+      const rincian = rincianNonaktifDiblokir(err);
+      if (rincian) setDiblokir({ nama: product.name, rincian });
     } finally {
       setTogglingId(null);
     }
@@ -1051,6 +1055,12 @@ export function TabMain({
           </div>
         </div>
       </Modal>
+
+      <NonaktifDiblokirModal
+        productName={diblokir?.nama ?? ""}
+        rincian={diblokir?.rincian ?? null}
+        onClose={() => setDiblokir(null)}
+      />
 
       <ProdukReportPreviewModal
         isOpen={showReportPreview}

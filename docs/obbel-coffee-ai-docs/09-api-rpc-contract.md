@@ -79,7 +79,7 @@ Return:
 Error codes:
 - `SHIFT_NOT_OPEN`
 - `UNAUTHORIZED_BOOTH`
-- `PRODUCT_INACTIVE`
+- `PRODUCT_INACTIVE` — juga saat membayar draft yang produknya sudah dinonaktifkan
 - `INSUFFICIENT_STOCK`
 - `INVALID_QTY`
 

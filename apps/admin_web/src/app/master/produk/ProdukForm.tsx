@@ -15,12 +15,13 @@ import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError } from "@/lib/api-client";
 import { nilaiAwalProduk, type ProdukFormValues } from "./form-values";
 import { FotoProdukInput } from "./FotoProdukInput";
+import { NonaktifDiblokirModal, rincianNonaktifDiblokir, type RincianNonaktifDiblokir } from "./NonaktifDiblokirModal";
 
 type Option = { value: string; label: string };
 
 // Field & label pemadat — bawaan Input/Select/CurrencyInput sizeVariant="lg"
 // (56px) terlalu tinggi untuk form isian panjang.
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 
 /// Form Produk — satu komponen untuk Tambah & Edit, dipakai dua halaman
@@ -47,6 +48,7 @@ export const ProdukForm: React.FC<{
 
   const [form, setForm] = useState<ProdukFormValues>(initial);
   const [error, setError] = useState("");
+  const [diblokir, setDiblokir] = useState<RincianNonaktifDiblokir | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Salinan lokal `categories` supaya kategori yang baru ditambahkan lewat
@@ -180,6 +182,7 @@ export const ProdukForm: React.FC<{
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Gagal menyimpan produk");
+      setDiblokir(rincianNonaktifDiblokir(err));
     } finally {
       setSubmitting(false);
     }
@@ -202,6 +205,8 @@ export const ProdukForm: React.FC<{
         </Alert>
       )}
 
+      <NonaktifDiblokirModal productName={form.name} rincian={diblokir} onClose={() => setDiblokir(null)} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {/* Saat edit, kode dipajang — bukan Input yang dinonaktifkan, karena
             isian abu-abu yang tidak bisa diketik selalu terbaca sebagai "rusak"
@@ -209,7 +214,7 @@ export const ProdukForm: React.FC<{
             Saat tambah, kode diketik sendiri: backend Obbel tidak membuatkannya. */}
         <div className="w-full flex flex-col gap-1.5">
           <span className={COMPACT_LABEL}>Kode Barang</span>
-          <div className="h-8.5 min-h-[34px] px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
+          <div className="h-8.5 min-h-8.5 px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
             {mode === "edit" ? (
               <span className="font-mono text-xs font-bold text-slate-700 dark:text-fg-secondary">{form.sku}</span>
             ) : (
@@ -313,7 +318,7 @@ export const ProdukForm: React.FC<{
               type="button"
               onClick={() => simpan(true)}
               disabled={submitting}
-              className="px-3.5 py-1.5 rounded-lg border border-[var(--brand-700)] bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-[var(--brand-700)] dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-lg border border-(--brand-700) bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-(--brand-700) dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Simpan &amp; Tambah Lagi</span>
@@ -325,7 +330,7 @@ export const ProdukForm: React.FC<{
             type="button"
             onClick={() => simpan(false)}
             disabled={submitting}
-            className="px-4 py-1.5 rounded-lg bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{submitting ? "Menyimpan..." : "Simpan"}</span>

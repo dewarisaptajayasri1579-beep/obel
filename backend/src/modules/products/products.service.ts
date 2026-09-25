@@ -205,6 +205,9 @@ export class ProductsService {
     if (!existing) {
       throw new DomainError('NOT_FOUND', 'Produk tidak ditemukan.');
     }
+    if (dto.active === false && existing.active) {
+      await this.pastikanBisaDinonaktifkan(existing.id, existing.name);
+    }
 
     const product = await this.prisma.product.update({
       where: { id },
@@ -255,6 +258,56 @@ export class ProductsService {
       minimumQty: product.minimumQty,
       criticalQty: product.criticalQty,
     };
+  }
+
+  /// Produk hanya boleh dinonaktifkan kalau sudah tidak beredar sama sekali:
+  /// tidak ada stok di Gudang/Booth DAN tidak ada dokumen yang masih akan
+  /// memindahkan stoknya (distribusi belum diterima, return belum di-approve,
+  /// restock belum diproses). Tanpa cek dokumen berjalan, total stok bisa
+  /// terlihat 0 saat barang sedang di jalan, lalu Booth menerima stok produk
+  /// yang sudah nonaktif. Menghabiskan stok = biarkan tetap Aktif tanpa
+  /// menambah pasokan; produk bermasalah = Adjustment (Rusak) ke 0 dulu.
+  private async pastikanBisaDinonaktifkan(productId: string, productName: string) {
+    const [gudang, booths, distribusi, retur, restock] = await Promise.all([
+      this.prisma.warehouseStock.findUnique({ where: { productId } }),
+      this.prisma.boothStock.findMany({
+        where: { productId, qtyOnHand: { gt: 0 } },
+        include: { booth: { select: { name: true } } },
+      }),
+      this.prisma.stockDistribution.findMany({
+        where: { status: { in: ['DRAFT', 'SENT'] }, items: { some: { productId } } },
+        select: { id: true, distributionNo: true },
+      }),
+      this.prisma.stockReturn.findMany({
+        where: { status: 'SUBMITTED', items: { some: { productId } } },
+        select: { id: true, returnNo: true },
+      }),
+      this.prisma.restockRequest.findMany({
+        where: { status: 'REQUESTED', items: { some: { productId } } },
+        select: { id: true, requestNo: true },
+      }),
+    ]);
+
+    const stok = [
+      ...((gudang?.qtyOnHand ?? 0) > 0 ? [{ lokasi: 'Gudang', qty: gudang!.qtyOnHand }] : []),
+      ...booths.map((b) => ({ lokasi: b.booth.name, qty: b.qtyOnHand })),
+    ];
+    const totalStok = stok.reduce((s, x) => s + x.qty, 0);
+    const jumlahDokumen = distribusi.length + retur.length + restock.length;
+    if (totalStok === 0 && jumlahDokumen === 0) return;
+
+    // Pesan sengaja ringkas (dipakai toast) — rincian lengkap di `details`,
+    // ditampilkan halaman Produk sebagai dialog.
+    const alasan = [
+      ...(totalStok > 0 ? [`masih ada stok ${totalStok}`] : []),
+      ...(jumlahDokumen > 0 ? [`${jumlahDokumen} dokumen belum selesai`] : []),
+    ];
+    throw new DomainError('PRODUCT_STILL_IN_USE', `Produk "${productName}" belum bisa dinonaktifkan: ${alasan.join(' dan ')}.`, {
+      stok,
+      serahTerima: distribusi.map((d) => ({ id: d.id, no: d.distributionNo })),
+      restock: restock.map((r) => ({ id: r.id, no: r.requestNo })),
+      pengembalian: retur.map((r) => ({ id: r.id, no: r.returnNo })),
+    });
   }
 
   /// Hapus (soft) — HANYA boleh kalau produk tidak pernah tersentuh transaksi

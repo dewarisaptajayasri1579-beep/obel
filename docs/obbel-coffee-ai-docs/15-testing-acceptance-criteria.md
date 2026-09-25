@@ -83,6 +83,8 @@ Transaksi mendekati tengah malam dikelompokkan ke business date Asia/Jakarta den
 ## AC-25 Master inactive
 Product inactive tidak tampil untuk sale baru, tetapi histori sale lama tetap menampilkan snapshot nama/harga.
 
+Menonaktifkan produk yang masih punya stok (Gudang/Booth) atau masih ada di Serah Terima/Pengembalian Stok/restock yang belum selesai ditolak dengan `PRODUCT_STILL_IN_USE`, dan pesannya menyebut lokasi stok serta nomor dokumennya (BR-016).
+
 ## Test scenarios end-to-end
 
 ### E2E-1 Hari normal

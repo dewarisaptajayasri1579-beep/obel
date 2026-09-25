@@ -416,6 +416,17 @@ export class SalesService {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift untuk draft ini sudah tidak berjalan.');
     }
 
+    // Produk bisa dinonaktifkan (rem darurat) SETELAH draft dibuat — cek ulang
+    // di sini, bukan cuma saat createDraftSale.
+    const nonaktif = await this.prisma.product.findFirst({
+      where: { id: { in: sale.items.map((i) => i.productId) }, active: false },
+    });
+    if (nonaktif) {
+      throw new DomainError('PRODUCT_INACTIVE', `Produk "${nonaktif.name}" sudah dinonaktifkan, hapus dari draft dulu.`, {
+        productId: nonaktif.id,
+      });
+    }
+
     const plan = this.resolvePaymentPlan(dto, sale.total);
     const paidAt = new Date();
     const businessDate = businessDateOf(paidAt);
