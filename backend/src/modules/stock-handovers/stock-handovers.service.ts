@@ -82,6 +82,7 @@ export class StockHandoversService {
     d: Prisma.StockDistributionGetPayload<{ include: ReturnType<StockHandoversService['distributionInclude']> }>,
     activeStaffByBooth: Map<string, string | null>,
     jenis: 'STOK_AWAL' | 'RE_STOK' | null,
+    koreksi: Map<string, number>,
   ) {
     const status =
       d.status === DistributionStatus.CANCELLED
@@ -111,7 +112,9 @@ export class StockHandoversService {
         productId: i.productId,
         productName: i.product.name,
         qty: i.qtySent,
-        qtyReceived: i.qtyReceived,
+        // Angka SETELAH Koreksi Penerimaan; `qtyReceivedAwal` = angka asli saat diterima.
+        qtyReceived: i.qtyReceived === null ? null : i.qtyReceived + (koreksi.get(`${d.id}:${i.productId}`) ?? 0),
+        qtyReceivedAwal: i.qtyReceived,
         sellPrice: Number(i.product.sellPrice),
         discrepancyReasonCode: i.discrepancyReasonCode,
         discrepancyNote: i.discrepancyNote,
@@ -163,9 +166,13 @@ export class StockHandoversService {
     const realId = this.stripPrefix(id, DISTRIBUTION_PREFIX);
     const d = await this.prisma.stockDistribution.findUnique({ where: { id: realId }, include: this.distributionInclude() });
     if (!d) throw new DomainError('NOT_FOUND', 'Serah Terima Stok tidak ditemukan.');
-    const [activeAssignments, jenis] = await Promise.all([this.shifts.findActiveAssignments(), this.computeJenisFor(d)]);
+    const [activeAssignments, jenis, koreksi] = await Promise.all([
+      this.shifts.findActiveAssignments(),
+      this.computeJenisFor(d),
+      this.distributions.deltaKoreksiPenerimaan([d.id]),
+    ]);
     const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
-    return this.mapDistributionRow(d, activeStaffByBooth, jenis);
+    return this.mapDistributionRow(d, activeStaffByBooth, jenis, koreksi);
   }
 
   /// Riwayat aktivitas gabungan — kalau dokumen ini asalnya dari pengajuan
@@ -285,10 +292,13 @@ export class StockHandoversService {
     ]);
 
     const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
-    const jenisById = await this.computeJenisBatch(distributions);
+    const [jenisById, koreksi] = await Promise.all([
+      this.computeJenisBatch(distributions),
+      this.distributions.deltaKoreksiPenerimaan(distributions.map((d) => d.id)),
+    ]);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
-    const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null));
+    const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null, koreksi));
 
     return [...requestRows, ...distributionRows].sort((a, b) => b.date.getTime() - a.date.getTime());
   }
@@ -440,10 +450,13 @@ export class StockHandoversService {
     ]);
 
     const activeStaffByBooth = this.buildActiveStaffByBooth(activeAssignments);
-    const jenisById = await this.computeJenisBatch(distributions);
+    const [jenisById, koreksi] = await Promise.all([
+      this.computeJenisBatch(distributions),
+      this.distributions.deltaKoreksiPenerimaan(distributions.map((d) => d.id)),
+    ]);
 
     const requestRows = requests.map((r) => this.mapRequestRow(r));
-    const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null));
+    const distributionRows = distributions.map((d) => this.mapDistributionRow(d, activeStaffByBooth, jenisById.get(d.id) ?? null, koreksi));
 
     const merged = [...requestRows, ...distributionRows].sort((a, b) => b.date.getTime() - a.date.getTime());
     const start = (page - 1) * limit;

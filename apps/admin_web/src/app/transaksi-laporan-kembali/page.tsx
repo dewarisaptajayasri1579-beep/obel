@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   Banknote,
@@ -219,6 +220,15 @@ function LaporanDetail({
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${RETUR_BADGE[retur.status].kelas}`}>
               {RETUR_BADGE[retur.status].label}
             </span>
+          )}
+          {retur && (retur.status === "RECEIVED" || retur.status === "DISCREPANCY") && (
+            <Link
+              href={`/return?id=${retur.id}&aksi=koreksi`}
+              title="Koreksi angka penerimaan kalau ternyata salah catat"
+              className="inline-flex items-center px-2.5 h-7 rounded-lg border border-slate-200 dark:border-line bg-white dark:bg-surface text-[11px] font-bold text-(--brand-700) hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+            >
+              Koreksi Penerimaan
+            </Link>
           )}
         </div>
 

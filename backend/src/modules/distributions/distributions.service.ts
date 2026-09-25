@@ -549,6 +549,12 @@ export class DistributionsService {
   /// TX-02 — Koreksi penerimaan setelah distribusi RECEIVED/DISCREPANCY.
   /// `qty_received` lama TIDAK diedit (DC-008); correction menerapkan delta
   /// langsung ke booth_stocks (COR-05).
+  /// Delta Koreksi Penerimaan per `${distributionId}:${productId}` — untuk
+  /// menampilkan qty Diterima SETELAH koreksi (lihat stock-handovers).
+  deltaKoreksiPenerimaan(distributionIds: string[]) {
+    return this.corrections.deltaKoreksiPenerimaan('stock_distribution', distributionIds);
+  }
+
   async correctReceipt(user: JwtPayload, id: string, dto: CorrectReceiptDto) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
@@ -569,13 +575,23 @@ export class DistributionsService {
     const correctedQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
     const tindakLanjutByProduct = new Map(dto.items.map((i) => [i.productId, i.tindakLanjut]));
     const tindakLanjutNoteByProduct = new Map(dto.items.map((i) => [i.productId, i.tindakLanjutNote]));
+    const [koreksiSebelumnya, tanggunganSebelumnya] = await Promise.all([
+      this.corrections.deltaKoreksiPenerimaan('stock_distribution', [distribution.id]),
+      this.prisma.staffLiability.groupBy({
+        by: ['productId'],
+        where: { distributionId: distribution.id },
+        _sum: { qty: true },
+      }),
+    ]);
+    const tanggunganByProduct = new Map(tanggunganSebelumnya.map((t) => [t.productId, t._sum.qty ?? 0]));
     const now = new Date();
     const deltas: { productId: string; delta: number }[] = [];
 
     for (const item of distribution.items) {
       const correctedQty = correctedQtyByProduct.get(item.productId);
       if (correctedQty === undefined) continue;
-      const recordedQty = item.qtyReceived ?? item.qtySent;
+      const recordedQty =
+        (item.qtyReceived ?? item.qtySent) + (koreksiSebelumnya.get(`${distribution.id}:${item.productId}`) ?? 0);
       const delta = correctedQty - recordedQty;
       if (delta !== 0) deltas.push({ productId: item.productId, delta });
     }
@@ -655,7 +671,9 @@ export class DistributionsService {
             });
           } else if (tindakLanjut === 'GANTI_RUGI_PETUGAS') {
             const correctedQty = correctedQtyByProduct.get(item.productId) ?? (item.qtyReceived ?? item.qtySent);
-            const qtyRugi = item.qtySent - correctedQty;
+            // Dikurangi tanggungan yang sudah tercatat di koreksi sebelumnya,
+            // supaya koreksi berulang tidak membebankan qty yang sama dua kali.
+            const qtyRugi = item.qtySent - correctedQty - (tanggunganByProduct.get(item.productId) ?? 0);
             if (qtyRugi <= 0) continue;
             const unitPrice = item.product.sellPrice;
             const totalAmount = unitPrice * BigInt(qtyRugi);

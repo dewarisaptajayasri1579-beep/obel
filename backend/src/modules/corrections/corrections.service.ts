@@ -38,6 +38,31 @@ export class CorrectionsService {
   /// Cek idempotency SEBELUM masuk ke $transaction domain — dipanggil oleh
   /// service pemanggil di awal method public-nya (pola sama dengan
   /// distributions.service.ts create()).
+  /// Total delta Koreksi Penerimaan per `${entityId}:${productId}`. `qtyReceived`
+  /// asli tidak pernah diedit (DC-008), jadi angka "setelah koreksi" = asli +
+  /// jumlah delta di sini. Tanpa ini koreksi kedua menghitung selisih dari
+  /// angka asli dan menerapkan ulang delta yang sudah pernah diterapkan.
+  async deltaKoreksiPenerimaan(
+    entityType: 'stock_return' | 'stock_distribution',
+    entityIds: string[],
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<Map<string, number>> {
+    const hasil = new Map<string, number>();
+    if (entityIds.length === 0) return hasil;
+    const rows = await client.transactionCorrection.findMany({
+      where: { entityType, entityId: { in: entityIds }, correctionType: CorrectionType.ADJUSTMENT },
+      select: { entityId: true, impactSnapshot: true },
+    });
+    for (const row of rows) {
+      const deltas = (row.impactSnapshot as { deltas?: { productId: string; delta: number }[] } | null)?.deltas ?? [];
+      for (const d of deltas) {
+        const key = `${row.entityId}:${d.productId}`;
+        hasil.set(key, (hasil.get(key) ?? 0) + d.delta);
+      }
+    }
+    return hasil;
+  }
+
   async findExistingByIdempotencyKey(idempotencyKey: string) {
     return this.prisma.transactionCorrection.findUnique({ where: { idempotencyKey } });
   }

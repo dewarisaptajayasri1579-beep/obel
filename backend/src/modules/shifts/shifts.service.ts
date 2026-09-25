@@ -755,6 +755,10 @@ export class ShiftsService {
       };
     });
 
+    const koreksiRetur = stockReturn
+      ? await this.corrections.deltaKoreksiPenerimaan('stock_return', [stockReturn.id])
+      : new Map<string, number>();
+
     return {
       boothName: booth.name,
       shiftTemplateName: shiftTemplate.name,
@@ -784,7 +788,11 @@ export class ShiftsService {
                   productName: i.product.name,
                   sellPrice: Number(i.product.sellPrice),
                   qtySubmitted: i.qtySubmitted,
-                  qtyReceived: i.qtyReceived,
+                  // Angka SETELAH Koreksi Penerimaan (lihat CorrectionsService.deltaKoreksiPenerimaan).
+                  qtyReceived:
+                    i.qtyReceived === null
+                      ? null
+                      : i.qtyReceived + (koreksiRetur.get(`${stockReturn.id}:${i.productId}`) ?? 0),
                   // Stok Fisik yang dihitung Petugas saat Check-Out — dipakai
                   // FE sebagai saran awal "Stok Dikembalikan" (qtySubmitted
                   // di atas itu qty SISTEM, bukan qty fisik, lihat

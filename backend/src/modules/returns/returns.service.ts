@@ -40,19 +40,21 @@ export class ReturnsService {
     );
   }
 
-  findAll() {
-    return this.prisma.stockReturn.findMany({
+  async findAll() {
+    const returns = await this.prisma.stockReturn.findMany({
       include: { booth: true, items: { include: { product: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    return this.denganQtyAkhir(returns);
   }
 
-  findForBooth(boothId: string) {
-    return this.prisma.stockReturn.findMany({
+  async findForBooth(boothId: string) {
+    const returns = await this.prisma.stockReturn.findMany({
       where: { boothId },
       include: { booth: true, items: { include: { product: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    return this.denganQtyAkhir(returns);
   }
 
   /// Booth Staff mengajukan return. Sesuai BR-013, qty default = seluruh
@@ -143,7 +145,7 @@ export class ReturnsService {
       }
     }
 
-    return this.loadWithRelations(returnId);
+    return this.muatUntukRespon(returnId);
   }
 
   /// Mirrors receive_stock_return (§09): warehouse hanya bertambah sesuai
@@ -267,7 +269,7 @@ export class ReturnsService {
       });
     });
 
-    return this.loadWithRelations(id);
+    return this.muatUntukRespon(id);
   }
 
   /// TX-09 — Cancel return SUBMITTED yang belum diterima Gudang. Kembalikan
@@ -275,7 +277,7 @@ export class ReturnsService {
   async cancelReturn(user: JwtPayload, id: string, dto: CancelReturnDto) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
-      return this.loadWithRelations(existing.entityId);
+      return this.muatUntukRespon(existing.entityId);
     }
 
     const stockReturn = await this.loadWithRelations(id);
@@ -330,7 +332,7 @@ export class ReturnsService {
       });
     });
 
-    return this.loadWithRelations(stockReturn.id);
+    return this.muatUntukRespon(stockReturn.id);
   }
 
   /// TX-09 — Revisi qty/produk return yang masih SUBMITTED (belum diterima
@@ -339,7 +341,7 @@ export class ReturnsService {
   async reviseReturn(user: JwtPayload, id: string, dto: ReviseReturnDto) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
-      return this.loadWithRelations(existing.replacementVersionId ?? existing.entityId);
+      return this.muatUntukRespon(existing.replacementVersionId ?? existing.entityId);
     }
 
     const stockReturn = await this.loadWithRelations(id);
@@ -482,7 +484,7 @@ export class ReturnsService {
       throw err;
     }
 
-    return this.loadWithRelations(newReturnId);
+    return this.muatUntukRespon(newReturnId);
   }
 
   /// TX-10 — Koreksi penerimaan return setelah RECEIVED/DISCREPANCY.
@@ -491,7 +493,7 @@ export class ReturnsService {
   async correctReceipt(user: JwtPayload, id: string, dto: CorrectReturnReceiptDto) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
-      return this.loadWithRelations(existing.entityId);
+      return this.muatUntukRespon(existing.entityId);
     }
 
     const stockReturn = await this.loadWithRelations(id);
@@ -506,13 +508,15 @@ export class ReturnsService {
     this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
 
     const correctedQtyByProduct = new Map(dto.items.map((i) => [i.productId, i.qty]));
+    const koreksiSebelumnya = await this.corrections.deltaKoreksiPenerimaan('stock_return', [stockReturn.id]);
     const now = new Date();
     const deltas: { productId: string; delta: number }[] = [];
 
     for (const item of stockReturn.items) {
       const correctedQty = correctedQtyByProduct.get(item.productId);
       if (correctedQty === undefined) continue;
-      const recordedQty = item.qtyReceived ?? item.qtySubmitted;
+      const recordedQty =
+        (item.qtyReceived ?? item.qtySubmitted) + (koreksiSebelumnya.get(`${stockReturn.id}:${item.productId}`) ?? 0);
       const delta = correctedQty - recordedQty;
       if (delta !== 0) deltas.push({ productId: item.productId, delta });
     }
@@ -590,7 +594,7 @@ export class ReturnsService {
       throw err;
     }
 
-    return this.loadWithRelations(stockReturn.id);
+    return this.muatUntukRespon(stockReturn.id);
   }
 
   private loadWithRelations(id: string) {
@@ -598,5 +602,28 @@ export class ReturnsService {
       where: { id },
       include: { booth: true, items: { include: { product: true } } },
     });
+  }
+
+  private async muatUntukRespon(id: string) {
+    const stockReturn = await this.loadWithRelations(id);
+    return stockReturn ? (await this.denganQtyAkhir([stockReturn]))[0] : stockReturn;
+  }
+
+  /// Untuk respons API saja: `qtyReceived` = angka SETELAH Koreksi Penerimaan
+  /// (yang dilihat & dikoreksi Admin), `qtyReceivedAwal` = angka asli saat
+  /// diterima. Jangan dipakai untuk menghitung delta koreksi (lihat correctReceipt).
+  private async denganQtyAkhir<T extends { id: string; items: { productId: string; qtyReceived: number | null }[] }>(returns: T[]) {
+    const koreksi = await this.corrections.deltaKoreksiPenerimaan(
+      'stock_return',
+      returns.map((r) => r.id),
+    );
+    return returns.map((r) => ({
+      ...r,
+      items: r.items.map((i) => ({
+        ...i,
+        qtyReceivedAwal: i.qtyReceived,
+        qtyReceived: i.qtyReceived === null ? null : i.qtyReceived + (koreksi.get(`${r.id}:${i.productId}`) ?? 0),
+      })),
+    }));
   }
 }

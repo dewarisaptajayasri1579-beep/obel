@@ -43,14 +43,27 @@ function ReturnContent() {
 
   async function load() {
     try {
-      setReturns(await api.getReturns());
+      const data = await api.getReturns();
+      setReturns(data);
+      return data;
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Return.");
+      return null;
     }
   }
 
+  // Deep-link dari Setor & Pengembalian Stok: /return?id=<id>&aksi=koreksi
+  // langsung membuka form Koreksi Penerimaan return itu.
   useEffect(() => {
-    load();
+    load().then((data) => {
+      const params = new URLSearchParams(window.location.search);
+      const target = data?.find((r) => r.id === params.get("id"));
+      if (!target) return;
+      openDetail(target);
+      if (params.get("aksi") === "koreksi" && (target.status === "RECEIVED" || target.status === "DISCREPANCY")) {
+        setMode("correct");
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
