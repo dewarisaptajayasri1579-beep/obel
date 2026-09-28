@@ -1,5 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SaleStatus, UserRole } from '@prisma/client';
+import type { Request } from 'express';
+import { imageFilePipe, imageUploadOptions, publicUploadUrl } from '../../common/image-upload';
+import { PAYMENT_PROOF_SUBDIR } from './dto/create-sale.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -69,6 +73,15 @@ export class SalesController {
       throw new DomainError('NOT_CHECKED_IN', 'Anda belum check-in ke Booth manapun.');
     }
     return this.salesService.listDrafts(user.boothId);
+  }
+
+  /// Foto bukti bayar QRIS — diunggah dulu, URL-nya lalu dikirim sebagai
+  /// `qrisProofPhotoUrl` di POST /sales atau POST /sales/:id/pay.
+  @Post('payment-proof/photo')
+  @Roles(UserRole.BOOTH_STAFF)
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions(PAYMENT_PROOF_SUBDIR, 'Foto bukti bayar')))
+  uploadPaymentProof(@UploadedFile(imageFilePipe()) file: Express.Multer.File, @Req() request: Request) {
+    return { photoUrl: publicUploadUrl(request, PAYMENT_PROOF_SUBDIR, file.filename) };
   }
 
   @Post(':id/pay')

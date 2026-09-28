@@ -65,6 +65,8 @@ Input:
 ```
 Jangan kirim unit_price sebagai authority.
 
+Split memakai `payments` (>=2 baris CASH/QRIS, jumlahnya pas = total) sebagai pengganti `payment_method`. Kalau ada pembayaran QRIS, petugas booth wajib mengirim `qris_proof_photo_url`: URL hasil `POST /sales/payment-proof/photo` (multipart, field `file`, JPG/PNG/WEBP/GIF maks 5MB, return `{ "photoUrl": "..." }`). URL di luar `/uploads/payment-proofs/` ditolak. Aturan yang sama berlaku untuk `POST /sales/:id/pay` (melunasi draft).
+
 Return:
 ```json
 {
@@ -82,6 +84,7 @@ Error codes:
 - `PRODUCT_INACTIVE` — juga saat membayar draft yang produknya sudah dinonaktifkan
 - `INSUFFICIENT_STOCK`
 - `INVALID_QTY`
+- `QRIS_PROOF_REQUIRED` — petugas booth membayar QRIS tanpa foto bukti (BR-038)
 
 ## 4. Create restock request
 ### `create_restock_request`

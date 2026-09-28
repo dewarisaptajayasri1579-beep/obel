@@ -1,26 +1,8 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  FileTypeValidator,
-  Get,
-  MaxFileSizeValidator,
-  Param,
-  ParseFilePipe,
-  Post,
-  Query,
-  Req,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { mkdirSync } from 'fs';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
 import type { Request } from 'express';
+import { imageFilePipe, imageUploadOptions, publicUploadUrl } from '../../common/image-upload';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,9 +14,6 @@ import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 import { ShiftsService } from './shifts.service';
-
-const attendanceUploadDir = join(process.cwd(), 'uploads', 'attendance');
-mkdirSync(attendanceUploadDir, { recursive: true });
 
 @Controller('shifts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -94,41 +73,9 @@ export class ShiftsController {
 
   @Post('attendance/photo')
   @Roles(UserRole.BOOTH_STAFF)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: attendanceUploadDir,
-        filename: (_request, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
-        },
-      }),
-      limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_request, file, callback) => {
-        if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
-          callback(new BadRequestException('Foto selfie harus berupa JPG, PNG, WEBP, atau GIF.'), false);
-          return;
-        }
-        callback(null, true);
-      },
-    }),
-  )
-  uploadAttendancePhoto(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({
-            fileType: /^image\/(jpeg|png|webp|gif)$/,
-            skipMagicNumbersValidation: true,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
-    @Req() request: Request,
-  ) {
-    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
-    return { photoUrl: `${publicBaseUrl}/uploads/attendance/${file.filename}` };
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions('attendance', 'Foto selfie')))
+  uploadAttendancePhoto(@UploadedFile(imageFilePipe()) file: Express.Multer.File, @Req() request: Request) {
+    return { photoUrl: publicUploadUrl(request, 'attendance', file.filename) };
   }
 
   @Post(':id/closing/start')

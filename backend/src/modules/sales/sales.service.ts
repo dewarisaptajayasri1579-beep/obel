@@ -111,6 +111,8 @@ export class SalesService {
       );
     }
 
+    this.pastikanBuktiQris(user, dto);
+
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
     const productById = new Map(products.map((p) => [p.id, p]));
@@ -221,7 +223,7 @@ export class SalesService {
 
       await tx.saleItem.createMany({ data: saleItemsData });
       await tx.payment.createMany({
-        data: plan.rows.map((r) => ({ saleId, method: r.method, amount: r.amount, paidAt })),
+        data: plan.rows.map((r) => ({ saleId, method: r.method, amount: r.amount, paidAt, proofPhotoUrl: this.buktiUntuk(r.method, dto) })),
       });
       await tx.stockMovement.createMany({ data: movementsData });
 
@@ -286,6 +288,27 @@ export class SalesService {
       return { saleMethod: dto.paymentMethod, rows: [{ method: dto.paymentMethod, amount: total }] };
     }
     throw new DomainError('PAYMENT_METHOD_REQUIRED', 'Metode pembayaran (paymentMethod atau payments) wajib diisi.');
+  }
+
+  /// Petugas booth wajib melampirkan foto bukti bayar kalau ada pembayaran
+  /// QRIS (penuh atau porsi QRIS di Split). Dicek dari dto, sebelum stok
+  /// disentuh. Admin (createPaidSale dari Admin Web) tidak diwajibkan.
+  private pastikanBuktiQris(
+    user: JwtPayload,
+    dto: { paymentMethod?: PaymentMethod; payments?: PaymentSplitDto[]; qrisProofPhotoUrl?: string },
+  ) {
+    if (user.role !== UserRole.BOOTH_STAFF || dto.qrisProofPhotoUrl) return;
+    const adaQris = dto.payments?.length
+      ? dto.payments.some((p) => p.method === PaymentMethod.QRIS)
+      : dto.paymentMethod === PaymentMethod.QRIS;
+    if (adaQris) {
+      throw new DomainError('QRIS_PROOF_REQUIRED', 'Foto bukti bayar QRIS wajib dilampirkan.');
+    }
+  }
+
+  /// Foto bukti hanya ditempel di baris Payment QRIS, bukan baris Tunai.
+  private buktiUntuk(method: PaymentMethod, dto: { qrisProofPhotoUrl?: string }): string | null {
+    return method === PaymentMethod.QRIS ? dto.qrisProofPhotoUrl ?? null : null;
   }
 
   /// "Simpan Draft" — Sale PENDING, item & harga di-snapshot, TAPI stok
@@ -427,6 +450,7 @@ export class SalesService {
       });
     }
 
+    this.pastikanBuktiQris(user, dto);
     const plan = this.resolvePaymentPlan(dto, sale.total);
     const paidAt = new Date();
     const businessDate = businessDateOf(paidAt);
@@ -474,7 +498,7 @@ export class SalesService {
         data: { status: SaleStatus.PAID, paidAt, paymentMethod: plan.saleMethod },
       });
       await tx.payment.createMany({
-        data: plan.rows.map((r) => ({ saleId: sale.id, method: r.method, amount: r.amount, paidAt })),
+        data: plan.rows.map((r) => ({ saleId: sale.id, method: r.method, amount: r.amount, paidAt, proofPhotoUrl: this.buktiUntuk(r.method, dto) })),
       });
 
       await this.activityLog.record(tx, {
@@ -751,6 +775,7 @@ export class SalesService {
         amount: Number(p.amount),
         status: p.status,
         paidAt: p.paidAt,
+        proofPhotoUrl: p.proofPhotoUrl,
       })),
       items: sale.items.map((i) => ({
         productId: i.productId,
@@ -975,6 +1000,11 @@ export class SalesService {
           transactionGroupId: activePayment?.transactionGroupId ?? randomUUID(),
           versionNo: (activePayment?.versionNo ?? 0) + 1,
           revisionOfId: activePayment?.id ?? null,
+          // Metode tetap QRIS → foto bukti versi lama tetap berlaku.
+          proofPhotoUrl:
+            paymentMethod === PaymentMethod.QRIS && activePayment?.method === PaymentMethod.QRIS
+              ? activePayment.proofPhotoUrl
+              : null,
         },
       });
 

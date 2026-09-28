@@ -134,6 +134,31 @@ async function request<T>(
   return data as T
 }
 
+/// Unggah satu foto (multipart, field `file`) — endpoint mengembalikan
+/// `{ photoUrl }`. Putus koneksi jadi ApiError berpesan jelas, sama seperti
+/// request() di atas.
+async function uploadPhoto(path: string, file: File): Promise<{ photoUrl: string }> {
+  const token = getToken()
+  const body = new FormData()
+  body.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    })
+  } catch {
+    throw new ApiError("NETWORK_ERROR", "Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.")
+  }
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah foto.")
+    throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
+  }
+  return data as { photoUrl: string }
+}
+
 export interface LoginResponse {
   accessToken: string
   profile: {
@@ -777,6 +802,7 @@ export interface SalePaymentRow {
   amount: number
   status: "POSTED" | "REVERSED" | "SUPERSEDED"
   paidAt: string
+  proofPhotoUrl: string | null
 }
 
 export interface SaleDetail {
@@ -1700,22 +1726,9 @@ export const api = {
   getActiveShift: () => request<ActiveShift>("/shifts/active"),
   checkIn: (input: { boothId?: string; latitude: number; longitude: number; photoUrl: string }) =>
     request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
-  uploadAttendancePhoto: async (file: File) => {
-    const token = getToken()
-    const body = new FormData()
-    body.append("file", file)
-    const res = await fetch(`${BASE_URL}/shifts/attendance/photo`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body,
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      const message = Array.isArray(data?.message) ? data.message.join(", ") : String(data?.message ?? "Gagal mengunggah foto.")
-      throw new ApiError(data?.code ?? "UPLOAD_FAILED", message, data?.details)
-    }
-    return data as { photoUrl: string }
-  },
+  uploadAttendancePhoto: (file: File) => uploadPhoto("/shifts/attendance/photo", file),
+  /// Foto bukti bayar QRIS — URL hasilnya dikirim sebagai `qrisProofPhotoUrl`.
+  uploadPaymentProofPhoto: (file: File) => uploadPhoto("/sales/payment-proof/photo", file),
   startClosing: (shiftSessionId: string) =>
     request<ClosingResponse>(`/shifts/${shiftSessionId}/closing/start`, { method: "POST" }),
   confirmClosing: (
@@ -1754,6 +1767,7 @@ export const api = {
     payments?: PaymentSplitInput[]
     discount?: number
     items: { productId: string; qty: number }[]
+    qrisProofPhotoUrl?: string
   }) => request<SaleResult>("/sales", { method: "POST", body: input }),
 
   /// "Simpan Draft" — stok BELUM dipotong, baru dipotong saat `payDraftSale`.
@@ -1766,7 +1780,7 @@ export const api = {
   getMyDrafts: () => request<DraftSale[]>("/sales/drafts"),
   payDraftSale: (
     saleId: string,
-    input: { paymentMethod?: "CASH" | "QRIS"; payments?: PaymentSplitInput[] },
+    input: { paymentMethod?: "CASH" | "QRIS"; payments?: PaymentSplitInput[]; qrisProofPhotoUrl?: string },
   ) => request<SaleResult>(`/sales/${saleId}/pay`, { method: "POST", body: input }),
   deleteDraftSale: (saleId: string) => request<{ id: string; deleted: boolean }>(`/sales/${saleId}/draft`, { method: "DELETE" }),
 

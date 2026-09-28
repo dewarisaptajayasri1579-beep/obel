@@ -34,6 +34,7 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printReceipt, isNativeBridgeAvailable } from "../_lib/native-bridge";
+import { PhotoCapture } from "../_components/PhotoCapture";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -104,6 +105,10 @@ function KasirContent() {
   const [nominalTunai, setNominalTunai] = useState<number>(0);
   const [splitTunai, setSplitTunai] = useState<number>(0);
   const [splitQris, setSplitQris] = useState<number>(0);
+  // Foto bukti bayar QRIS (wajib untuk QRIS & Split). URL hasil upload
+  // disimpan supaya retry Bayar tidak mengunggah ulang foto yang sama.
+  const [qrisPhoto, setQrisPhoto] = useState<File | null>(null);
+  const [qrisPhotoUrl, setQrisPhotoUrl] = useState<string | null>(null);
 
   const [drafts, setDrafts] = useState<DraftSale[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
@@ -247,6 +252,8 @@ function KasirContent() {
     setCart(new Map());
     setDiscountInput(0);
     setPaymentMethod("CASH");
+    setQrisPhoto(null);
+    setQrisPhotoUrl(null);
     setActiveDraftId(null);
     setSheet(null);
   }
@@ -266,12 +273,14 @@ function KasirContent() {
 
   const kembalianAtauKurang = nominalTunai - total;
   const sisaSplit = total - splitTunai - splitQris;
-  const bisaBayar =
+  const butuhBuktiQris = paymentMethod !== "CASH";
+  const nominalValid =
     paymentMethod === "QRIS"
       ? true
       : paymentMethod === "CASH"
         ? nominalTunai >= total
         : splitTunai > 0 && splitQris > 0 && sisaSplit === 0;
+  const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
     if (!shift || lines.length === 0) return;
@@ -312,10 +321,17 @@ function KasirContent() {
     if (!shift || lines.length === 0 || !bisaBayar) return;
     setSubmitting(true);
     try {
-      const payload =
-        paymentMethod === "SPLIT"
+      let qrisProofPhotoUrl: string | undefined;
+      if (butuhBuktiQris && qrisPhoto) {
+        qrisProofPhotoUrl = qrisPhotoUrl ?? (await api.uploadPaymentProofPhoto(qrisPhoto)).photoUrl;
+        setQrisPhotoUrl(qrisProofPhotoUrl);
+      }
+      const payload = {
+        ...(paymentMethod === "SPLIT"
           ? { payments: [{ method: "CASH" as const, amount: splitTunai }, { method: "QRIS" as const, amount: splitQris }] }
-          : { paymentMethod };
+          : { paymentMethod }),
+        qrisProofPhotoUrl,
+      };
 
       const sale = activeDraftId
         ? await api.payDraftSale(activeDraftId, payload)
@@ -815,6 +831,19 @@ function KasirContent() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {butuhBuktiQris && (
+                <PhotoCapture
+                  variant="dokumen"
+                  title="Foto Bukti Bayar QRIS"
+                  hint="Foto layar pembayaran berhasil di HP pelanggan. Wajib sebelum Bayar."
+                  photoFile={qrisPhoto}
+                  onPhoto={(file) => {
+                    setQrisPhoto(file);
+                    setQrisPhotoUrl(null);
+                  }}
+                />
               )}
 
               {paymentMethod === "CASH" && (

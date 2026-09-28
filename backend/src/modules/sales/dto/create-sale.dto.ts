@@ -6,10 +6,19 @@ import {
   IsInt,
   IsOptional,
   IsUUID,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
+
+export const PAYMENT_PROOF_SUBDIR = 'payment-proofs';
+
+/// URL hasil POST /sales/payment-proof/photo — cuma menerima file yang
+/// memang diunggah ke server ini, bukan URL gambar sembarang.
+export const POLA_URL_BUKTI_QRIS = new RegExp(
+  `/uploads/${PAYMENT_PROOF_SUBDIR}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpe?g|png|webp|gif)$`,
+);
 
 export class SaleItemDto {
   @IsUUID()
@@ -56,6 +65,12 @@ export class CreateSaleDto {
   @IsInt()
   @Min(0)
   discount?: number;
+
+  /// Wajib untuk petugas booth kalau ada pembayaran QRIS (lihat
+  /// SalesService.pastikanBuktiQris).
+  @IsOptional()
+  @Matches(POLA_URL_BUKTI_QRIS, { message: 'Foto bukti bayar QRIS tidak valid.' })
+  qrisProofPhotoUrl?: string;
 
   @IsArray()
   @ArrayMinSize(1)

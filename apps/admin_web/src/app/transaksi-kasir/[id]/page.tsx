@@ -2,11 +2,12 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShoppingCart, MapPin, Printer, Ban, Pencil, Undo2, CreditCard } from "lucide-react";
+import { ArrowLeft, ShoppingCart, MapPin, Printer, Ban, Pencil, Undo2, CreditCard, Image as ImageIcon } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { Textarea } from "@/components/ui/Textarea";
@@ -77,6 +78,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
   const [detail, setDetail] = useState<SaleDetail | null>(null);
   const [tidakAda, setTidakAda] = useState(false);
   const [refunds, setRefunds] = useState<SaleRefund[]>([]);
+  const [buktiDibuka, setBuktiDibuka] = useState<string | null>(null);
   const [mode, setMode] = useState<"void" | "revise" | "refund" | "payment" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "QRIS">("CASH");
   const [reviseQty, setReviseQty] = useState<Record<string, number>>({});
@@ -229,6 +231,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
   }
 
   const status = detail ? STATUS_LABEL[detail.status] : null;
+  const buktiQris = detail?.payments.filter((p) => p.status === "POSTED" && p.proofPhotoUrl) ?? [];
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
@@ -430,6 +433,37 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
                   </div>
                 )}
 
+                {buktiQris.length > 0 && (
+                  <div className="pt-3 mt-2 border-t border-slate-200 dark:border-line space-y-2">
+                    <p className="text-xs font-bold text-slate-700 dark:text-fg-secondary">Bukti Bayar QRIS</p>
+                    {buktiQris.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-line bg-slate-50 dark:bg-surface-hover/60 p-2.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setBuktiDibuka(p.proofPhotoUrl)}
+                          className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-slate-200 dark:border-line hover:opacity-90"
+                          title="Lihat foto bukti"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.proofPhotoUrl!} alt="Bukti bayar QRIS" className="w-full h-full object-cover" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-fg">Foto bukti pembayaran</p>
+                          <p className="text-xs text-slate-500 dark:text-fg-muted">
+                            QRIS {formatRupiah(p.amount)} · {waktuJakarta(p.paidAt)}
+                          </p>
+                        </div>
+                        <Button variant="secondary" size="sm" leftIcon={<ImageIcon className="w-4 h-4" />} onClick={() => setBuktiDibuka(p.proofPhotoUrl)}>
+                          Lihat Foto
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {refunds.length > 0 && (
                   <div className="pt-3 mt-2 border-t border-slate-200 dark:border-line space-y-1.5">
                     <p className="text-xs font-bold text-slate-700 dark:text-fg-secondary">Riwayat Refund</p>
@@ -508,6 +542,28 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
       </Card>
 
       <SaleNotaPreviewModal isOpen={showNota} onClose={() => setShowNota(false)} sale={detail} />
+      <Modal isOpen={!!buktiDibuka} onClose={() => setBuktiDibuka(null)} title="Foto Bukti Bayar QRIS" subtitle={detail?.saleNo} size="md">
+        {buktiDibuka && (
+          <div className="flex flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* Tinggi Modal maks 85vh; 14rem = padding + header + link di bawah,
+                supaya foto utuh terlihat tanpa scroll. */}
+            <img
+              src={buktiDibuka}
+              alt="Bukti bayar QRIS"
+              className="max-h-[calc(85vh-14rem)] max-w-full w-auto rounded-lg object-contain"
+            />
+            <a
+              href={buktiDibuka}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
+            >
+              Buka ukuran asli di tab baru
+            </a>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

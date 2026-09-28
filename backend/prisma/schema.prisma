@@ -643,6 +643,8 @@ model Payment {
   versionNo          Int           @default(1) @map("version_no")
   revisionOfId       String?       @map("revision_of_id")
   reversalOfId       String?       @map("reversal_of_id")
+  // Foto bukti bayar QRIS dari petugas booth; hanya diisi di baris QRIS.
+  proofPhotoUrl      String?       @map("proof_photo_url")
 
   @@index([saleId])
   @@map("payments")

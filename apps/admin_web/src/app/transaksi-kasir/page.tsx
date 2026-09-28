@@ -16,6 +16,7 @@ import {
   ExternalLink,
   FileText,
   FileSpreadsheet,
+  Image as ImageIcon,
   TrendingUp,
   X,
   XCircle,
@@ -607,6 +608,20 @@ function TransaksiKasirContent() {
                                       {detail.payments.map((p) => `${METODE_LABEL[p.method]} ${formatRupiah(p.amount)}`).join(" + ")}
                                     </strong>
                                   </span>
+                                  {detail.payments
+                                    .filter((p) => p.status === "POSTED" && p.proofPhotoUrl)
+                                    .map((p) => (
+                                      <a
+                                        key={p.id}
+                                        href={p.proofPhotoUrl!}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
+                                      >
+                                        <ImageIcon className="w-3.5 h-3.5" />
+                                        Lihat bukti bayar QRIS
+                                      </a>
+                                    ))}
                                   {detail.status === "VOIDED" && detail.voidReason && (
                                     <span className="text-rose-600 dark:text-rose-400">Dibatalkan: {detail.voidReason}</span>
                                   )}

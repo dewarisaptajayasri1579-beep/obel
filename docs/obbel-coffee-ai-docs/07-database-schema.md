@@ -219,6 +219,7 @@ V1 satu payment per sale, tetapi tabel terpisah membuat future-proof.
 - amount bigint >= 0
 - reference_no text nullable
 - paid_at timestamptz
+- proof_photo_url text nullable — foto bukti bayar QRIS dari petugas booth; hanya di baris QRIS
 
 Constraint V1: total payment = sale.total.
 

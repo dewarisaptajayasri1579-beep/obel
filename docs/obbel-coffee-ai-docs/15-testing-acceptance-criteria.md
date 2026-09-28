@@ -157,3 +157,6 @@ Owner/Admin melihat KPI terbaru segera setelah correction/reconciliation selesai
 
 ### AC-40 Stock opname revision
 Confirmed opname tidak bisa update langsung; recount version menghasilkan audit lineage dan delta yang benar.
+
+### AC-41 Bukti bayar QRIS
+Petugas booth bayar QRIS (atau Split) tanpa foto bukti → ditolak `QRIS_PROOF_REQUIRED`, stok Booth tidak berubah. Dengan foto → sale PAID, `proof_photo_url` hanya terisi di baris payment QRIS dan tampil di detail transaksi Admin. Tunai tetap tanpa foto. Retry dengan `idempotency_key` sama mengembalikan sale yang sama, stok terpotong sekali (BR-038, BR-017).
