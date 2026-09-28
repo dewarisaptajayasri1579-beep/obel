@@ -119,7 +119,11 @@ function KasirContent() {
   const [draftKey, setDraftKey] = useState(() => randomUUID());
 
   const [drafts, setDrafts] = useState<DraftSale[]>([]);
-  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  // Draft yang sedang dibuka. Isinya DIKUNCI (qty/diskon tidak bisa diubah):
+  // POST /sales/:id/pay membayar item & harga yang tersimpan di draft, jadi
+  // perubahan di layar tidak akan ikut tercatat. Untuk mengubah isi, hapus
+  // draft lalu buat transaksi baru.
+  const [draftAktif, setDraftAktif] = useState<DraftSale | null>(null);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -181,9 +185,11 @@ function KasirContent() {
     setSaleKey(randomUUID());
     setDraftKey(randomUUID());
   }, [cart, discountInput]);
-  const subtotal = lines.reduce((sum, l) => sum + l.product.sellPrice * l.qty, 0);
-  const totalItems = lines.reduce((sum, l) => sum + l.qty, 0);
-  const discount = Math.max(0, Math.min(subtotal, discountInput));
+  // Draft: angka dari snapshot server (harga saat draft dibuat), bukan
+  // dihitung ulang dari harga katalog sekarang.
+  const subtotal = draftAktif ? draftAktif.subtotal : lines.reduce((sum, l) => sum + l.product.sellPrice * l.qty, 0);
+  const totalItems = (draftAktif ? draftAktif.items : lines).reduce((sum, l) => sum + l.qty, 0);
+  const discount = draftAktif ? draftAktif.discount : Math.max(0, Math.min(subtotal, discountInput));
   const total = subtotal - discount;
 
   const categories = useMemo(() => {
@@ -228,6 +234,7 @@ function KasirContent() {
   }, [sheet]);
 
   function addToCart(product: Product) {
+    if (draftAktif) return;
     setCart((prev) => {
       const next = new Map(prev);
       const existing = next.get(product.id);
@@ -243,6 +250,7 @@ function KasirContent() {
   }
 
   function changeQty(productId: string, delta: number) {
+    if (draftAktif) return;
     setCart((prev) => {
       const next = new Map(prev);
       const line = next.get(productId);
@@ -267,22 +275,17 @@ function KasirContent() {
     setPaymentMethod("CASH");
     setQrisPhoto(null);
     setQrisPhotoUrl(null);
-    setActiveDraftId(null);
+    setDraftAktif(null);
     setSheet(null);
   }
 
   function openDraft(draft: DraftSale) {
-    const nextCart = new Map<string, CartLine>();
-    for (const item of draft.items) {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) continue;
-      nextCart.set(item.productId, { product, qty: item.qty });
-    }
-    setCart(nextCart);
-    setDiscountInput(draft.discount);
-    setActiveDraftId(draft.id);
+    setCart(new Map());
+    setDiscountInput(0);
+    setDraftAktif(draft);
     setSheet("cart");
   }
+
 
   const kembalianAtauKurang = nominalTunai - total;
   const sisaSplit = total - splitTunai - splitQris;
@@ -296,7 +299,7 @@ function KasirContent() {
   const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
-    if (!shift || lines.length === 0) return;
+    if (!shift || lines.length === 0 || draftAktif) return;
     setSubmitting(true);
     try {
       await api.createDraftSale({
@@ -323,6 +326,7 @@ function KasirContent() {
   async function handleHapusDraft(id: string) {
     try {
       await api.deleteDraftSale(id);
+      if (draftAktif?.id === id) resetTransaksi();
       toast.success("Draft dihapus.");
       loadDrafts();
     } catch (err) {
@@ -331,7 +335,7 @@ function KasirContent() {
   }
 
   async function handleBayar() {
-    if (!shift || lines.length === 0 || !bisaBayar) return;
+    if (!shift || totalItems === 0 || !bisaBayar) return;
     setSubmitting(true);
     try {
       let qrisProofPhotoUrl: string | undefined;
@@ -346,8 +350,8 @@ function KasirContent() {
         qrisProofPhotoUrl,
       };
 
-      const sale = activeDraftId
-        ? await api.payDraftSale(activeDraftId, payload)
+      const sale = draftAktif
+        ? await api.payDraftSale(draftAktif.id, payload)
         : await api.createSale({
             idempotencyKey: saleKey,
             shiftSessionId: shift.shiftSessionId,
@@ -357,7 +361,11 @@ function KasirContent() {
           });
 
       setResult(sale);
-      setResultItems(lines.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.sellPrice })));
+      setResultItems(
+        draftAktif
+          ? draftAktif.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice }))
+          : lines.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.sellPrice })),
+      );
       resetTransaksi();
       loadDrafts();
     } catch (err) {
@@ -625,7 +633,7 @@ function KasirContent() {
                   </p>
                   <button
                     type="button"
-                    disabled={!bisaDitambah}
+                    disabled={!bisaDitambah || !!draftAktif}
                     onClick={() => addToCart(p)}
                     className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-30 shrink-0"
                     style={{ backgroundColor: GREEN }}
@@ -647,7 +655,7 @@ function KasirContent() {
           <div className="max-w-md mx-auto flex items-center justify-between bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm text-slate-500 font-semibold flex items-center gap-1.5">
-                <ShoppingCart size={14} /> {totalItems} pack{activeDraftId ? " · Draft" : ""}
+                <ShoppingCart size={14} /> {totalItems} pack{draftAktif ? " · Draft" : ""}
               </p>
               <p className="font-extrabold text-base text-slate-900">{formatRupiah(total)}</p>
             </div>
@@ -709,12 +717,26 @@ function KasirContent() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="font-extrabold text-slate-900">Keranjang Transaksi{activeDraftId ? " (Draft)" : ""}</p>
+              <p className="font-extrabold text-slate-900">Keranjang Transaksi{draftAktif ? ` (${draftAktif.saleNo})` : ""}</p>
               <button type="button" onClick={() => setSheet(null)} className="text-slate-400 text-base">
                 Tutup
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              {draftAktif && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
+                  Isi draft tidak bisa diubah. Kalau ada yang salah, hapus draft ini lalu buat transaksi baru.
+                </div>
+              )}
+              {draftAktif?.items.map((i) => (
+                <div key={i.productId} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-base text-slate-900 truncate">{i.productName}</p>
+                    <p className="text-sm text-slate-500">{formatRupiah(i.unitPrice)}</p>
+                  </div>
+                  <span className="shrink-0 text-base font-semibold text-slate-700">x{i.qty}</span>
+                </div>
+              ))}
               {lines.map((l) => (
                 <div key={l.product.id} className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
@@ -751,26 +773,42 @@ function KasirContent() {
               </div>
               <div className="flex items-center justify-between mb-3 gap-3">
                 <span className="text-base text-slate-500 shrink-0">Diskon (Rp)</span>
-                <RibuanInput
-                  value={discountInput}
-                  onChange={setDiscountInput}
-                  className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-base text-right"
-                />
+                {draftAktif ? (
+                  <span className="text-base font-semibold">{formatRupiah(discount)}</span>
+                ) : (
+                  <RibuanInput
+                    value={discountInput}
+                    onChange={setDiscountInput}
+                    className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-base text-right"
+                  />
+                )}
               </div>
               <div className="flex justify-between mb-3 pt-2 border-t border-slate-100">
                 <span className="font-bold text-slate-700">Total</span>
                 <span className="font-extrabold text-lg">{formatRupiah(total)}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleSimpanDraft}
-                  disabled={submitting}
-                  className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3.5 font-bold disabled:opacity-50"
-                  style={{ borderColor: GREEN, color: GREEN }}
-                >
-                  {submitting ? <Spinner size="sm" /> : "Simpan Draft"}
-                </button>
+                {draftAktif ? (
+                  // Keluar tanpa membayar — draft tetap tersimpan di daftar.
+                  <button
+                    type="button"
+                    onClick={resetTransaksi}
+                    className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3.5 font-bold"
+                    style={{ borderColor: GREEN, color: GREEN }}
+                  >
+                    Tutup Draft
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSimpanDraft}
+                    disabled={submitting}
+                    className="flex items-center justify-center gap-2 rounded-2xl border-2 py-3.5 font-bold disabled:opacity-50"
+                    style={{ borderColor: GREEN, color: GREEN }}
+                  >
+                    {submitting ? <Spinner size="sm" /> : "Simpan Draft"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSheet("payment")}
