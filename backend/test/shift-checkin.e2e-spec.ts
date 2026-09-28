@@ -86,7 +86,10 @@ describe('Shift check-in (e2e)', () => {
     await request(app.getHttpServer())
       .put('/booth-shift-assignments')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ boothId: boothIdToAssign, shiftTemplateId, staffId: staffIdFromToken(token) })
+      // force: slot yang sama dipakai ulang tiap run, dan petugas test run
+      // sebelumnya masih OPEN (tidak pernah check-out) → tanpa konfirmasi
+      // upsert ditolak STAFF_SHIFT_ACTIVE.
+      .send({ boothId: boothIdToAssign, shiftTemplateId, staffId: staffIdFromToken(token), force: true })
       .expect(200);
   }
 

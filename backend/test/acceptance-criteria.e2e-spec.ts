@@ -408,7 +408,8 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
     const received2 = await request(app.getHttpServer())
       .post(`/returns/${ret2.body.id}/receive`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ items: [{ productId, qtyReceived: 9 }] })
+      // Selisih wajib disertai Tindak Lanjut (DISCREPANCY_REASON_REQUIRED).
+      .send({ items: [{ productId, qtyReceived: 9, tindakLanjut: 'RUSAK' }] })
       .expect(201);
     expect(received2.body.status).toBe('DISCREPANCY');
     expect(await warehouseQty(productId)).toBe(warehouseBefore2 + 9);
@@ -453,54 +454,68 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
     expect(await todayOmzet()).toBe(omzetBefore);
   });
 
-  it('AC-25: deactivating a product removes it from catalog, but past sales keep their name/price snapshot', async () => {
-    // This suite shares one real (non-ephemeral) database with every other
-    // spec file and with the seed data itself — there's no DELETE endpoint
-    // for products (by design, per the no-hard-delete audit philosophy), so
-    // creating a throwaway product here would permanently pollute the master
-    // catalog on every run. Instead, reuse an existing seeded product and
-    // always flip it back to active before this test ends.
-    const productBefore = await request(app.getHttpServer())
-      .get('/products')
+  it('AC-25 (BR-016): a product still in circulation cannot be deactivated', async () => {
+    // `productId` has Booth stock (the earlier ACs distribute it to booth01).
+    const res = await request(app.getHttpServer())
+      .patch(`/products/${productId}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
-    const target = productBefore.body.find((p: { id: string; active: boolean }) => p.id === productId);
-    const targetName = target.name as string;
+      .send({ active: false })
+      .expect(400);
+    expect(res.body.code).toBe('PRODUCT_STILL_IN_USE');
+    expect(res.body.details.stok.length).toBeGreaterThan(0);
 
-    const sale = await request(app.getHttpServer())
+    const products = await request(app.getHttpServer()).get('/products').set('Authorization', `Bearer ${adminToken}`).expect(200);
+    expect(products.body.find((p: { id: string }) => p.id === productId).active).toBe(true);
+  });
+
+  it('AC-25: deactivating a sold-out product removes it from catalog, but past sales keep their name/price snapshot', async () => {
+    // Needs a product with no stock and no open documents left (BR-016), so a
+    // dedicated product is used instead of a seeded one. It is found by a
+    // fixed SKU and reused on every run — there is no DELETE for products
+    // (no-hard-delete policy), and a new product per run would pile up.
+    const server = app.getHttpServer();
+    const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+    const SKU = 'E2E-AC25';
+    const all = await request(server).get('/products').set(auth(adminToken)).expect(200);
+    let dedicated = all.body.find((p: { sku: string | null }) => p.sku === SKU);
+    if (!dedicated) {
+      dedicated = (
+        await request(server).post('/products').set(auth(adminToken)).send({ sku: SKU, name: 'E2E AC-25 Product', sellPrice: 12000 }).expect(201)
+      ).body;
+    } else if (!dedicated.active) {
+      await request(server).patch(`/products/${dedicated.id}`).set(auth(adminToken)).send({ active: true }).expect(200);
+    }
+    const id: string = dedicated.id;
+
+    // Gudang +1 → kirim ke booth01 → diterima → terjual habis.
+    await request(server)
+      .post('/stock-receipts')
+      .set(auth(adminToken))
+      .send({ idempotencyKey: randomUUID(), receiptDate: new Date().toISOString(), status: 'POSTED', items: [{ productId: id, qtyReceived: 1 }] })
+      .expect(201);
+    const dist = await request(server)
+      .post('/distributions')
+      .set(auth(adminToken))
+      .send({ idempotencyKey: randomUUID(), boothId, items: [{ productId: id, qty: 1 }] })
+      .expect(201);
+    await request(server)
+      .post(`/distributions/${dist.body.id}/receive`)
+      .set(auth(boothToken))
+      .send({ items: [{ productId: id, actualQty: 1 }] })
+      .expect(201);
+    const sale = await request(server)
       .post('/sales')
-      .set('Authorization', `Bearer ${boothToken}`)
-      .send({ idempotencyKey: randomUUID(), shiftSessionId, paymentMethod: 'CASH', items: [{ productId, qty: 1 }] })
+      .set(auth(boothToken))
+      .send({ idempotencyKey: randomUUID(), shiftSessionId, paymentMethod: 'CASH', items: [{ productId: id, qty: 1 }] })
       .expect(201);
 
-    try {
-      await request(app.getHttpServer())
-        .patch(`/products/${productId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ active: false })
-        .expect(200);
+    await request(server).patch(`/products/${id}`).set(auth(adminToken)).send({ active: false }).expect(200);
 
-      const catalogAfter = await request(app.getHttpServer())
-        .get('/catalog')
-        .set('Authorization', `Bearer ${boothToken}`)
-        .expect(200);
-      expect(catalogAfter.body.some((p: { id: string }) => p.id === productId)).toBe(false);
+    const catalogAfter = await request(server).get('/catalog').set(auth(boothToken)).expect(200);
+    expect(catalogAfter.body.some((p: { id: string }) => p.id === id)).toBe(false);
 
-      const saleDetail = await request(app.getHttpServer())
-        .get(`/sales/${sale.body.saleId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-      const line = saleDetail.body.items.find((i: { productId: string }) => i.productId === productId);
-      expect(line).toBeDefined();
-      expect(line.productName).toBe(targetName);
-    } finally {
-      // Always reactivate — every other test/spec-file in this suite
-      // assumes `productId` is sellable.
-      await request(app.getHttpServer())
-        .patch(`/products/${productId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ active: true })
-        .expect(200);
-    }
+    const saleDetail = await request(server).get(`/sales/${sale.body.saleId}`).set(auth(adminToken)).expect(200);
+    const line = saleDetail.body.items.find((i: { productId: string }) => i.productId === id);
+    expect(line).toMatchObject({ productName: dedicated.name, unitPrice: dedicated.sellPrice });
   });
 });
