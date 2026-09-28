@@ -458,6 +458,19 @@ export class SalesService {
     for (let percobaan = 0; percobaan < MAKS_PERCOBAAN_NOMOR; percobaan++) {
       try {
         await this.prisma.$transaction(async (tx) => {
+      // Klaim draft dulu, SEBELUM stok disentuh: cek status di luar transaksi
+      // (di atas) tidak cukup — dua request bersamaan (double-tap, retry)
+      // sama-sama lolos cek itu lalu memotong stok dua kali. UPDATE bersyarat
+      // ini mengunci baris sale; request kedua menunggu, lalu mendapati
+      // status sudah bukan PENDING (count 0) dan tidak memotong apa pun.
+      const klaim = await tx.sale.updateMany({
+        where: { id: sale.id, status: SaleStatus.PENDING },
+        data: { status: SaleStatus.PAID, paidAt, paymentMethod: plan.saleMethod },
+      });
+      if (klaim.count !== 1) {
+        throw new DomainError('DRAFT_ALREADY_PAID', 'Draft ini sudah dibayar.');
+      }
+
       const movementNos = await nomorMovementBerikutnyaBanyak(tx, 'MOV', sale.items.length);
       const movementsData: Prisma.StockMovementCreateManyInput[] = [];
       for (const [index, item] of sale.items.entries()) {
@@ -493,10 +506,6 @@ export class SalesService {
       }
 
       await tx.stockMovement.createMany({ data: movementsData });
-      await tx.sale.update({
-        where: { id: sale.id },
-        data: { status: SaleStatus.PAID, paidAt, paymentMethod: plan.saleMethod },
-      });
       await tx.payment.createMany({
         data: plan.rows.map((r) => ({ saleId: sale.id, method: r.method, amount: r.amount, paidAt, proofPhotoUrl: this.buktiUntuk(r.method, dto) })),
       });
@@ -512,6 +521,11 @@ export class SalesService {
         });
         break;
       } catch (err) {
+        // Kalah balapan dengan request bayar lain untuk draft yang sama —
+        // idempotent, sama seperti cek status PAID di atas.
+        if (err instanceof DomainError && err.code === 'DRAFT_ALREADY_PAID') {
+          return this.toSaleResponse(sale.id);
+        }
         const bentrokNomor = err instanceof Prisma.PrismaClientKnownRequestError && err.code === KODE_UNIQUE_VIOLATION;
         if (!bentrokNomor || percobaan === MAKS_PERCOBAAN_NOMOR - 1) throw err;
       }
