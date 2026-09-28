@@ -35,6 +35,8 @@ import { DomainExceptionFilter } from '../src/common/filters/http-exception.filt
 /// - AC-24 (timezone bucketing) — dicover lewat unit test murni di
 ///   src/common/jakarta-date.spec.ts karena server selalu memakai waktu
 ///   asli (`new Date()`), jadi e2e tidak bisa mengontrol titik waktunya.
+const STOK_GUDANG_MINIMUM = 100;
+
 describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
   let app: INestApplication;
   let adminToken: string;
@@ -98,6 +100,20 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
     // together in one `npm run test:e2e` invocation.
     productId = catalog.body[2].id;
     secondProductId = catalog.body[3].id;
+
+    // Tiap run menguras stok Gudang (distribusi, restock) tanpa mengisinya
+    // lagi — lama-lama test gagal INSUFFICIENT_STOCK / RESTOCK_EXCEEDS_WAREHOUSE
+    // padahal kodenya benar. Isi ulang lewat Tambah Stok Gudang (tercatat di
+    // ledger) sampai minimal STOK_GUDANG_MINIMUM.
+    for (const pid of [productId, secondProductId]) {
+      const kurang = STOK_GUDANG_MINIMUM - (await warehouseQty(pid));
+      if (kurang <= 0) continue;
+      await request(app.getHttpServer())
+        .post('/stock-receipts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ idempotencyKey: randomUUID(), receiptDate: new Date().toISOString(), status: 'POSTED', items: [{ productId: pid, qtyReceived: kurang }] })
+        .expect(201);
+    }
   });
 
   afterAll(async () => {
