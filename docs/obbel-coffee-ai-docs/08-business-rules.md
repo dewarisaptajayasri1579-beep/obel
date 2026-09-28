@@ -202,3 +202,6 @@ Dilarang memakai skema timestamp+random (mis. `DIST-LX2K3A-1F2B3C`) atau skema l
 
 ## BR-038 — Bukti bayar QRIS
 Petugas booth WAJIB melampirkan foto bukti bayar (layar pembayaran berhasil di HP pelanggan) untuk setiap pembayaran QRIS, termasuk porsi QRIS di Split, baik saat bayar langsung maupun saat melunasi draft. Tanpa foto, backend menolak dengan `QRIS_PROOF_REQUIRED` sebelum stok disentuh. Foto disimpan di baris `payments` QRIS (`proof_photo_url`), bukan di baris Tunai. Admin (sale dari Admin Web dan revisi metode bayar) tidak diwajibkan; revisi sale yang metodenya tetap QRIS membawa foto versi lama.
+
+## BR-039 — Restock tidak melebihi stok Gudang
+Qty per produk di permintaan restock (saat diajukan maupun direvisi) tidak boleh melebihi stok Gudang saat itu; backend menolak dengan `RESTOCK_EXCEEDS_WAREHOUSE` (pesan menyebut stok Gudang yang tersedia). Tab Restock petugas menampilkan stok Gudang per produk, membatasi stepper dan saran restock ke angka itu, dan menandai produk yang Gudangnya kosong. Cek ini per permintaan, tidak memesan stok: dua Booth tetap bisa meminta sisa stok yang sama, jadi saat Setujui Admin melihat kolom Stok Gudang dan qty awalnya diisi `min(qty diminta, stok Gudang)` (BR-009).

@@ -348,6 +348,44 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
     expect(await boothStockOf(boothId, productId)).toBe(boothBefore + 5);
   });
 
+  it('AC-10 (BR-039): a restock request (and its revision) cannot exceed warehouse stock', async () => {
+    const server = app.getHttpServer();
+    // Petugas boleh membaca stok Gudang (dipakai tab Restock).
+    const gudang = await request(server).get('/warehouse-stock').set('Authorization', `Bearer ${boothToken}`).expect(200);
+    const available = gudang.body.find((r: { productId: string }) => r.productId === productId).qtyOnHand as number;
+    expect(available).toBe(await warehouseQty(productId));
+    expect(available).toBeGreaterThan(0);
+
+    const over = await request(server)
+      .post('/restock-requests')
+      .set('Authorization', `Bearer ${boothToken}`)
+      .send({ items: [{ productId, qty: available + 1 }] })
+      .expect(400);
+    expect(over.body.code).toBe('RESTOCK_EXCEEDS_WAREHOUSE');
+    expect(over.body.details).toMatchObject({ productId, requested: available + 1, available });
+
+    const ok = await request(server)
+      .post('/restock-requests')
+      .set('Authorization', `Bearer ${boothToken}`)
+      .send({ items: [{ productId, qty: available }] })
+      .expect(201);
+    try {
+      const revisiLebih = await request(server)
+        .post(`/restock-requests/${ok.body.id}/revise`)
+        .set('Authorization', `Bearer ${boothToken}`)
+        .send({ items: [{ productId, qty: available + 1 }] })
+        .expect(400);
+      expect(revisiLebih.body.code).toBe('RESTOCK_EXCEEDS_WAREHOUSE');
+    } finally {
+      // Jangan tinggalkan permintaan REQUESTED (menghalangi nonaktif produk, BR-016).
+      await request(server)
+        .post(`/restock-requests/${ok.body.id}/reject`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ reason: 'e2e cleanup' })
+        .expect(201);
+    }
+  });
+
   // AC-13/AC-14 (closing discrepancy requires a reason) are NOT live-tested
   // here for the same reason as AC-15: `POST /shifts/:id/closing/start`
   // itself moves the one shared seeded active shift from OPEN to CLOSING

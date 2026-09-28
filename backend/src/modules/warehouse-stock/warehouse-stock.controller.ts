@@ -13,8 +13,10 @@ import { WarehouseStockService } from './warehouse-stock.service';
 export class WarehouseStockController {
   constructor(private readonly warehouseStockService: WarehouseStockService) {}
 
+  /// Petugas ikut membaca (tab Restock) supaya tidak meminta melebihi stok
+  /// Gudang — isinya cuma produk & qty, tanpa data sensitif.
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll() {
     return this.warehouseStockService.findAll();
   }

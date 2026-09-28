@@ -34,6 +34,7 @@ import {
   type Product,
   type RestockRequest,
   type StockLedgerResponse,
+  type WarehouseStockItem,
 } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -123,6 +124,8 @@ function rentangPeriode(preset: Periode): { from: string; to: string } {
 }
 
 type Tab = "STOK" | "RESTOCK" | "RIWAYAT";
+
+const petaStokGudang = (rows: WarehouseStockItem[]) => new Map(rows.map((r) => [r.productId, r.qtyOnHand]));
 type FilterStatus = "SEMUA" | BoothStockRow["status"];
 
 const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
@@ -161,16 +164,22 @@ function StokContent() {
   const [loadingLedger, setLoadingLedger] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [riwayatRestock, setRiwayatRestock] = useState<RestockRequest[]>([]);
+  // Stok Gudang per produk — permintaan restock dibatasi ke angka ini (backend
+  // juga menolak yang melebihi, RESTOCK_EXCEEDS_WAREHOUSE). null = gagal dimuat,
+  // tampilan tanpa batas dan backend tetap menjaga.
+  const [stokGudang, setStokGudang] = useState<Map<string, number> | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [stockRows, productList, terlaris, restockRequests] = await Promise.all([
+        const [stockRows, productList, terlaris, restockRequests, gudang] = await Promise.all([
           api.getMyBoothStock(),
           api.getProducts(),
           api.getTerlarisMine().catch(() => []),
           api.getMyRestockRequests().catch(() => []),
+          api.getWarehouseStock().catch(() => null),
         ]);
+        if (gudang) setStokGudang(petaStokGudang(gudang));
         setStock(stockRows);
         setProducts(productList.filter((p) => p.active));
         setQtyTerjual7Hari(new Map(terlaris.map((t) => [t.productId, t.qty])));
@@ -184,6 +193,24 @@ function StokContent() {
     })();
   }, []);
 
+  const batasGudang = (productId: string) => stokGudang?.get(productId) ?? Infinity;
+
+  /// Saran restock satu produk, tidak lebih dari stok Gudang.
+  function saranUntuk(p: Product): number {
+    const saran = hitungSaranRestock({
+      qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
+      minimumQty: p.minimumQty,
+      stokSaatIni: stock.find((s) => s.productId === p.id)?.qtyOnHand ?? 0,
+      sisaJamShift,
+      jamPerShift,
+    });
+    return Math.min(saran, batasGudang(p.id));
+  }
+
+  function saranSemua(): Record<string, number> {
+    return Object.fromEntries(products.map((p) => [p.id, saranUntuk(p)]));
+  }
+
   /// Nilai awal stepper = saran restock (lihat hitungSaranRestock), TAPI
   /// hanya sekali begitu semua datanya siap — supaya perubahan manual
   /// Petugas di stepper tidak ketiban ulang tiap re-render. Draft
@@ -193,7 +220,9 @@ function StokContent() {
     const draftRaw = typeof window !== "undefined" ? localStorage.getItem(draftKey) : null;
     if (draftRaw) {
       try {
-        setRequestQty(JSON.parse(draftRaw));
+        // Draft lama bisa melebihi stok Gudang sekarang — dipangkas.
+        const draft: Record<string, number> = JSON.parse(draftRaw);
+        setRequestQty(Object.fromEntries(Object.entries(draft).map(([id, q]) => [id, Math.min(q, batasGudang(id))])));
         setSaranDihitung(true);
         return;
       } catch {
@@ -201,20 +230,10 @@ function StokContent() {
       }
     }
 
-    const saran: Record<string, number> = {};
-    for (const p of products) {
-      const stockRow = stock.find((s) => s.productId === p.id);
-      saran[p.id] = hitungSaranRestock({
-        qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
-        minimumQty: p.minimumQty,
-        stokSaatIni: stockRow?.qtyOnHand ?? 0,
-        sisaJamShift,
-        jamPerShift,
-      });
-    }
-    setRequestQty(saran);
+    setRequestQty(saranSemua());
     setSaranDihitung(true);
-  }, [saranDihitung, draftKey, jamPerShift, sisaJamShift, products, stock, qtyTerjual7Hari]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saranDihitung, products]);
 
   // Produk default utk dropdown "Pilih Stok" — begitu daftar produk siap,
   // sekali saja (bukan tiap re-render, biar pilihan manual Petugas tidak
@@ -257,8 +276,14 @@ function StokContent() {
     }
   }
 
-  function changeRequestQty(productId: string, delta: number) {
-    setRequestQty((prev) => ({ ...prev, [productId]: Math.max(0, (prev[productId] ?? 0) + delta) }));
+  function changeRequestQty(p: Product, delta: number) {
+    const sekarang = requestQty[p.id] ?? 0;
+    const batas = batasGudang(p.id);
+    if (delta > 0 && sekarang + delta > batas) {
+      toast.warning(batas === 0 ? `Stok Gudang ${p.name} sedang kosong.` : `Stok Gudang ${p.name} tinggal ${batas} cup.`);
+      return;
+    }
+    setRequestQty((prev) => ({ ...prev, [p.id]: Math.max(0, sekarang + delta) }));
   }
 
   function handlePilihSemua(checked: boolean) {
@@ -266,18 +291,7 @@ function StokContent() {
       setRequestQty({});
       return;
     }
-    const saran: Record<string, number> = {};
-    for (const p of products) {
-      const stockRow = stock.find((s) => s.productId === p.id);
-      saran[p.id] = hitungSaranRestock({
-        qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
-        minimumQty: p.minimumQty,
-        stokSaatIni: stockRow?.qtyOnHand ?? 0,
-        sisaJamShift,
-        jamPerShift,
-      });
-    }
-    setRequestQty(saran);
+    setRequestQty(saranSemua());
   }
 
   function handleSimpanDraft() {
@@ -301,6 +315,10 @@ function StokContent() {
       localStorage.removeItem(draftKey);
       api.getMyRestockRequests().then(setRiwayatRestock).catch(() => {});
     } catch (err) {
+      // Stok Gudang berubah sejak halaman dibuka — muat ulang supaya batasnya benar.
+      if (err instanceof ApiError && err.code === "RESTOCK_EXCEEDS_WAREHOUSE") {
+        api.getWarehouseStock().then((g) => setStokGudang(petaStokGudang(g))).catch(() => {});
+      }
       toast.error(err instanceof ApiError ? err.message : "Gagal mengirim permintaan restock.");
     } finally {
       setSubmitting(false);
@@ -313,7 +331,8 @@ function StokContent() {
     const s = stock.find((row) => row.productId === p.id)?.status;
     return s === "Kritis" || s === "Habis";
   }).length;
-  const semuaTerpilih = products.length > 0 && products.every((p) => (requestQty[p.id] ?? 0) > 0);
+  const semuaTerpilih =
+    products.length > 0 && products.every((p) => (requestQty[p.id] ?? 0) > 0 || batasGudang(p.id) === 0);
 
   useHidePetugasNav(tab === "RESTOCK");
 
@@ -590,6 +609,8 @@ function StokContent() {
               const style = STATUS_STYLE[status];
               const Icon = style.icon;
               const qty = requestQty[p.id] ?? 0;
+              const gudang = stokGudang?.get(p.id);
+              const gudangKosong = gudang === 0;
               return (
                 <div key={p.id} className="rounded-2xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
@@ -603,7 +624,12 @@ function StokContent() {
 
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
-                    <p className="text-sm text-slate-500 mb-1">Stok saat ini {stockRow?.qtyOnHand ?? 0} cup</p>
+                    <p className="text-sm text-slate-500">Stok saat ini {stockRow?.qtyOnHand ?? 0} cup</p>
+                    {gudang !== undefined && (
+                      <p className={`text-sm mb-1 ${gudangKosong ? "font-bold text-rose-600" : "text-slate-500"}`}>
+                        {gudangKosong ? "Gudang kosong" : `Gudang ${gudang} cup`}
+                      </p>
+                    )}
                     <span
                       className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1"
                       style={{ backgroundColor: style.bg, color: style.fg }}
@@ -615,16 +641,10 @@ function StokContent() {
 
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <p className="text-xs text-slate-400 whitespace-nowrap">
-                      Saran restock <span className="font-bold text-slate-600">{hitungSaranRestock({
-                        qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
-                        minimumQty: p.minimumQty,
-                        stokSaatIni: stockRow?.qtyOnHand ?? 0,
-                        sisaJamShift,
-                        jamPerShift,
-                      })} cup</span>
+                      Saran restock <span className="font-bold text-slate-600">{saranUntuk(p)} cup</span>
                     </p>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => changeRequestQty(p.id, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                      <button type="button" onClick={() => changeRequestQty(p, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
                         <Minus size={18} />
                       </button>
                       <span className="w-10 text-center text-base font-bold rounded-lg py-1.5" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
@@ -632,8 +652,9 @@ function StokContent() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => changeRequestQty(p.id, 1)}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white active:opacity-80"
+                        onClick={() => changeRequestQty(p, 1)}
+                        disabled={gudangKosong || qty >= batasGudang(p.id)}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white active:opacity-80 disabled:opacity-30"
                         style={{ backgroundColor: GREEN }}
                       >
                         <Plus size={18} />

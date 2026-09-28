@@ -58,6 +58,8 @@ export class RestockRequestsService {
       }
     }
 
+    await this.pastikanTidakMelebihiGudang(dto.items, productById);
+
     const request = await this.prisma.$transaction(async (tx) => {
       const semua = await tx.restockRequest.findMany({
         where: { requestNo: { startsWith: 'RSTK-' } },
@@ -91,6 +93,33 @@ export class RestockRequestsService {
     });
 
     return request;
+  }
+
+  /// Qty restock tidak boleh melebihi stok Gudang SAAT diajukan/direvisi —
+  /// kalau lebih, Admin pasti tidak bisa mengirim penuh. Ini cek per
+  /// permintaan (tidak memesan stok): dua Booth tetap bisa meminta sisa stok
+  /// yang sama; Admin menyesuaikan qty saat approve (BR-009).
+  private async pastikanTidakMelebihiGudang(
+    items: { productId: string; qty: number }[],
+    productById: Map<string, { name: string }>,
+  ) {
+    const gudang = await this.prisma.warehouseStock.findMany({
+      where: { productId: { in: items.map((i) => i.productId) } },
+    });
+    const qtyGudang = new Map(gudang.map((g) => [g.productId, g.qtyOnHand]));
+    for (const item of items) {
+      const tersedia = qtyGudang.get(item.productId) ?? 0;
+      if (item.qty > tersedia) {
+        const nama = productById.get(item.productId)?.name ?? 'Produk';
+        throw new DomainError(
+          'RESTOCK_EXCEEDS_WAREHOUSE',
+          tersedia === 0
+            ? `Stok Gudang ${nama} sedang kosong.`
+            : `Permintaan ${nama} (${item.qty} cup) melebihi stok Gudang (${tersedia} cup).`,
+          { productId: item.productId, requested: item.qty, available: tersedia },
+        );
+      }
+    }
   }
 
   /// Approve = langsung kirim (menghasilkan StockDistribution) sesuai
@@ -163,6 +192,8 @@ export class RestockRequestsService {
         });
       }
     }
+
+    await this.pastikanTidakMelebihiGudang(dto.items, productById);
 
     const oldItems = await this.prisma.restockRequestItem.findMany({ where: { restockRequestId: id } });
 

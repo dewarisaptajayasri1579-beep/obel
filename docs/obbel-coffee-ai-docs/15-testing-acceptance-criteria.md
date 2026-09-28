@@ -160,3 +160,6 @@ Confirmed opname tidak bisa update langsung; recount version menghasilkan audit 
 
 ### AC-41 Bukti bayar QRIS
 Petugas booth bayar QRIS (atau Split) tanpa foto bukti → ditolak `QRIS_PROOF_REQUIRED`, stok Booth tidak berubah. Dengan foto → sale PAID, `proof_photo_url` hanya terisi di baris payment QRIS dan tampil di detail transaksi Admin. Tunai tetap tanpa foto. Retry dengan `idempotency_key` sama mengembalikan sale yang sama, stok terpotong sekali (BR-038, BR-017).
+
+### AC-42 Restock dibatasi stok Gudang
+Gudang punya N cup → petugas mengajukan N+1 ditolak `RESTOCK_EXCEEDS_WAREHOUSE` (details menyebut available N); mengajukan N diterima; merevisi ke N+1 ditolak. Admin membuka Setujui → kolom Stok Gudang tampil dan qty awal = min(diminta, stok Gudang) (BR-039).

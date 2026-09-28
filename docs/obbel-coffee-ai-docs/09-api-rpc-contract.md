@@ -90,6 +90,8 @@ Error codes:
 ### `create_restock_request`
 Input booth derived from shift, product + qty.
 
+Qty per produk tidak boleh melebihi stok Gudang (juga saat revisi `POST /restock-requests/:id/revise`): error `RESTOCK_EXCEEDS_WAREHOUSE` dengan details `{ productId, requested, available }`. Petugas membaca stok Gudang lewat `GET /warehouse-stock` (role BOOTH_STAFF diizinkan, read-only).
+
 Return request id/status.
 
 ## 5. Approve restock

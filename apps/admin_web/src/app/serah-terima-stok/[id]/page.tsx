@@ -87,6 +87,8 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
   const [tampilkanSemuaProduk, setTampilkanSemuaProduk] = useState(false);
   const [tindakLanjut, setTindakLanjut] = useState<Record<string, TindakLanjutSelisih>>({});
   const [tindakLanjutNote, setTindakLanjutNote] = useState<Record<string, string>>({});
+  // Stok Gudang saat membuka mode Setujui — qty yang bisa dikirim dibatasi ini.
+  const [stokGudang, setStokGudang] = useState<Map<string, number> | null>(null);
 
   async function load() {
     try {
@@ -104,9 +106,26 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  function bukaMode(m: Mode) {
+  async function bukaMode(m: Mode) {
     if (!detail) return;
-    setItemQty(Object.fromEntries(detail.items.map((i) => [i.productId, i.qtyReceived ?? i.qty])));
+    let gudang: Map<string, number> | null = null;
+    if (m === "approve") {
+      // Isi awal = yang diminta, dipangkas ke stok Gudang — kalau tidak,
+      // approve penuh pasti ditolak INSUFFICIENT_STOCK.
+      gudang = await api
+        .getWarehouseStock()
+        .then((rows) => new Map(rows.map((r) => [r.productId, r.qtyOnHand])))
+        .catch(() => null);
+    }
+    setStokGudang(gudang);
+    setItemQty(
+      Object.fromEntries(
+        detail.items.map((i) => {
+          const qty = i.qtyReceived ?? i.qty;
+          return [i.productId, gudang ? Math.min(qty, gudang.get(i.productId) ?? 0) : qty];
+        }),
+      ),
+    );
     setReasonCode("WRONG_QTY");
     setReasonNote("");
     setRejectReason("");
@@ -295,6 +314,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                           <th className={`py-2.5 px-3 text-left ${mode === "correct" ? "w-40" : ""}`}>Nama Produk</th>
                           <th className="py-2.5 px-3 text-right w-28">Qty Dikirim/Diajukan</th>
                           <th className="py-2.5 px-3 text-right w-24">Qty Diterima</th>
+                          {mode === "approve" && stokGudang && <th className="py-2.5 px-3 text-right w-24">Stok Gudang</th>}
                           {mode === "correct" && <th className="py-2.5 px-3 text-left">Tindak Lanjut</th>}
                           {(mode === "approve" || mode === "revise" || mode === "correct") && (
                             <th className="py-2.5 px-3 text-right w-32">Koreksi</th>
@@ -327,6 +347,18 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                                   <span className="ml-1.5 text-[10px] font-bold">({selisih > 0 ? `+${selisih}` : selisih})</span>
                                 )}
                               </td>
+                              {mode === "approve" && stokGudang && (
+                                <td
+                                  className={`py-2 px-3 text-right tabular-nums font-semibold ${
+                                    (stokGudang.get(item.productId) ?? 0) < item.qty
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : "text-slate-600 dark:text-fg-secondary"
+                                  }`}
+                                  title={(stokGudang.get(item.productId) ?? 0) < item.qty ? "Stok Gudang kurang dari yang diminta" : undefined}
+                                >
+                                  {stokGudang.get(item.productId) ?? 0}
+                                </td>
+                              )}
                               {mode === "correct" && (
                                 <td className="py-2 px-3 align-top">
                                   {selisih !== 0 ? (
