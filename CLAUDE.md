@@ -19,8 +19,8 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 - `npm run start:dev` — run API with ts-node-dev (hot reload).
 - `npm run build` / `npm run start` — compile to `dist` and run.
 - `npm run prisma:generate` — regenerate Prisma client after schema changes.
-- `npm run prisma:migrate` — create/apply a dev migration (`prisma migrate dev`).
-- `npm run prisma:deploy` — apply migrations in a deployed environment.
+- `npm run prisma:migrate` — `prisma migrate dev`. **Do not run it against the shared dev database**: `obel-db` on Coolify is also used by production, and `migrate dev` may ask to reset it on drift. Write the migration SQL by hand in `prisma/migrations/<timestamp>_<name>/migration.sql` and apply it with `npm run prisma:deploy`.
+- `npm run prisma:deploy` — apply pending migrations (the only way to apply migrations to the shared database). Never delete an applied migration folder, even one that is reverted by a later migration; Prisma treats a missing folder as drift.
 - `npm run prisma:seed` — run `prisma/seed.ts`.
 - `npm test` — unit tests (`jest --config jest.config.json`).
 - `npm run test:e2e` — e2e tests (`jest --config test/jest-e2e.json --runInBand`); run a single e2e file with `npm run test:e2e -- test/correction-flows.e2e-spec.ts`.
