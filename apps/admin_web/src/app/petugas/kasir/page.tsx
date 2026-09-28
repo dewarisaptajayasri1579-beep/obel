@@ -103,8 +103,9 @@ function KasirContent() {
   const [discountInput, setDiscountInput] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<MetodeBayar>("CASH");
   const [nominalTunai, setNominalTunai] = useState<number>(0);
+  // Split: cukup simpan bagian Tunai — bagian QRIS selalu sisanya (lihat
+  // splitQris di bawah), jadi jumlah keduanya pasti sama dengan total.
   const [splitTunai, setSplitTunai] = useState<number>(0);
-  const [splitQris, setSplitQris] = useState<number>(0);
   // Foto bukti bayar QRIS (wajib untuk QRIS & Split). URL hasil upload
   // disimpan supaya retry Bayar tidak mengunggah ulang foto yang sama.
   const [qrisPhoto, setQrisPhoto] = useState<File | null>(null);
@@ -227,7 +228,6 @@ function KasirContent() {
     if (sheet !== "payment") return;
     setNominalTunai(total);
     setSplitTunai(Math.ceil(total / 2));
-    setSplitQris(total - Math.ceil(total / 2));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet]);
 
@@ -286,14 +286,20 @@ function KasirContent() {
 
 
   const kembalianAtauKurang = nominalTunai - total;
-  const sisaSplit = total - splitTunai - splitQris;
+  const splitQris = total - splitTunai;
+  /// Mengisi salah satu bagian Split otomatis menyesuaikan bagian lainnya;
+  /// nilai di atas total dibatasi ke total.
+  const aturSplit = (bagian: "TUNAI" | "QRIS", nilai: number) => {
+    const n = Math.min(Math.max(nilai, 0), total);
+    setSplitTunai(bagian === "TUNAI" ? n : total - n);
+  };
   const butuhBuktiQris = paymentMethod !== "CASH";
   const nominalValid =
     paymentMethod === "QRIS"
       ? true
       : paymentMethod === "CASH"
         ? nominalTunai >= total
-        : splitTunai > 0 && splitQris > 0 && sisaSplit === 0;
+        : splitTunai > 0 && splitQris > 0;
   const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
@@ -930,7 +936,7 @@ function KasirContent() {
                     <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian Tunai</p>
                     <RibuanInput
                       value={splitTunai}
-                      onChange={setSplitTunai}
+                      onChange={(n) => aturSplit("TUNAI", n)}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
                     />
                   </div>
@@ -938,13 +944,13 @@ function KasirContent() {
                     <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian QRIS</p>
                     <RibuanInput
                       value={splitQris}
-                      onChange={setSplitQris}
+                      onChange={(n) => aturSplit("QRIS", n)}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
                     />
                   </div>
-                  {sisaSplit !== 0 && (
+                  {(splitTunai === 0 || splitQris === 0) && (
                     <p className="text-sm font-semibold" style={{ color: OBBEL.accentRed }}>
-                      {sisaSplit > 0 ? `Kurang ${formatRupiah(sisaSplit)}` : `Lebih ${formatRupiah(-sisaSplit)}`} dari total.
+                      Split butuh bagian Tunai dan QRIS masing-masing lebih dari Rp0. Kalau hanya satu metode, pilih Tunai atau QRIS.
                     </p>
                   )}
                 </div>
