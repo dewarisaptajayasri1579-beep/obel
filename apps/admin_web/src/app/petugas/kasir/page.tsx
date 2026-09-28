@@ -110,6 +110,14 @@ function KasirContent() {
   const [qrisPhoto, setQrisPhoto] = useState<File | null>(null);
   const [qrisPhotoUrl, setQrisPhotoUrl] = useState<string | null>(null);
 
+  // Idempotency key per transaksi, BUKAN per klik: kalau respons Bayar hilang
+  // (sinyal jelek) lalu petugas menekan lagi, backend mengenali key yang sama
+  // dan mengembalikan sale yang sudah tercatat alih-alih membuat sale kedua.
+  // Key draft dipisah karena keduanya masuk kolom sale.idempotency_key yang
+  // sama. Dibuat ulang tiap isi keranjang/diskon berubah = transaksi berbeda.
+  const [saleKey, setSaleKey] = useState(() => randomUUID());
+  const [draftKey, setDraftKey] = useState(() => randomUUID());
+
   const [drafts, setDrafts] = useState<DraftSale[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
@@ -168,6 +176,11 @@ function KasirContent() {
   }, []);
 
   const lines = useMemo(() => Array.from(cart.values()), [cart]);
+
+  useEffect(() => {
+    setSaleKey(randomUUID());
+    setDraftKey(randomUUID());
+  }, [cart, discountInput]);
   const subtotal = lines.reduce((sum, l) => sum + l.product.sellPrice * l.qty, 0);
   const totalItems = lines.reduce((sum, l) => sum + l.qty, 0);
   const discount = Math.max(0, Math.min(subtotal, discountInput));
@@ -287,7 +300,7 @@ function KasirContent() {
     setSubmitting(true);
     try {
       await api.createDraftSale({
-        idempotencyKey: randomUUID(),
+        idempotencyKey: draftKey,
         shiftSessionId: shift.shiftSessionId,
         items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
         discount,
@@ -336,7 +349,7 @@ function KasirContent() {
       const sale = activeDraftId
         ? await api.payDraftSale(activeDraftId, payload)
         : await api.createSale({
-            idempotencyKey: randomUUID(),
+            idempotencyKey: saleKey,
             shiftSessionId: shift.shiftSessionId,
             items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
             discount,
