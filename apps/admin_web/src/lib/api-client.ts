@@ -1211,6 +1211,8 @@ export interface SaleResult {
   paymentMethod: "CASH" | "QRIS" | "SPLIT"
   payments: PaymentSplitInput[]
   paidAt: string | null
+  /// Sisa stok Booth untuk produk di sale ini, setelah dipotong.
+  remainingStock: { productId: string; qtyOnHand: number }[]
 }
 
 export interface DraftSaleItem {

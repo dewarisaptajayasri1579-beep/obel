@@ -365,6 +365,13 @@ function KasirContent() {
           });
 
       setResult(sale);
+      // Stok di layar ikut sisa stok terbaru dari server — tanpa ini angka
+      // "Stok N" dan batas tambah ke keranjang tetap angka saat halaman dibuka.
+      setStockByProduct((prev) => {
+        const next = new Map(prev);
+        for (const s of sale.remainingStock) next.set(s.productId, s.qtyOnHand);
+        return next;
+      });
       setResultItems(
         draftAktif
           ? draftAktif.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice }))
