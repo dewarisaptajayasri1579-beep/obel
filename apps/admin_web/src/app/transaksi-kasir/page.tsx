@@ -64,7 +64,7 @@ function batasAwalPeriode(periode: Periode, now: Date): Date | null {
 
 const STATUS_LABEL: Record<SaleListItem["status"], { label: string; kelas: string }> = {
   PENDING: { label: "Pending", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
-  PAID: { label: "Lunas", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  PAID: { label: "Lunas", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   VOIDED: { label: "Dibatalkan", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
 };
 
@@ -272,7 +272,7 @@ function TransaksiKasirContent() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
             <ShoppingCart className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -299,7 +299,7 @@ function TransaksiKasirContent() {
             onClick={() => setTab(key)}
             className={`flex items-center gap-2 px-4 h-9 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
               tab === key
-                ? "bg-[var(--brand-700)] text-white border-[var(--brand-700)] shadow-xs"
+                ? "bg-(--brand-700) text-white border-(--brand-700) shadow-xs"
                 : "bg-white/90 dark:bg-surface text-slate-700 dark:text-fg-secondary border-slate-200/90 dark:border-line hover:bg-slate-50 dark:hover:bg-surface-hover"
             }`}
           >
@@ -315,7 +315,7 @@ function TransaksiKasirContent() {
       <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20">
             <ClipboardList className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -326,7 +326,7 @@ function TransaksiKasirContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
             <CheckCircle2 className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -337,7 +337,7 @@ function TransaksiKasirContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30">
             <Ban className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -348,7 +348,7 @@ function TransaksiKasirContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
             <History className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -363,14 +363,14 @@ function TransaksiKasirContent() {
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         <div className="flex items-center gap-2.5 flex-wrap mb-3.5">
-          <div className="relative flex items-center flex-1 min-w-[200px] sm:max-w-[280px]">
+          <div className="relative flex items-center flex-1 min-w-50 sm:max-w-70">
             <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari no. sale atau petugas..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 searchInput.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -397,7 +397,7 @@ function TransaksiKasirContent() {
               onChange={(v) => setStatusFilter(v as typeof statusFilter)}
               placeholder="Semua Status"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={statusFilter !== ""}
             />
           </div>
@@ -409,7 +409,7 @@ function TransaksiKasirContent() {
               onChange={setBoothId}
               placeholder="Semua Booth"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={boothId !== ""}
             />
           </div>
@@ -421,7 +421,7 @@ function TransaksiKasirContent() {
               onChange={setStaffId}
               placeholder="Semua Petugas"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={staffId !== ""}
             />
           </div>
@@ -432,7 +432,7 @@ function TransaksiKasirContent() {
               value={periodeFilter}
               onChange={(v) => setPeriodeFilter(v as Periode)}
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={periodeFilter !== "SEMUA"}
             />
           </div>
@@ -550,7 +550,7 @@ function TransaksiKasirContent() {
                               href={`/transaksi-kasir/${s.id}`}
                               onClick={(e) => e.stopPropagation()}
                               title="Buka halaman detail lengkap (koreksi)"
-                              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
+                              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                               <span>Buka</span>
@@ -629,7 +629,7 @@ function TransaksiKasirContent() {
 
                                 <Link
                                   href={`/transaksi-kasir/${s.id}`}
-                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
                                 >
                                   <ExternalLink className="w-3.5 h-3.5" />
                                   Buka detail lengkap untuk Batalkan/Revisi/Refund →
