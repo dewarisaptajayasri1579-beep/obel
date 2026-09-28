@@ -30,7 +30,6 @@ import {
 import {
   api,
   ApiError,
-  type ActiveShift,
   type BoothStockRow,
   type Product,
   type RestockRequest,
@@ -39,6 +38,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
+import { RequireActiveShift, useActiveShift } from "../_components/RequireActiveShift";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
@@ -149,7 +149,10 @@ function StokContent() {
   const [cari, setCari] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("SEMUA");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [shift, setShift] = useState<ActiveShift | null>(null);
+  const shift = useActiveShift();
+  const draftKey = `obbel-petugas-restock-draft-${shift.booth.id}`;
+  const jamPerShift = (new Date(shift.scheduledEndAt).getTime() - new Date(shift.scheduledStartAt).getTime()) / 3_600_000;
+  const sisaJamShift = (new Date(shift.scheduledEndAt).getTime() - Date.now()) / 3_600_000;
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [saranDihitung, setSaranDihitung] = useState(false);
   const [ledgerProductId, setLedgerProductId] = useState<string | null>(null);
@@ -162,16 +165,14 @@ function StokContent() {
   useEffect(() => {
     (async () => {
       try {
-        const [stockRows, productList, active, terlaris, restockRequests] = await Promise.all([
+        const [stockRows, productList, terlaris, restockRequests] = await Promise.all([
           api.getMyBoothStock(),
           api.getProducts(),
-          api.getActiveShift(),
           api.getTerlarisMine().catch(() => []),
           api.getMyRestockRequests().catch(() => []),
         ]);
         setStock(stockRows);
         setProducts(productList.filter((p) => p.active));
-        setShift(active);
         setQtyTerjual7Hari(new Map(terlaris.map((t) => [t.productId, t.qty])));
         setRiwayatRestock(restockRequests);
       } catch (err) {
@@ -188,8 +189,7 @@ function StokContent() {
   /// Petugas di stepper tidak ketiban ulang tiap re-render. Draft
   /// tersimpan (localStorage per Booth) menang atas saran kalau ada.
   useEffect(() => {
-    if (saranDihitung || !shift || products.length === 0) return;
-    const draftKey = `obbel-petugas-restock-draft-${shift.booth.id}`;
+    if (saranDihitung || products.length === 0) return;
     const draftRaw = typeof window !== "undefined" ? localStorage.getItem(draftKey) : null;
     if (draftRaw) {
       try {
@@ -200,10 +200,6 @@ function StokContent() {
         localStorage.removeItem(draftKey);
       }
     }
-
-    const jamPerShift =
-      (new Date(shift.scheduledEndAt).getTime() - new Date(shift.scheduledStartAt).getTime()) / 3_600_000;
-    const sisaJamShift = (new Date(shift.scheduledEndAt).getTime() - Date.now()) / 3_600_000;
 
     const saran: Record<string, number> = {};
     for (const p of products) {
@@ -218,7 +214,7 @@ function StokContent() {
     }
     setRequestQty(saran);
     setSaranDihitung(true);
-  }, [saranDihitung, shift, products, stock, qtyTerjual7Hari]);
+  }, [saranDihitung, draftKey, jamPerShift, sisaJamShift, products, stock, qtyTerjual7Hari]);
 
   // Produk default utk dropdown "Pilih Stok" — begitu daftar produk siap,
   // sekali saja (bukan tiap re-render, biar pilihan manual Petugas tidak
@@ -265,17 +261,11 @@ function StokContent() {
     setRequestQty((prev) => ({ ...prev, [productId]: Math.max(0, (prev[productId] ?? 0) + delta) }));
   }
 
-  const draftKey = shift ? `obbel-petugas-restock-draft-${shift.booth.id}` : null;
-
   function handlePilihSemua(checked: boolean) {
     if (!checked) {
       setRequestQty({});
       return;
     }
-    const jamPerShift = shift
-      ? (new Date(shift.scheduledEndAt).getTime() - new Date(shift.scheduledStartAt).getTime()) / 3_600_000
-      : 0;
-    const sisaJamShift = shift ? (new Date(shift.scheduledEndAt).getTime() - Date.now()) / 3_600_000 : 0;
     const saran: Record<string, number> = {};
     for (const p of products) {
       const stockRow = stock.find((s) => s.productId === p.id);
@@ -291,7 +281,6 @@ function StokContent() {
   }
 
   function handleSimpanDraft() {
-    if (!draftKey) return;
     localStorage.setItem(draftKey, JSON.stringify(requestQty));
     toast.success("Draft pengajuan restock disimpan di perangkat ini.");
   }
@@ -309,7 +298,7 @@ function StokContent() {
       await api.createRestockRequest({ items });
       toast.success("Permintaan restock berhasil dikirim.");
       setRequestQty({});
-      if (draftKey) localStorage.removeItem(draftKey);
+      localStorage.removeItem(draftKey);
       api.getMyRestockRequests().then(setRiwayatRestock).catch(() => {});
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal mengirim permintaan restock.");
@@ -518,7 +507,7 @@ function StokContent() {
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-base text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
+              <p className="font-extrabold text-base text-slate-900 truncate">{shift.booth.name}</p>
               <p className="text-sm text-slate-500">Butuh Restock Hari Ini</p>
               <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
                 <Calendar size={11} /> {formatTanggalJakarta(new Date().toISOString())}
@@ -630,10 +619,8 @@ function StokContent() {
                         qtyTerjual7Hari: qtyTerjual7Hari.get(p.id) ?? 0,
                         minimumQty: p.minimumQty,
                         stokSaatIni: stockRow?.qtyOnHand ?? 0,
-                        sisaJamShift: shift ? (new Date(shift.scheduledEndAt).getTime() - Date.now()) / 3_600_000 : 0,
-                        jamPerShift: shift
-                          ? (new Date(shift.scheduledEndAt).getTime() - new Date(shift.scheduledStartAt).getTime()) / 3_600_000
-                          : 0,
+                        sisaJamShift,
+                        jamPerShift,
                       })} cup</span>
                     </p>
                     <div className="flex items-center gap-2">
@@ -700,7 +687,7 @@ function StokContent() {
               <Store size={20} style={{ color: GREEN }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-base text-slate-900 truncate">{shift?.booth.name ?? "-"}</p>
+              <p className="font-extrabold text-base text-slate-900 truncate">{shift.booth.name}</p>
               <p className="text-sm text-slate-500">Pilih produk untuk melihat riwayat stok</p>
             </div>
           </div>
@@ -861,7 +848,9 @@ export default function StokPage() {
           </div>
         }
       >
-        <StokContent />
+        <RequireActiveShift title="Stok">
+          <StokContent />
+        </RequireActiveShift>
       </Suspense>
     </RequirePetugasAuth>
   );

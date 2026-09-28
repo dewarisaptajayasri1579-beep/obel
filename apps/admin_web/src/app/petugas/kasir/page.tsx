@@ -21,7 +21,6 @@ import {
   ApiError,
   type Product,
   type BoothStockRow,
-  type ActiveShift,
   type DraftSale,
   type SaleResult,
 } from "@/lib/api-client";
@@ -35,6 +34,7 @@ import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printReceipt, isNativeBridgeAvailable } from "../_lib/native-bridge";
 import { PhotoCapture } from "../_components/PhotoCapture";
+import { RequireActiveShift, useActiveShift } from "../_components/RequireActiveShift";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -92,7 +92,7 @@ function KasirContent() {
   const router = useRouter();
   const { session } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [shift, setShift] = useState<ActiveShift | null>(null);
+  const shift = useActiveShift();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockByProduct, setStockByProduct] = useState<Map<string, number>>(new Map());
   const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
@@ -140,21 +140,19 @@ function KasirContent() {
   useEffect(() => {
     (async () => {
       try {
-        const [active, productList, stockRows, terlaris, booths] = await Promise.all([
-          api.getActiveShift(),
+        const [productList, stockRows, terlaris, booths] = await Promise.all([
           api.getProducts(),
           api.getMyBoothStock(),
           api.getTerlarisMine().catch(() => []),
           api.getBooths().catch(() => []),
         ]);
-        setShift(active);
         // Produk nonaktif TETAP ditampilkan (bisa masih ada di keranjang
         // draft lama), cuma digeser ke bawah + tidak bisa ditambah baru —
         // lihat pengurutan & disabled state di grid.
         setProducts(productList);
         setStockByProduct(new Map(stockRows.map((s: BoothStockRow) => [s.productId, s.qtyOnHand])));
         setQtyTerjual7Hari(new Map(terlaris.map((t) => [t.productId, t.qty])));
-        setQrisImageUrl(booths.find((b) => b.id === active.booth.id)?.qrisImageUrl ?? null);
+        setQrisImageUrl(booths.find((b) => b.id === shift.booth.id)?.qrisImageUrl ?? null);
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Kasir.");
       } finally {
@@ -299,7 +297,7 @@ function KasirContent() {
   const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
-    if (!shift || lines.length === 0 || draftAktif) return;
+    if (lines.length === 0 || draftAktif) return;
     setSubmitting(true);
     try {
       await api.createDraftSale({
@@ -335,7 +333,7 @@ function KasirContent() {
   }
 
   async function handleBayar() {
-    if (!shift || totalItems === 0 || !bisaBayar) return;
+    if (totalItems === 0 || !bisaBayar) return;
     setSubmitting(true);
     try {
       let qrisProofPhotoUrl: string | undefined;
@@ -384,7 +382,7 @@ function KasirContent() {
     const lines = [
       `*Obbel Coffee & Milk*`,
       `No. Invoice: ${sale.saleNo}`,
-      `Booth: ${shift?.booth.name ?? "-"}`,
+      `Booth: ${shift.booth.name}`,
       `Waktu: ${sale.paidAt ? formatJamJakarta(sale.paidAt) : "-"}`,
       `--------------------------`,
       `Total: ${formatRupiah(sale.total)}`,
@@ -408,7 +406,7 @@ function KasirContent() {
     setPrinting(true);
     try {
       await printReceipt({
-        boothName: shift?.booth.name ?? "-",
+        boothName: shift.booth.name,
         saleNo: result.saleNo,
         time: result.paidAt ?? new Date().toISOString(),
         items: resultItems,
@@ -453,7 +451,7 @@ function KasirContent() {
         <div className="hidden print:block text-left w-full text-base">
           <p className="font-extrabold text-base">Obbel Coffee & Milk</p>
           <p>No. Invoice: {result.saleNo}</p>
-          <p>Booth: {shift?.booth.name}</p>
+          <p>Booth: {shift.booth.name}</p>
           <p>Waktu: {result.paidAt ? formatJamJakarta(result.paidAt) : "-"}</p>
           <hr className="my-2" />
           <p>Total: {formatRupiah(result.total)}</p>
@@ -467,7 +465,7 @@ function KasirContent() {
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Booth</span>
-            <span className="font-semibold">{shift?.booth.name}</span>
+            <span className="font-semibold">{shift.booth.name}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Waktu Transaksi</span>
@@ -999,7 +997,9 @@ function KasirContent() {
 export default function KasirPage() {
   return (
     <RequirePetugasAuth>
-      <KasirContent />
+      <RequireActiveShift title="Kasir">
+        <KasirContent />
+      </RequireActiveShift>
     </RequirePetugasAuth>
   );
 }

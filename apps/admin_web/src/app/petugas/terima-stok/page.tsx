@@ -6,6 +6,7 @@ import { api, ApiError, type Distribution, type DistributionItem } from "@/lib/a
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
+import { RequireActiveShift } from "../_components/RequireActiveShift";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { QtyStepper } from "../_components/QtyStepper";
@@ -404,7 +405,9 @@ function TerimaStokContent() {
 export default function TerimaStokPage() {
   return (
     <RequirePetugasAuth>
-      <TerimaStokContent />
+      <RequireActiveShift title="Terima Stok">
+        <TerimaStokContent />
+      </RequireActiveShift>
     </RequirePetugasAuth>
   );
 }
