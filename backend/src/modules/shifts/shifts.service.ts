@@ -333,7 +333,7 @@ export class ShiftsService {
       where: { shiftSessionId },
       include: { items: { include: { product: true } } },
     });
-    if (existing) {
+    if (existing && existing.status === StockCountStatus.CONFIRMED) {
       return this.toClosingResponse(existing);
     }
 
@@ -345,6 +345,30 @@ export class ShiftsService {
       where: { boothId: shift.boothId },
       include: { product: true },
     });
+
+    // Snapshot DRAFT dari buka-layar-Check-Out sebelumnya bisa sudah basi:
+    // shift tetap OPEN sampai konfirmasi, jadi Petugas bisa balik, lanjut
+    // jualan/terima stok, lalu buka layar lagi. Diisi ulang dari stok Booth
+    // sekarang — aman, karena Stok Fisik yang diketik belum pernah disimpan
+    // ke server sebelum konfirmasi.
+    if (existing) {
+      const segar = await this.prisma.$transaction(async (tx) => {
+        await tx.shiftStockCountItem.deleteMany({ where: { stockCountId: existing.id } });
+        await tx.shiftStockCountItem.createMany({
+          data: boothStocks.map((b) => ({
+            stockCountId: existing.id,
+            productId: b.productId,
+            expectedQty: b.qtyOnHand,
+            actualQty: b.qtyOnHand,
+          })),
+        });
+        return tx.shiftStockCount.findUniqueOrThrow({
+          where: { id: existing.id },
+          include: { items: { include: { product: true } } },
+        });
+      });
+      return this.toClosingResponse(segar);
+    }
 
     const count = await this.prisma.$transaction(async (tx) => {
       await tx.shiftSession.update({
@@ -398,6 +422,24 @@ export class ShiftsService {
     }
     if (shift.status !== ShiftStatus.OPEN) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk konfirmasi checkout.');
+    }
+
+    // Stok Booth harus masih sama dengan snapshot yang Petugas lihat di layar
+    // (mis. Admin mengirim stok atau ada penjualan setelah layar dibuka) —
+    // kalau tidak, selisih yang dihitung dari angka basi akan salah tercatat.
+    const stokSekarang = await this.prisma.boothStock.findMany({ where: { boothId: shift.boothId } });
+    const qtySekarang = new Map(stokSekarang.map((b) => [b.productId, b.qtyOnHand]));
+    const snapshot = new Map(count.items.map((i) => [i.productId, i.expectedQty]));
+    const berubah = [
+      ...count.items.filter((i) => (qtySekarang.get(i.productId) ?? 0) !== i.expectedQty).map((i) => i.productId),
+      ...stokSekarang.filter((b) => !snapshot.has(b.productId) && b.qtyOnHand > 0).map((b) => b.productId),
+    ];
+    if (berubah.length > 0) {
+      throw new DomainError(
+        'STOCK_CHANGED_DURING_CLOSING',
+        'Stok Booth berubah sejak layar Check-Out dibuka. Muat ulang layar ini lalu hitung ulang Stok Fisik.',
+        { productIds: berubah },
+      );
     }
 
     const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));
@@ -696,13 +738,19 @@ export class ShiftsService {
       }
     }
 
+    // Snapshot penutupan baru jadi sumber kebenaran SETELAH dikonfirmasi: saat itu
+    // sisa Stok Fisik otomatis diajukan sebagai Return ke Gudang (lihat
+    // confirmClosing) yang men-nol-kan BoothStock, jadi qtyOnHand live tidak lagi
+    // merepresentasikan kondisi shift ini. Selama masih DRAFT, snapshot bisa basi
+    // (Petugas membuka layar Check-Out lalu lanjut jualan/terima stok) — layar
+    // Check-Out memanggil laporan ini BERSAMAAN dengan startClosing yang
+    // memperbaruinya, jadi laporan selalu membaca snapshot sebelum diperbarui.
+    // Akibatnya "Awal" (diturunkan dari Sisa Sistem) ikut bergeser sebesar
+    // penjualan sejak snapshot terakhir. Maka selama DRAFT dipakai stok live.
+    const snapshotFinal = stockCount?.status === StockCountStatus.CONFIRMED;
+
     const items = Array.from(byProduct.entries()).map(([productId, v]) => {
-      const closingItem = closingItemByProduct.get(productId);
-      // "Sisa Sistem" HARUS dibaca dari snapshot expectedQty saat closing
-      // dimulai (ShiftStockCount), bukan BoothStock.qtyOnHand live —
-      // begitu Check-Out selesai, sisa Stok Fisik otomatis diajukan sebagai
-      // Return ke Gudang (lihat confirmClosing) yang men-nol-kan BoothStock,
-      // jadi qtyOnHand live tidak lagi merepresentasikan kondisi shift ini.
+      const closingItem = snapshotFinal ? closingItemByProduct.get(productId) : undefined;
       const sisaSistem = closingItem?.expectedQty ?? qtyOnHandByProduct.get(productId) ?? 0;
       const stokAwal = sisaSistem - v.restock + v.terjual + v.retur - v.adjustmentNet;
       return {

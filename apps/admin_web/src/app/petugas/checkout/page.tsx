@@ -57,40 +57,44 @@ function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false);
   const [sekarang, setSekarang] = useState(new Date());
 
+  /// Memuat laporan + snapshot penutupan. Dipanggil saat layar dibuka dan lagi
+  /// kalau stok Booth berubah selagi layar ini terbuka (STOCK_CHANGED_DURING_CLOSING).
+  async function muatData() {
+    try {
+      const active = await api.getActiveShift();
+      setShift(active);
+      const [rpt, closing] = await Promise.all([
+        api.getShiftReport(active.shiftSessionId),
+        api.startClosing(active.shiftSessionId),
+      ]);
+      setReport(rpt);
+      const closingByProduct = new Map<string, ClosingItem>(closing.items.map((i) => [i.productId, i]));
+      setBaris(
+        rpt.items.map((it) => ({
+          productId: it.productId,
+          productName: it.productName,
+          stokAwal: it.stokAwal,
+          restock: it.restock,
+          terjual: it.terjual,
+          retur: it.retur,
+          sisaSistem: closingByProduct.get(it.productId)?.expectedQty ?? it.sisaSistem,
+        })),
+      );
+      setStokFisik(
+        Object.fromEntries(
+          rpt.items.map((it) => [it.productId, closingByProduct.get(it.productId)?.actualQty ?? it.sisaSistem]),
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan shift.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      try {
-        const active = await api.getActiveShift();
-        setShift(active);
-        const [rpt, closing] = await Promise.all([
-          api.getShiftReport(active.shiftSessionId),
-          api.startClosing(active.shiftSessionId),
-        ]);
-        setReport(rpt);
-        const closingByProduct = new Map<string, ClosingItem>(closing.items.map((i) => [i.productId, i]));
-        setBaris(
-          rpt.items.map((it) => ({
-            productId: it.productId,
-            productName: it.productName,
-            stokAwal: it.stokAwal,
-            restock: it.restock,
-            terjual: it.terjual,
-            retur: it.retur,
-            sisaSistem: closingByProduct.get(it.productId)?.expectedQty ?? it.sisaSistem,
-          })),
-        );
-        setStokFisik(
-          Object.fromEntries(
-            rpt.items.map((it) => [it.productId, closingByProduct.get(it.productId)?.actualQty ?? it.sisaSistem]),
-          ),
-        );
-      } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan shift.");
-      } finally {
-        setLoading(false);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    })();
+    muatData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // "Jam Sekarang" & "Durasi Kerja" di Ringkasan Shift ikut berjalan selama
@@ -137,6 +141,13 @@ function CheckoutContent() {
       toast.success("Check-Out berhasil. Sampai jumpa di shift berikutnya!");
       router.replace("/petugas/check-in");
     } catch (err) {
+      if (err instanceof ApiError && err.code === "STOCK_CHANGED_DURING_CLOSING") {
+        // Stok berubah sejak layar dibuka — kembali ke laporan dengan angka terbaru.
+        toast.warning(err.message);
+        setStep("LAPORAN");
+        await muatData();
+        return;
+      }
       toast.error(err instanceof ApiError ? err.message : "Gagal Check-Out. Coba lagi.");
     } finally {
       setSubmitting(false);
