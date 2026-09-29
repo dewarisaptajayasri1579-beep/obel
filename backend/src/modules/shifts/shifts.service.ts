@@ -749,6 +749,35 @@ export class ShiftsService {
     // penjualan sejak snapshot terakhir. Maka selama DRAFT dipakai stok live.
     const snapshotFinal = stockCount?.status === StockCountStatus.CONFIRMED;
 
+    // Koreksi Penerimaan Admin (TX-02) mengubah stok Booth lewat movement ADJUSTMENT
+    // yang TIDAK ber-shiftSessionId (Admin bukan Petugas yang sedang shift), jadi
+    // tidak ikut di `movements` di atas — tanpa ini selisihnya diserap diam-diam ke
+    // "Awal" (residual) dan "Restock" tetap qty lama. Koreksi atas kiriman yang
+    // diterima di shift ini ditambahkan ke Restock-nya; koreksi atas kiriman PERTAMA
+    // (Stok Awal) sengaja tidak, karena Awal memang qty kiriman itu SETELAH koreksi.
+    // Koreksi setelah shift ditutup tidak dihitung (snapshot sudah beku).
+    const kirimanDiShift = [
+      ...new Set(
+        movements
+          .filter((m) => m.movementType === StockMovementType.WAREHOUSE_TO_BOOTH && m.toBoothId === shift.boothId && m.referenceId)
+          .map((m) => m.referenceId as string),
+      ),
+    ];
+    if (kirimanDiShift.length > 0) {
+      const koreksi = await this.prisma.stockMovement.findMany({
+        where: {
+          referenceType: 'distribution_receipt_correction',
+          referenceId: { in: kirimanDiShift },
+          occurredAt: { lte: shift.closedAt ?? new Date() },
+        },
+        include: { product: true },
+      });
+      for (const m of koreksi) {
+        if (m.referenceId === referenceIdAwal) continue;
+        acc(m.productId, m.product.name).restock += m.toBoothId === shift.boothId ? m.qty : -m.qty;
+      }
+    }
+
     const items = Array.from(byProduct.entries()).map(([productId, v]) => {
       const closingItem = snapshotFinal ? closingItemByProduct.get(productId) : undefined;
       const sisaSistem = closingItem?.expectedQty ?? qtyOnHandByProduct.get(productId) ?? 0;
