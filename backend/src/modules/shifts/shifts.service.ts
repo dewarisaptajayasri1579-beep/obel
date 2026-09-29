@@ -666,7 +666,14 @@ export class ShiftsService {
         this.prisma.booth.findUniqueOrThrow({ where: { id: shift.boothId } }),
         this.prisma.shiftTemplate.findUniqueOrThrow({ where: { id: shift.shiftTemplateId } }),
         this.prisma.profile.findUniqueOrThrow({ where: { id: shift.staffId }, select: SAFE_PROFILE_SELECT }),
-        this.prisma.stockMovement.findMany({ where: { shiftSessionId }, include: { product: true } }),
+        this.prisma.stockMovement.findMany({
+          // Shift CLOSED = keadaan saat ditutup: hanya movement sampai closedAt, titik waktu
+          // yang sama dengan snapshot yang jadi Sisa Sistem. Movement ber-shift sesudahnya
+          // (return otomatis, void/refund/revisi Admin) ada di ledger tapi tidak di Sisa;
+          // kalau ikut dijumlahkan, Awal (residual) bergeser.
+          where: { shiftSessionId, ...(shift.closedAt ? { occurredAt: { lte: shift.closedAt } } : {}) },
+          include: { product: true },
+        }),
         this.prisma.boothStock.findMany({ where: { boothId: shift.boothId } }),
         this.prisma.sale.findMany({
           where: { shiftSessionId, status: 'PAID' },
