@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { isiUlangGudang } from './support/warehouse';
 
 // main.ts patches this globally for the real server; the e2e app is built
 // directly via TestingModule and bypasses main.ts, so responses touching
@@ -55,6 +56,8 @@ describe('Distribution/Return/Opname/Adjustment/Shift correction flows (e2e)', (
       .expect(200);
     productId = catalog.body[0].id;
     secondProductId = catalog.body[1].id;
+
+    await isiUlangGudang(app, adminToken, [productId, secondProductId]);
   });
 
   afterAll(async () => {

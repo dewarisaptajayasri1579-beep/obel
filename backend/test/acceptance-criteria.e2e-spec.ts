@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { isiUlangGudang } from './support/warehouse';
 
 // main.ts patches this globally for the real server; the e2e app is built
 // directly via TestingModule and bypasses main.ts, so responses touching
@@ -101,19 +102,7 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
     productId = catalog.body[2].id;
     secondProductId = catalog.body[3].id;
 
-    // Tiap run menguras stok Gudang (distribusi, restock) tanpa mengisinya
-    // lagi — lama-lama test gagal INSUFFICIENT_STOCK / RESTOCK_EXCEEDS_WAREHOUSE
-    // padahal kodenya benar. Isi ulang lewat Tambah Stok Gudang (tercatat di
-    // ledger) sampai minimal STOK_GUDANG_MINIMUM.
-    for (const pid of [productId, secondProductId]) {
-      const kurang = STOK_GUDANG_MINIMUM - (await warehouseQty(pid));
-      if (kurang <= 0) continue;
-      await request(app.getHttpServer())
-        .post('/stock-receipts')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ idempotencyKey: randomUUID(), receiptDate: new Date().toISOString(), status: 'POSTED', items: [{ productId: pid, qtyReceived: kurang }] })
-        .expect(201);
-    }
+    await isiUlangGudang(app, adminToken, [productId, secondProductId], STOK_GUDANG_MINIMUM);
   });
 
   afterAll(async () => {
