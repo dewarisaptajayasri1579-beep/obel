@@ -171,7 +171,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         {assignments === null ? (
           <div className="flex justify-center py-10">
-            <Loader2 className="w-5 h-5 animate-spin text-[var(--brand-700)]" />
+            <Loader2 className="w-5 h-5 animate-spin text-(--brand-700)" />
           </div>
         ) : shiftTemplates.length === 0 ? (
           <p className="text-center text-sm text-slate-500 dark:text-fg-muted py-10">
@@ -186,7 +186,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                   <th className="py-3.5 px-3">Booth</th>
                   <th className="py-3.5 px-3">Lokasi</th>
                   {shiftTemplates.map((t) => (
-                    <th key={t.id} className="py-3.5 px-3 min-w-[220px]">
+                    <th key={t.id} className="py-3.5 px-3 min-w-55">
                       {t.name}
                       <span className="ml-1.5 font-mono text-[10px] font-normal text-slate-400 dark:text-fg-muted">
                         {t.startTime}–{t.endTime}
@@ -225,10 +225,10 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                                 onChange={(v) => pilihPetugas(b.id, t.id, v)}
                                 placeholder="Belum ditugaskan"
                                 sizeVariant="sm"
-                                className="!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs"
+                                className="text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs"
                               />
                               {sedangMenyimpan && (
-                                <Loader2 className="w-3.5 h-3.5 absolute right-9 top-1/2 -translate-y-1/2 animate-spin text-[var(--brand-700)] pointer-events-none" />
+                                <Loader2 className="w-3.5 h-3.5 absolute right-9 top-1/2 -translate-y-1/2 animate-spin text-(--brand-700) pointer-events-none" />
                               )}
                             </div>
                           </td>
@@ -246,7 +246,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
       <Modal isOpen={!!peringatan} onClose={() => setPeringatan(null)} title="Barista Masih Aktif Shift" size="sm">
         <div className="space-y-4">
           <div className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-fg-secondary">
-            <AlertTriangle className="w-4.5 h-4.5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
             <p>{peringatan?.pesan}</p>
           </div>
           <p className="text-xs text-slate-500 dark:text-fg-muted">

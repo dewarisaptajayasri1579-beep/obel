@@ -16,7 +16,7 @@ import { nilaiAwalPetugas, type PetugasFormValues } from "./form-values";
 
 type Option = { value: string; label: string };
 
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-[34px] !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 
 /// Form Petugas — satu komponen untuk Tambah & Edit, dipakai dua halaman
@@ -161,7 +161,7 @@ export const PetugasForm: React.FC<{
         {mode === "edit" ? (
           <div className="w-full flex flex-col gap-1.5">
             <span className={COMPACT_LABEL}>Username</span>
-            <div className="h-8.5 min-h-[34px] px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
+            <div className="h-8.5 min-h-8.5 px-3 rounded-lg border border-dashed border-slate-300/90 dark:border-line bg-slate-50/70 dark:bg-surface-hover/40 flex items-center">
               <span className="font-mono text-xs font-bold text-slate-700 dark:text-fg-secondary">{form.username}</span>
             </div>
           </div>
@@ -247,7 +247,7 @@ export const PetugasForm: React.FC<{
               type="button"
               onClick={() => simpan(true)}
               disabled={submitting}
-              className="px-3.5 py-1.5 rounded-lg border border-[var(--brand-700)] bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-[var(--brand-700)] dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-lg border border-(--brand-700) bg-white dark:bg-surface hover:bg-brand-50 dark:hover:bg-brand-950/30 text-(--brand-700) dark:text-brand-400 font-semibold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Simpan &amp; Tambah Lagi</span>
@@ -259,7 +259,7 @@ export const PetugasForm: React.FC<{
             type="button"
             onClick={() => simpan(false)}
             disabled={submitting}
-            className="px-4 py-1.5 rounded-lg bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{submitting ? "Menyimpan..." : "Simpan"}</span>

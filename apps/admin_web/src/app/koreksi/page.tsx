@@ -200,7 +200,7 @@ function KoreksiContent() {
         <div className="w-56">
           <Select label="Jenis Transaksi" options={entityOptions} value={entityFilter} onChange={setEntityFilter} />
         </div>
-        <div className="flex-1 min-w-[220px]">
+        <div className="flex-1 min-w-55">
           <Input
             label="Cari"
             placeholder="Nomor transaksi, nama barista, atau alasan..."

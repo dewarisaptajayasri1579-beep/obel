@@ -13,7 +13,7 @@ import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError, BASE_URL, getToken, type ActiveAssignment, type Product, type WarehouseStockItem } from "@/lib/api-client";
 import { SerahTerimaLivePreview } from "./SerahTerimaLivePreview";
 
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 const TANPA_KATEGORI = "Tanpa Kategori";
 

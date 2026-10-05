@@ -41,7 +41,7 @@ export function KodeQrisInput({
       <span className={labelClassName}>Kode QRIS Booth (opsional)</span>
 
       <div className="flex items-start gap-3">
-        <div className="relative w-24 aspect-square rounded-xl overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center flex-shrink-0">
+        <div className="relative w-24 aspect-square rounded-xl overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center shrink-0">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="Pratinjau kode QRIS" className="w-full h-full object-contain" />
@@ -50,7 +50,7 @@ export function KodeQrisInput({
           )}
           {mengunggah && (
             <div className="absolute inset-0 bg-white/70 dark:bg-black/50 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-[var(--brand-700)] animate-spin" />
+              <Loader2 className="w-5 h-5 text-(--brand-700) animate-spin" />
             </div>
           )}
         </div>

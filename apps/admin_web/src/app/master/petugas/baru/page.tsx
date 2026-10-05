@@ -50,12 +50,12 @@ function PetugasBaruContent() {
         <div className="flex items-start gap-3">
           <Link
             href={kembali}
-            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
             aria-label="Kembali ke daftar Barista"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <UserRound className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
+          <UserRound className="w-5 h-5 text-(--brand-700) dark:text-brand-400 mt-1.5 shrink-0" />
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
               Tambah Barista
@@ -71,7 +71,7 @@ function PetugasBaruContent() {
         </span>
       </div>
 
-      <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
+      <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs!">
         {!booths ? (
           <div className="flex justify-center py-10">
             <Spinner />

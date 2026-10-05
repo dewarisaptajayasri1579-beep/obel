@@ -39,7 +39,7 @@ const LIMIT = 20;
 
 const STATUS_LABEL: Record<StockReceipt["status"], { label: string; kelas: string }> = {
   DRAFT: { label: "Draft", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
-  POSTED: { label: "Posted", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  POSTED: { label: "Posted", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   REVISED: { label: "Revised", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
 };
 
@@ -168,7 +168,7 @@ function PenerimaanContent() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
             <PackagePlus className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -190,7 +190,7 @@ function PenerimaanContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20">
             <ClipboardList className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -201,7 +201,7 @@ function PenerimaanContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted flex items-center justify-center flex-shrink-0 border border-slate-200 dark:border-line">
+          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted flex items-center justify-center shrink-0 border border-slate-200 dark:border-line">
             <Clock className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -212,7 +212,7 @@ function PenerimaanContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
             <CheckCircle2 className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -223,7 +223,7 @@ function PenerimaanContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
             <History className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -236,14 +236,14 @@ function PenerimaanContent() {
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         <div className="flex items-center gap-2.5 flex-wrap mb-3.5">
-          <div className="relative flex items-center flex-1 min-w-[200px] sm:max-w-[280px]">
+          <div className="relative flex items-center flex-1 min-w-50 sm:max-w-70">
             <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari no. bukti atau keterangan..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 searchInput.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -270,7 +270,7 @@ function PenerimaanContent() {
               onChange={(v) => setStatusFilter(v as typeof statusFilter)}
               placeholder="Semua Status"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={statusFilter !== ""}
             />
           </div>
@@ -351,7 +351,7 @@ function PenerimaanContent() {
                           <Link
                             href={`/stok/penerimaan/${r.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                            className="text-(--brand-700) dark:text-brand-400 hover:underline"
                           >
                             {r.receiptNo}
                           </Link>
@@ -384,7 +384,7 @@ function PenerimaanContent() {
                               setNotaTarget(r);
                             }}
                             title="Pratinjau & cetak nota dokumen ini"
-                            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
+                            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/90 dark:border-line bg-white/80 dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 text-[11px] font-semibold shadow-2xs cursor-pointer transition-colors"
                           >
                             <Printer className="w-3.5 h-3.5" />
                             <span>Preview</span>
@@ -399,9 +399,9 @@ function PenerimaanContent() {
                                 setActionMenuAnchor(buka ? e.currentTarget : null);
                                 setActionMenuRowId(buka ? r.id : null);
                               }}
-                              className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-[var(--brand-700)] dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
+                              className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
                                 actionMenuRowId === r.id
-                                  ? "bg-brand-50 text-[var(--brand-700)] border-brand-300"
+                                  ? "bg-brand-50 text-(--brand-700) border-brand-300"
                                   : "bg-white/80 dark:bg-surface hover:bg-slate-50"
                               }`}
                               title="Aksi Lainnya"
@@ -432,7 +432,7 @@ function PenerimaanContent() {
                                 }}
                                 className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left cursor-pointer"
                               >
-                                <Printer className="w-3.5 h-3.5 text-[var(--brand-700)]" />
+                                <Printer className="w-3.5 h-3.5 text-(--brand-700)" />
                                 <span>Cetak Nota</span>
                               </button>
 
@@ -482,7 +482,7 @@ function PenerimaanContent() {
                             </div>
                             <Link
                               href={`/stok/penerimaan/${r.id}`}
-                              className="inline-block mt-3 text-xs font-semibold text-[var(--brand-700)] dark:text-brand-400 hover:underline"
+                              className="inline-block mt-3 text-xs font-semibold text-(--brand-700) dark:text-brand-400 hover:underline"
                             >
                               Buka detail lengkap →
                             </Link>

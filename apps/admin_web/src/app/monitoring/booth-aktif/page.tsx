@@ -276,7 +276,7 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
   const sedangKirimStok = booth.pendingDistribution !== null;
 
   return (
-    <div className="w-full lg:w-[380px] shrink-0">
+    <div className="w-full lg:w-95 shrink-0">
       <Card variant="solid" padding="md" className="lg:sticky lg:top-4 space-y-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -422,7 +422,7 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
           ) : (
             <Link
               href={`/serah-terima-stok/baru?boothId=${booth.boothId}`}
-              className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[var(--brand-700)] hover:bg-[var(--brand-800)] text-white text-sm font-bold shadow-sm cursor-pointer transition-colors"
+              className="flex items-center justify-center gap-2 h-10 rounded-xl bg-(--brand-700) hover:bg-(--brand-800) text-white text-sm font-bold shadow-sm cursor-pointer transition-colors"
             >
               <Send className="w-4 h-4" />
               Kirim Stok

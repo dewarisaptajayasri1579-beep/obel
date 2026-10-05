@@ -44,7 +44,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
           <Card className="p-5">
             <CardHeader className="p-0 mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
+                <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20">
                   <Store className="w-4 h-4" />
                 </div>
                 <CardTitle>Penjualan Terbanyak per Booth</CardTitle>
@@ -66,7 +66,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                       <td className="py-2.5 px-3 text-slate-400 dark:text-fg-muted">{i + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-fg">{b.boothName}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600 dark:text-fg-secondary">{b.cupSold} cup</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-[var(--brand-700)] dark:text-brand-400">{formatRupiah(b.omzet)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-(--brand-700) dark:text-brand-400">{formatRupiah(b.omzet)}</td>
                     </tr>
                   ))}
                   {data.byBooth.length === 0 && (
@@ -84,7 +84,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
           <Card className="p-5">
             <CardHeader className="p-0 mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
                   <Coffee className="w-4 h-4" />
                 </div>
                 <CardTitle>Produk Terlaris</CardTitle>
@@ -122,7 +122,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
           <Card className="p-5">
             <CardHeader className="p-0 mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 border border-blue-100 dark:border-blue-900/30">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
                   <Users2 className="w-4 h-4" />
                 </div>
                 <CardTitle>Penjualan per Barista</CardTitle>
@@ -150,7 +150,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 dark:text-fg-secondary">{s.shift}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600 dark:text-fg-secondary">{s.cupSold} cup</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-[var(--brand-700)] dark:text-brand-400">{formatRupiah(s.omzet)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-(--brand-700) dark:text-brand-400">{formatRupiah(s.omzet)}</td>
                     </tr>
                   ))}
                   {data.byStaffShift.length === 0 && (
@@ -168,7 +168,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
           <Card className="p-5">
             <CardHeader className="p-0 mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30">
+                <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30">
                   <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div className="flex-1">

@@ -25,7 +25,7 @@ type Tab = "SEMUA" | "MENUNGGU" | "SELESAI";
 const STATUS_LABEL: Record<Distribution["status"], { label: string; kelas: string }> = {
   DRAFT: { label: "Draft", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
   SENT: { label: "Menunggu Diterima", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
-  RECEIVED: { label: "Selesai", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  RECEIVED: { label: "Selesai", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   DISCREPANCY: { label: "Selesai · Selisih", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
   CANCELLED: { label: "Dibatalkan", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
@@ -96,7 +96,7 @@ function TransaksiTerimaStokContent() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
             <PackageCheck className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -112,7 +112,7 @@ function TransaksiTerimaStokContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20">
             <Warehouse className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -123,7 +123,7 @@ function TransaksiTerimaStokContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
             <Clock className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -134,7 +134,7 @@ function TransaksiTerimaStokContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
             <CheckCircle2 className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -145,7 +145,7 @@ function TransaksiTerimaStokContent() {
         </div>
 
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-100 dark:border-rose-900/30">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100 dark:border-rose-900/30">
             <AlertTriangle className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -158,14 +158,14 @@ function TransaksiTerimaStokContent() {
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
         <div className="flex items-center gap-2.5 flex-wrap mb-3.5">
-          <div className="relative flex items-center flex-1 min-w-[200px] sm:max-w-[280px]">
+          <div className="relative flex items-center flex-1 min-w-50 sm:max-w-70">
             <Search className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari no. distribusi atau booth..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-[var(--brand-700)] focus:ring-2 focus:ring-[var(--brand-700)]/10 transition-colors shadow-2xs ${
+              className={`w-full h-9 pl-9 pr-8 text-xs sm:text-sm font-medium rounded-xl bg-white/90 dark:bg-surface border text-slate-800 dark:text-fg placeholder:text-slate-400 dark:placeholder:text-fg-muted focus:outline-none focus:border-(--brand-700) focus:ring-2 focus:ring-(--brand-700)/10 transition-colors shadow-2xs ${
                 search.trim() !== "" ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200/90 dark:border-line"
               }`}
             />
@@ -188,7 +188,7 @@ function TransaksiTerimaStokContent() {
               onChange={setBoothId}
               placeholder="Semua Booth"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={boothId !== ""}
             />
           </div>
@@ -200,7 +200,7 @@ function TransaksiTerimaStokContent() {
               onChange={setStaffId}
               placeholder="Semua Barista"
               sizeVariant="sm"
-              className="!h-9"
+              className="h-9!"
               active={staffId !== ""}
             />
           </div>
@@ -217,7 +217,7 @@ function TransaksiTerimaStokContent() {
                 onClick={() => setTab(key)}
                 className={`h-9 px-3 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                   tab === key
-                    ? "bg-[var(--brand-700)] text-white"
+                    ? "bg-(--brand-700) text-white"
                     : "bg-white/90 dark:bg-surface border border-slate-200/90 dark:border-line text-slate-600 dark:text-fg-secondary hover:bg-slate-50 dark:hover:bg-surface-hover"
                 }`}
               >

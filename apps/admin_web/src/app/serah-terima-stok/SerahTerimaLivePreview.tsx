@@ -31,7 +31,7 @@ export function SerahTerimaLivePreview({
       <div className="flex items-start justify-between gap-3 border-b border-slate-200 dark:border-line pb-3">
         <div>
           <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Obbel Coffee &amp; Milk</p>
-          <h2 className="text-base font-black text-[var(--brand-700)] dark:text-brand-400 tracking-tight leading-tight mt-0.5">
+          <h2 className="text-base font-black text-(--brand-700) dark:text-brand-400 tracking-tight leading-tight mt-0.5">
             BUKTI SERAH TERIMA STOK
           </h2>
         </div>
@@ -62,7 +62,7 @@ export function SerahTerimaLivePreview({
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-line">
         <table className="w-full text-xs">
-          <thead className="bg-[var(--brand-700)] text-white">
+          <thead className="bg-(--brand-700) text-white">
             <tr>
               <th className="w-10 py-2 px-3 text-center font-bold">No.</th>
               <th className="py-2 px-3 text-left font-bold">Kode</th>

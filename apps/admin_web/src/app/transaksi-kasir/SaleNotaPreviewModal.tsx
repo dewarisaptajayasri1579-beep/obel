@@ -88,7 +88,7 @@ export function SaleNotaPreviewModal({
         <span className="flex items-center gap-2.5 flex-wrap">
           <span>Pratinjau Struk</span>
           {sale && (
-            <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
+            <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
               {sale.saleNo}
             </span>
           )}
@@ -137,7 +137,7 @@ export function SaleNotaPreviewModal({
             <button
               type="button"
               onClick={cetak}
-              className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-[var(--brand-700)] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-(--brand-700) text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
               Cetak
