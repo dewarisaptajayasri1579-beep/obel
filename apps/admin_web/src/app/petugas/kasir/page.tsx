@@ -115,11 +115,6 @@ function KasirContent() {
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SaleResult | null>(null);
-  // Snapshot item keranjang PERSIS sebelum resetTransaksi() di handleBayar()
-  // — SaleResult dari backend tidak bawa daftar item sama sekali, jadi tanpa
-  // snapshot ini struk Bluetooth (butuh item+qty+harga per baris) tidak
-  // punya data buat dicetak begitu cart sudah dikosongkan.
-  const [resultItems, setResultItems] = useState<{ name: string; qty: number; price: number }[]>([]);
   const [printing, setPrinting] = useState(false);
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
@@ -346,11 +341,6 @@ function KasirContent() {
         for (const s of sale.remainingStock) next.set(s.productId, s.qtyOnHand);
         return next;
       });
-      setResultItems(
-        draftAktif
-          ? draftAktif.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice }))
-          : lines.map((l) => ({ name: l.product.name, qty: l.qty, price: l.product.sellPrice })),
-      );
       resetTransaksi();
       loadDrafts();
     } catch (err) {
@@ -365,6 +355,10 @@ function KasirContent() {
     }
   }
 
+  function labelMetode(metode: SaleResult["paymentMethod"]): string {
+    return metode === "SPLIT" ? "Split" : metode === "CASH" ? "Tunai" : "QRIS";
+  }
+
   function receiptText(sale: SaleResult): string {
     const lines = [
       `*Obbel Coffee & Milk*`,
@@ -372,8 +366,14 @@ function KasirContent() {
       `Booth: ${shift.booth.name}`,
       `Waktu: ${sale.paidAt ? formatJamJakarta(sale.paidAt) : "-"}`,
       `--------------------------`,
-      `Total: ${formatRupiah(sale.total)}`,
-      `Metode: ${sale.paymentMethod === "SPLIT" ? "Split" : sale.paymentMethod === "CASH" ? "Tunai" : "QRIS"}`,
+      ...sale.items.map((i) => `${i.productName}
+  ${i.qty} x ${formatRupiah(i.unitPrice)} = ${formatRupiah(i.lineTotal)}`),
+      `--------------------------`,
+      ...(sale.discount > 0
+        ? [`Subtotal: ${formatRupiah(sale.subtotal)}`, `Diskon: -${formatRupiah(sale.discount)}`]
+        : []),
+      `*Total: ${formatRupiah(sale.total)}*`,
+      `Metode: ${labelMetode(sale.paymentMethod)}`,
       `--------------------------`,
       `Terima kasih telah berbelanja di Obbel Coffee & Milk!`,
     ];
@@ -396,9 +396,9 @@ function KasirContent() {
         boothName: shift.booth.name,
         saleNo: result.saleNo,
         time: result.paidAt ?? new Date().toISOString(),
-        items: resultItems,
+        items: result.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice })),
         total: result.total,
-        paymentMethod: result.paymentMethod === "SPLIT" ? "Split" : result.paymentMethod === "CASH" ? "Tunai" : "QRIS",
+        paymentMethod: labelMetode(result.paymentMethod),
         staffName: session?.profile.fullName,
       });
       toast.success("Struk terkirim ke printer.");
@@ -441,8 +441,20 @@ function KasirContent() {
           <p>Booth: {shift.booth.name}</p>
           <p>Waktu: {result.paidAt ? formatJamJakarta(result.paidAt) : "-"}</p>
           <hr className="my-2" />
-          <p>Total: {formatRupiah(result.total)}</p>
-          <p>Metode: {result.paymentMethod === "SPLIT" ? "Split" : result.paymentMethod === "CASH" ? "Tunai" : "QRIS"}</p>
+          {result.items.map((i) => (
+            <p key={i.productId}>
+              {i.productName}: {i.qty} x {formatRupiah(i.unitPrice)} = {formatRupiah(i.lineTotal)}
+            </p>
+          ))}
+          <hr className="my-2" />
+          {result.discount > 0 && (
+            <>
+              <p>Subtotal: {formatRupiah(result.subtotal)}</p>
+              <p>Diskon: -{formatRupiah(result.discount)}</p>
+            </>
+          )}
+          <p className="font-bold">Total: {formatRupiah(result.total)}</p>
+          <p>Metode: {labelMetode(result.paymentMethod)}</p>
         </div>
 
         <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 mt-2 text-base text-left flex flex-col gap-1.5">
@@ -481,7 +493,7 @@ function KasirContent() {
           <div className="flex justify-between">
             <span className="text-slate-400">Metode Pembayaran</span>
             <span className="font-semibold">
-              {result.paymentMethod === "SPLIT" ? "Split" : result.paymentMethod === "CASH" ? "Tunai" : "QRIS"}
+              {labelMetode(result.paymentMethod)}
             </span>
           </div>
           {result.payments.map((p, i) => (

@@ -1308,6 +1308,8 @@ export interface SaleResult {
   paymentMethod: "CASH" | "QRIS" | "SPLIT"
   payments: PaymentSplitInput[]
   paidAt: string | null
+  /// Item seperti tercatat di server (nama & harga snapshot) — sumber isi struk.
+  items: { productId: string; productName: string; unitPrice: number; qty: number; lineTotal: number }[]
   /// Sisa stok Booth untuk produk di sale ini, setelah dipotong.
   remainingStock: { productId: string; qtyOnHand: number }[]
 }
