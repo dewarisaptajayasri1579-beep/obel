@@ -9,7 +9,6 @@ import {
   ShoppingCart,
   CheckCircle2,
   Search,
-  Coffee,
   ChevronLeft,
   FileText,
   Printer,
@@ -46,6 +45,15 @@ interface CartLine {
 
 type Sheet = null | "cart" | "payment" | "drafts";
 type MetodeBayar = "CASH" | "QRIS" | "SPLIT";
+
+/// Ukuran huruf kartu tulisan produk per kelompok panjang nama — nama pendek tampil
+/// besar, nama panjang mengecil supaya muat 2–3 baris tanpa terpotong. Bertingkat
+/// (bukan dihitung per huruf) supaya kartu yang bersebelahan tetap terlihat seragam.
+function ukuranNamaKartu(nama: string): string {
+  if (nama.length <= 8) return "text-2xl";
+  if (nama.length <= 16) return "text-xl";
+  return "text-lg";
+}
 
 /// Input nominal Rupiah dgn pemisah ribuan otomatis saat mengetik (mis.
 /// "85.000") — `type="text"` bukan `type="number"` karena `<input
@@ -614,30 +622,23 @@ function KasirContent() {
               className="rounded-2xl bg-white border border-slate-200 overflow-hidden relative"
               style={!p.active || habis ? { opacity: 0.55 } : undefined}
             >
-              <div className="w-full aspect-square bg-slate-100 flex items-center justify-center overflow-hidden relative">
-                {p.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Coffee size={32} className="text-slate-300" />
-                )}
-                {!p.active && (
-                  <span className="absolute top-2 left-2 bg-slate-700 text-white text-[11px] font-extrabold rounded-full px-2.5 py-1">
-                    Nonaktif
-                  </span>
-                )}
-                {habis && (
-                  <span
-                    className="absolute top-2 left-2 text-white text-[11px] font-extrabold rounded-full px-2.5 py-1"
-                    style={{ backgroundColor: OBBEL.accentRed }}
-                  >
-                    Stok Habis
-                  </span>
-                )}
+              {/* Kartu tulisan (permintaan client): nama produk sebagai "gambar" papan menu,
+                  bukan foto — sekaligus satu-satunya tempat nama, supaya tidak ditulis dua kali. */}
+              <div className="m-2 mb-0 aspect-4/3 rounded-xl border border-slate-200 bg-white flex items-center justify-center px-3">
+                <p className={`${ukuranNamaKartu(p.name)} font-extrabold text-slate-900 text-center leading-tight tracking-tight text-balance line-clamp-3 wrap-break-word`}>
+                  {p.name}
+                </p>
               </div>
               <div className="p-3">
-                <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
-                <p className="text-sm text-slate-500 mt-0.5">Stok {stock} pack</p>
+                {!p.active ? (
+                  <span className="inline-block bg-slate-700 text-white text-[11px] font-extrabold rounded-full px-2.5 py-0.5">Nonaktif</span>
+                ) : habis ? (
+                  <p className="text-sm font-bold" style={{ color: OBBEL.accentRed }}>
+                    Stok habis
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-500">Stok {stock} pack</p>
+                )}
                 <div className="flex items-end justify-between mt-1.5">
                   <p className="font-extrabold text-base" style={{ color: GREEN }}>
                     {formatRupiah(p.sellPrice)}
@@ -750,14 +751,6 @@ function KasirContent() {
               ))}
               {lines.map((l) => (
                 <div key={l.product.id} className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
-                    {l.product.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={l.product.imageUrl} alt={l.product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Coffee size={18} className="text-slate-300" />
-                    )}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-base text-slate-900 truncate">{l.product.name}</p>
                     <p className="text-sm text-slate-500">{formatRupiah(l.product.sellPrice)}</p>
