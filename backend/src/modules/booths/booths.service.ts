@@ -20,6 +20,18 @@ export class BoothsService {
     };
   }
 
+  /// Nama Booth tampil di semua laporan & pilihan Booth, jadi dua Booth bernama sama
+  /// (beda kode) tidak bisa dibedakan Admin. Dibandingkan tanpa beda huruf besar/kecil &
+  /// spasi berlebih, termasuk Booth nonaktif (masih muncul di laporan lama).
+  private async pastikanNamaUnik(name: string, kecualiId?: string) {
+    const kembar = await this.prisma.booth.findFirst({
+      where: { name: { equals: name.trim().replace(/\s+/g, ' '), mode: 'insensitive' }, ...(kecualiId ? { id: { not: kecualiId } } : {}) },
+    });
+    if (kembar) {
+      throw new DomainError('BOOTH_NAME_TAKEN', `Nama booth "${kembar.name}" sudah dipakai booth ${kembar.code}.`, { boothId: kembar.id });
+    }
+  }
+
   async findAll() {
     const booths = await this.prisma.booth.findMany({ orderBy: { name: 'asc' } });
     return booths.map((b) => this.toResponse(b));
@@ -30,6 +42,7 @@ export class BoothsService {
     if (existing) {
       throw new ConflictException(`Kode booth "${dto.code}" sudah dipakai.`);
     }
+    await this.pastikanNamaUnik(dto.name);
     const booth = await this.prisma.booth.create({
       data: {
         code: dto.code,
@@ -47,6 +60,9 @@ export class BoothsService {
     const existing = await this.prisma.booth.findUnique({ where: { id } });
     if (!existing) {
       throw new DomainError('NOT_FOUND', 'Booth tidak ditemukan.');
+    }
+    if (dto.name !== undefined && dto.name.trim().toLowerCase() !== existing.name.trim().toLowerCase()) {
+      await this.pastikanNamaUnik(dto.name, id);
     }
 
     /// Menonaktifkan Booth yang masih punya petugas di Setting Petugas
