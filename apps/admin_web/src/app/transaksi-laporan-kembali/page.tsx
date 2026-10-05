@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
@@ -444,16 +445,14 @@ function LaporanDetail({
               <>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 dark:text-fg-muted shrink-0">Diterima Admin</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={depositAmount}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => setDepositAmount(Math.max(0, Number(e.target.value) || 0))}
-                    className={`flex-1 rounded-lg border px-3 py-1.5 text-xs text-right font-semibold ${
-                      setoranAdaBeda ? "border-amber-300 bg-amber-50 dark:bg-amber-900/10" : "border-slate-200 dark:border-line"
-                    }`}
-                  />
+                  <div className="flex-1">
+                    <CurrencyInput
+                      value={depositAmount}
+                      onChange={setDepositAmount}
+                      sizeVariant="sm"
+                      className={`font-semibold ${setoranAdaBeda ? "border-amber-300! bg-amber-50! dark:bg-amber-900/10!" : ""}`}
+                    />
+                  </div>
                 </div>
                 <textarea
                   value={depositNote}
