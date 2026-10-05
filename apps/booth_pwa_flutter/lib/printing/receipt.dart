@@ -40,6 +40,10 @@ class Receipt {
 
   int get subtotal => items.fold(0, (sum, item) => sum + item.lineTotal);
 
+  /// Diskon transaksi = subtotal item − total yang dibayar. Diturunkan, bukan
+  /// dikirim PWA, supaya struk tetap benar untuk PWA versi mana pun.
+  int get discount => subtotal > total ? subtotal - total : 0;
+
   factory Receipt.fromJson(Map<String, dynamic> json) {
     return Receipt(
       boothName: json['boothName'] as String,
@@ -53,4 +57,25 @@ class Receipt {
       staffName: json['staffName'] as String?,
     );
   }
+}
+
+const _bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/// Rupiah sesuai konvensi UI: `Rp24.560`, negatif `-Rp1.000`.
+String formatRupiah(int nilai) {
+  final angka = nilai.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < angka.length; i++) {
+    if (i > 0 && (angka.length - i) % 3 == 0) buf.write('.');
+    buf.write(angka[i]);
+  }
+  return '${nilai < 0 ? '-' : ''}Rp$buf';
+}
+
+/// Waktu struk dalam Asia/Jakarta (UTC+7, tanpa DST) sesuai konvensi UI:
+/// `23 Agu 2026, 15.40` — tidak bergantung zona waktu HP.
+String formatWaktuStruk(DateTime waktu) {
+  final wib = waktu.toUtc().add(const Duration(hours: 7));
+  String dua(int n) => n.toString().padLeft(2, '0');
+  return '${wib.day} ${_bulan[wib.month - 1]} ${wib.year}, ${dua(wib.hour)}.${dua(wib.minute)}';
 }

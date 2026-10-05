@@ -8,10 +8,10 @@ import 'receipt_printer.dart';
 const _prefsMacKey = 'printer_mac_address';
 const _prefsNameKey = 'printer_name';
 
-/// Salinan pola dari booth_flutter/lib/printing/bluetooth_receipt_printer.dart
+/// Berasal dari pola booth_flutter/lib/printing/bluetooth_receipt_printer.dart
 /// (printer thermal Bluetooth 58mm generik ESC/POS, pairing lewat pengaturan
-/// Bluetooth OS). Dipertahankan identik supaya struk yang dicetak dari PWA
-/// (lewat shell ini) tetap konsisten formatnya dengan app native booth_flutter.
+/// Bluetooth OS). Isi struk mengikuti konvensi UI (Rupiah `Rp24.000`, waktu
+/// Asia/Jakarta) plus baris Subtotal & Diskon kalau transaksi berdiskon.
 class BluetoothReceiptPrinter implements ReceiptPrinter {
   String? _macAddress;
 
@@ -77,7 +77,7 @@ class BluetoothReceiptPrinter implements ReceiptPrinter {
     bytes.addAll(generator.text(receipt.boothName, styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.hr());
     bytes.addAll(generator.text('No: ${receipt.saleNo}'));
-    bytes.addAll(generator.text(_formatDateTime(receipt.time)));
+    bytes.addAll(generator.text(formatWaktuStruk(receipt.time)));
     if (receipt.staffName != null) {
       bytes.addAll(generator.text('Barista: ${receipt.staffName}'));
     }
@@ -86,20 +86,17 @@ class BluetoothReceiptPrinter implements ReceiptPrinter {
     for (final item in receipt.items) {
       bytes.addAll(generator.text(item.name, styles: const PosStyles(bold: true)));
       bytes.addAll(generator.row([
-        PosColumn(text: '${item.qty} x ${item.price}', width: 6),
-        PosColumn(text: 'Rp ${item.lineTotal}', width: 6, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(text: '${item.qty} x ${formatRupiah(item.price)}', width: 7),
+        PosColumn(text: formatRupiah(item.lineTotal), width: 5, styles: const PosStyles(align: PosAlign.right)),
       ]));
     }
 
     bytes.addAll(generator.hr());
-    bytes.addAll(generator.row([
-      PosColumn(text: 'TOTAL', width: 6, styles: const PosStyles(bold: true)),
-      PosColumn(
-        text: 'Rp ${receipt.total}',
-        width: 6,
-        styles: const PosStyles(bold: true, align: PosAlign.right),
-      ),
-    ]));
+    if (receipt.discount > 0) {
+      bytes.addAll(_baris(generator, 'Subtotal', formatRupiah(receipt.subtotal)));
+      bytes.addAll(_baris(generator, 'Diskon', formatRupiah(-receipt.discount)));
+    }
+    bytes.addAll(_baris(generator, 'TOTAL', formatRupiah(receipt.total), tebal: true));
     bytes.addAll(generator.text('Metode: ${receipt.paymentMethod}'));
     bytes.addAll(generator.feed(1));
     bytes.addAll(generator.text('Terima kasih!', styles: const PosStyles(align: PosAlign.center)));
@@ -109,9 +106,10 @@ class BluetoothReceiptPrinter implements ReceiptPrinter {
     return PrintBluetoothThermal.writeBytes(bytes);
   }
 
-  String _formatDateTime(DateTime dt) {
-    final local = dt.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)}/${local.year} ${two(local.hour)}:${two(local.minute)}';
+  List<int> _baris(Generator generator, String label, String nilai, {bool tebal = false}) {
+    return generator.row([
+      PosColumn(text: label, width: 6, styles: PosStyles(bold: tebal)),
+      PosColumn(text: nilai, width: 6, styles: PosStyles(bold: tebal, align: PosAlign.right)),
+    ]);
   }
 }
