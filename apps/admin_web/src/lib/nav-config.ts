@@ -5,6 +5,7 @@ import {
   ShoppingCart,
   Truck,
   PackagePlus,
+  PackageX,
   PackageCheck,
   Receipt,
   Database,
@@ -76,6 +77,11 @@ export const MAIN_NAV: NavGroup[] = [
             href: "/stok/penerimaan",
             icon: PackagePlus,
             bottomBar: true,
+          },
+          {
+            label: "Pemusnahan Stok",
+            href: "/stok/pemusnahan",
+            icon: PackageX,
           },
           {
             label: "Serah Terima Stok",

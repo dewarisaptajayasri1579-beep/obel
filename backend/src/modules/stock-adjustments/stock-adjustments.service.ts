@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OpnameLocationType, StockMovementType } from '@prisma/client';
+import { OpnameLocationType, ReasonCode, StockMovementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
@@ -9,6 +9,7 @@ import { CorrectionsService } from '../corrections/corrections.service';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateStockAdjustmentDto, ReverseStockAdjustmentDto } from './dto/create-stock-adjustment.dto';
+import { WriteOffStockDto } from './dto/write-off-stock.dto';
 
 /// TX-13 — Manual Stock Adjustment. BUKAN jalan pintas edit stok bebas:
 /// Admin memilih lokasi+produk+target qty+reason, server hitung delta
@@ -37,39 +38,80 @@ export class StockAdjustmentsService {
     this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
 
     const currentQty = await this.getCurrentQty(dto.locationType, dto.boothId, dto.productId);
-    const delta = dto.targetQty - currentQty;
+    return this.catat({ ...dto, user, before: currentQty, delta: dto.targetQty - currentQty });
+  }
+
+  /// TX-13 — Pemusnahan Stok Gudang (BR-041): produk kedaluwarsa / tidak layak jual
+  /// dikeluarkan dari Gudang sebanyak `qty`, dengan foto bukti wajib. Dokumennya sama
+  /// dengan adjustment (alasan EXPIRED), jadi salah input dibatalkan lewat reverse().
+  async writeOff(dto: WriteOffStockDto, user: JwtPayload) {
+    const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    if (existing) {
+      return existing;
+    }
+    const currentQty = await this.getCurrentQty(OpnameLocationType.WAREHOUSE, undefined, dto.productId);
+    if (dto.qty > currentQty) {
+      throw new DomainError('INSUFFICIENT_STOCK', `Stok Gudang hanya ${currentQty} cup.`, { available: currentQty });
+    }
+    return this.catat({
+      idempotencyKey: dto.idempotencyKey,
+      locationType: OpnameLocationType.WAREHOUSE,
+      productId: dto.productId,
+      reasonCode: ReasonCode.EXPIRED,
+      reasonNote: dto.reasonNote,
+      evidencePhotoUrl: dto.photoUrl,
+      before: currentQty,
+      delta: -dto.qty,
+      user,
+    });
+  }
+
+  /// Posting adjustment: ubah projection stok (pengurangan dijaga atomik supaya tidak
+  /// negatif), tulis StockMovement, lalu dokumen koreksi — satu DB transaction.
+  private async catat(p: {
+    idempotencyKey: string;
+    locationType: OpnameLocationType;
+    boothId?: string;
+    productId: string;
+    reasonCode: ReasonCode;
+    reasonNote?: string;
+    evidencePhotoUrl?: string;
+    before: number;
+    delta: number;
+    user: JwtPayload;
+  }) {
     const adjustmentId = randomUUID();
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
-      if (delta !== 0) {
-        if (dto.locationType === OpnameLocationType.WAREHOUSE) {
-          if (delta > 0) {
+      if (p.delta !== 0) {
+        if (p.locationType === OpnameLocationType.WAREHOUSE) {
+          if (p.delta > 0) {
             await tx.warehouseStock.upsert({
-              where: { productId: dto.productId },
-              create: { productId: dto.productId, qtyOnHand: delta },
-              update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
+              where: { productId: p.productId },
+              create: { productId: p.productId, qtyOnHand: p.delta },
+              update: { qtyOnHand: { increment: p.delta }, version: { increment: 1 } },
             });
           } else {
             const decremented = await tx.warehouseStock.updateMany({
-              where: { productId: dto.productId, qtyOnHand: { gte: -delta } },
-              data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
+              where: { productId: p.productId, qtyOnHand: { gte: -p.delta } },
+              data: { qtyOnHand: { decrement: -p.delta }, version: { increment: 1 } },
             });
             if (decremented.count !== 1) {
               throw new DomainError('INSUFFICIENT_STOCK', 'Adjustment akan membuat stok Gudang negatif.');
             }
           }
         } else {
-          if (delta > 0) {
+          if (p.delta > 0) {
             await tx.boothStock.upsert({
-              where: { boothId_productId: { boothId: dto.boothId!, productId: dto.productId } },
-              create: { boothId: dto.boothId!, productId: dto.productId, qtyOnHand: delta },
-              update: { qtyOnHand: { increment: delta }, version: { increment: 1 } },
+              where: { boothId_productId: { boothId: p.boothId!, productId: p.productId } },
+              create: { boothId: p.boothId!, productId: p.productId, qtyOnHand: p.delta },
+              update: { qtyOnHand: { increment: p.delta }, version: { increment: 1 } },
             });
           } else {
             const decremented = await tx.boothStock.updateMany({
-              where: { boothId: dto.boothId!, productId: dto.productId, qtyOnHand: { gte: -delta } },
-              data: { qtyOnHand: { decrement: -delta }, version: { increment: 1 } },
+              where: { boothId: p.boothId!, productId: p.productId, qtyOnHand: { gte: -p.delta } },
+              data: { qtyOnHand: { decrement: -p.delta }, version: { increment: 1 } },
             });
             if (decremented.count !== 1) {
               throw new DomainError('INSUFFICIENT_STOCK', 'Adjustment akan membuat stok Booth negatif.');
@@ -81,21 +123,21 @@ export class StockAdjustmentsService {
           data: {
             movementNo: await nomorMovementBerikutnya(tx, 'MOV'),
             movementType: StockMovementType.ADJUSTMENT,
-            productId: dto.productId,
-            qty: Math.abs(delta),
-            toBoothId: dto.locationType === OpnameLocationType.BOOTH && delta > 0 ? dto.boothId : null,
-            fromBoothId: dto.locationType === OpnameLocationType.BOOTH && delta < 0 ? dto.boothId : null,
+            productId: p.productId,
+            qty: Math.abs(p.delta),
+            toBoothId: p.locationType === OpnameLocationType.BOOTH && p.delta > 0 ? p.boothId : null,
+            fromBoothId: p.locationType === OpnameLocationType.BOOTH && p.delta < 0 ? p.boothId : null,
             // Sufiks arah wajib khusus Gudang — lihat arah.util.ts adjustmentGudang().
             referenceType:
-              dto.locationType === OpnameLocationType.WAREHOUSE
-                ? delta > 0
+              p.locationType === OpnameLocationType.WAREHOUSE
+                ? p.delta > 0
                   ? 'stock_adjustment_in'
                   : 'stock_adjustment_out'
                 : 'stock_adjustment',
             referenceId: adjustmentId,
             businessDate: businessDateOf(now),
             occurredAt: now,
-            createdBy: user.sub,
+            createdBy: p.user.sub,
           },
         });
       }
@@ -105,22 +147,23 @@ export class StockAdjustmentsService {
         entityId: adjustmentId,
         transactionGroupId: adjustmentId,
         correctionType: 'ADJUSTMENT',
-        reasonCode: dto.reasonCode,
-        reasonNote: dto.reasonNote,
+        reasonCode: p.reasonCode,
+        reasonNote: p.reasonNote,
+        evidencePhotoUrl: p.evidencePhotoUrl,
         impactSnapshot: {
-          locationType: dto.locationType,
-          boothId: dto.boothId ?? null,
-          productId: dto.productId,
-          before: currentQty,
-          after: dto.targetQty,
-          delta,
+          locationType: p.locationType,
+          boothId: p.boothId ?? null,
+          productId: p.productId,
+          before: p.before,
+          after: p.before + p.delta,
+          delta: p.delta,
         },
-        createdById: user.sub,
-        idempotencyKey: dto.idempotencyKey,
+        createdById: p.user.sub,
+        idempotencyKey: p.idempotencyKey,
       });
     });
 
-    return this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
+    return this.corrections.findExistingByIdempotencyKey(p.idempotencyKey);
   }
 
   /// Reverse adjustment yang salah — original tetap ada, reversal jadi

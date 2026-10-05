@@ -15,6 +15,8 @@ export interface RecordCorrectionInput {
   replacementVersionId?: string | null;
   reasonCode: ReasonCode;
   reasonNote?: string | null;
+  /// Foto bukti (mis. produk yang dimusnahkan, BR-041).
+  evidencePhotoUrl?: string | null;
   impactSnapshot: Record<string, unknown>;
   createdById: string;
   idempotencyKey: string;
@@ -140,6 +142,7 @@ export class CorrectionsService {
         replacementVersionId: input.replacementVersionId ?? null,
         reasonCode: input.reasonCode,
         reasonNote: input.reasonNote ?? null,
+        evidencePhotoUrl: input.evidencePhotoUrl ?? null,
         impactSnapshot: input.impactSnapshot as Prisma.InputJsonValue,
         status: 'POSTED',
         createdById: input.createdById,

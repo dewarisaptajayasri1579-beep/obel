@@ -928,6 +928,7 @@ export type ReasonCode =
   | "DATA_ENTRY_ERROR"
   | "SYSTEM_ERROR"
   | "OTHER"
+  | "EXPIRED"
 
 /// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §10.
 export const REASON_CODE_OPTIONS: { value: ReasonCode; label: string }[] = [
@@ -946,6 +947,7 @@ export const REASON_CODE_OPTIONS: { value: ReasonCode; label: string }[] = [
   { value: "DATA_ENTRY_ERROR", label: "Salah Input Data" },
   { value: "SYSTEM_ERROR", label: "Error Sistem" },
   { value: "OTHER", label: "Lainnya" },
+  { value: "EXPIRED", label: "Expired / Tidak Layak Jual" },
 ]
 
 export interface StockOpnameItem {
@@ -1008,6 +1010,8 @@ export interface StockAdjustmentRecord {
   correctionType: "ADJUSTMENT" | "VOID"
   reasonCode: ReasonCode
   reasonNote: string | null
+  /// Foto bukti — diisi untuk Pemusnahan Stok (alasan EXPIRED).
+  evidencePhotoUrl: string | null
   impactSnapshot: {
     locationType: "WAREHOUSE" | "BOOTH"
     boothId: string | null
@@ -1632,6 +1636,10 @@ export const api = {
     reasonCode: ReasonCode
     reasonNote?: string
   }) => request<StockAdjustmentRecord>("/stock-adjustments", { method: "POST", body: input }),
+  /// Pemusnahan Stok Gudang (produk expired / tidak layak jual): qty yang dibuang + foto wajib.
+  uploadWriteOffPhoto: (file: File) => uploadPhoto("/stock-adjustments/write-off/photo", file),
+  writeOffStock: (input: { idempotencyKey: string; productId: string; qty: number; photoUrl: string; reasonNote?: string }) =>
+    request<StockAdjustmentRecord>("/stock-adjustments/write-off", { method: "POST", body: input }),
   reverseStockAdjustment: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request<StockAdjustmentRecord>(`/stock-adjustments/${id}/reverse`, { method: "POST", body: input }),
 

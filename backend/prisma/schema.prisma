@@ -128,6 +128,8 @@ enum ReasonCode {
   DATA_ENTRY_ERROR
   SYSTEM_ERROR
   OTHER
+  // Produk kedaluwarsa / tidak layak jual — Pemusnahan Stok Gudang (BR-041).
+  EXPIRED
 
   @@map("reason_code")
 }
@@ -957,6 +959,8 @@ model TransactionCorrection {
   createdAt            DateTime         @default(now()) @map("created_at")
   postedAt             DateTime?        @map("posted_at")
   idempotencyKey       String           @unique @map("idempotency_key")
+  // Foto bukti koreksi, mis. produk yang dimusnahkan (BR-041).
+  evidencePhotoUrl     String?          @map("evidence_photo_url")
 
   @@index([entityType, entityId])
   @@index([transactionGroupId])

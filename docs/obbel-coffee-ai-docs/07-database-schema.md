@@ -355,8 +355,9 @@ Untuk tabel yang sudah mempunyai status lifecycle khusus, `posting_status` boleh
 - correction_type `VOID|REVISION|RECOUNT|ADJUSTMENT|PAYMENT_CORRECTION`
 - original_version_id uuid nullable
 - replacement_version_id uuid nullable
-- reason_code text required
+- reason_code text required (`EXPIRED` = produk kedaluwarsa / tidak layak jual, BR-041)
 - reason_note text nullable
+- evidence_photo_url text nullable — foto bukti koreksi, wajib untuk Pemusnahan Stok (BR-041)
 - impact_snapshot jsonb
 - status `PENDING|POSTED|FAILED`
 - created_by uuid

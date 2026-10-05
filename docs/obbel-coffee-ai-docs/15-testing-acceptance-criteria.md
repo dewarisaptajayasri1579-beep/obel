@@ -167,3 +167,6 @@ Gudang punya N cup → petugas mengajukan N+1 ditolak `RESTOCK_EXCEEDS_WAREHOUSE
 ### AC-43 Barista mengganti metode bayar
 Sale Tunai di shift aktif → ganti ke QRIS tanpa alasan ditolak `REASON_NOTE_REQUIRED`, tanpa foto ditolak `QRIS_PROOF_REQUIRED`; dengan keduanya → satu baris payment QRIS POSTED berfoto, `sales.payment_method` = QRIS, stok tetap, kas Tunai/QRIS laporan shift bergeser sebesar total. Split → Tunai men-supersede KEDUA baris Split. Metode sama → `PAYMENT_UNCHANGED`; pecahan Split tidak pas → `PAYMENT_AMOUNT_MISMATCH`; retry dengan key sama tercatat sekali. Sale milik Barista lain atau setelah Check-Out → `SALE_NOT_IN_ACTIVE_SHIFT`. Admin bisa tanpa foto, bukti lama ikut (BR-040). Test: `payment-method-change.e2e-spec.ts`.
 
+
+### AC-44 Pemusnahan Stok Gudang
+Admin memusnahkan N cup tanpa foto atau dengan URL foto asing → ditolak; N melebihi stok Gudang → `INSUFFICIENT_STOCK` (details `available`), stok tidak berubah. Dengan foto → stok Gudang berkurang N, satu movement `ADJUSTMENT` `stock_adjustment_out`, dokumen koreksi `EXPIRED` menyimpan foto & catatan; retry dengan key sama tercatat sekali. Batalkan → stok kembali; batal kedua `ADJUSTMENT_ALREADY_REVERSED`. Petugas → 403 (BR-041). Test: `stock-write-off.e2e-spec.ts`.

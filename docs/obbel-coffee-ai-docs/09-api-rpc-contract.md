@@ -150,6 +150,13 @@ Admin only.
 Input location, product, delta or target qty, reason.
 Prefer API with target count then server derives delta to reduce confusion.
 
+### `write_off_stock` (Pemusnahan Stok Gudang, BR-041)
+Admin only. `POST /stock-adjustments/write-off` dengan `product_id`, `qty` (cup yang dibuang, >=1), `photo_url`
+(wajib, hasil `POST /stock-adjustments/write-off/photo`, multipart field `file`, JPG/PNG/WEBP/GIF maks 5MB; URL di
+luar `/uploads/stock-write-offs/` ditolak), `reason_note` opsional, `idempotency_key`. Hasilnya dokumen adjustment
+Gudang beralasan `EXPIRED` + movement `ADJUSTMENT` keluar Gudang; dibatalkan lewat `POST /stock-adjustments/:id/reverse`.
+Error: `INSUFFICIENT_STOCK` (details `{ available }`), `ADJUSTMENT_ALREADY_REVERSED` saat reverse kedua.
+
 ## 13. Void sale
 ### `void_sale`
 Admin only, reason required, reversal movement generated.
