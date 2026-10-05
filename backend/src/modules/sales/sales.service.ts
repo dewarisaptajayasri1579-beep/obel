@@ -1491,6 +1491,14 @@ export class SalesService {
       paymentMethod: sale.paymentMethod,
       payments: sale.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
       paidAt: sale.paidAt,
+      // Isi struk (Bluetooth & WhatsApp) dari harga yang tercatat, bukan dari keranjang di client.
+      items: sale.items.map((i) => ({
+        productId: i.productId,
+        productName: i.productNameSnapshot,
+        unitPrice: Number(i.unitPrice),
+        qty: i.qty,
+        lineTotal: Number(i.lineTotal),
+      })),
       remainingStock: remainingStock.map((s) => ({
         productId: s.productId,
         qtyOnHand: s.qtyOnHand,

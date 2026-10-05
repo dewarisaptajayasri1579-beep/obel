@@ -76,6 +76,35 @@ describe('Draft payment (e2e)', () => {
     expect(detail.body.payments).toHaveLength(1);
   });
 
+  it('returns the recorded items with server prices for the receipt, on direct sale and draft payment', async () => {
+    const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
+    const harga = catalog.body.find((p: { id: string }) => p.id === productId).sellPrice as number;
+    const itemDiharapkan = (qty: number) => [
+      { productId, productName: expect.any(String), unitPrice: harga, qty, lineTotal: harga * qty },
+    ];
+
+    const langsung = await request(server())
+      .post('/sales')
+      .set('Authorization', `Bearer ${boothToken}`)
+      .send({ idempotencyKey: randomUUID(), shiftSessionId, paymentMethod: 'CASH', items: [{ productId, qty: 2 }], discount: 1000 })
+      .expect(201);
+    paidSaleIds.push(langsung.body.saleId);
+    expect(langsung.body.items).toEqual(itemDiharapkan(2));
+    expect(langsung.body.subtotal).toBe(harga * 2);
+    expect(langsung.body.total).toBe(harga * 2 - 1000);
+
+    const draft = (
+      await request(server())
+        .post('/sales/draft')
+        .set('Authorization', `Bearer ${boothToken}`)
+        .send({ idempotencyKey: randomUUID(), shiftSessionId, items: [{ productId, qty: 1 }] })
+        .expect(201)
+    ).body;
+    const dibayar = await request(server()).post(`/sales/${draft.id}/pay`).set('Authorization', `Bearer ${boothToken}`).send({ paymentMethod: 'CASH' }).expect(201);
+    paidSaleIds.push(draft.id);
+    expect(dibayar.body.items).toEqual(itemDiharapkan(1));
+  });
+
   it('paying an already-paid draft again is a no-op returning the same sale', async () => {
     const before = await stockOnHand();
     const draft = (
