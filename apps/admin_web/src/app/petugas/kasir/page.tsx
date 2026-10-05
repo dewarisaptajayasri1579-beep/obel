@@ -33,6 +33,15 @@ import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printReceipt, isNativeBridgeAvailable } from "../_lib/native-bridge";
 import { PhotoCapture } from "../_components/PhotoCapture";
+import {
+  KodeQrisBooth,
+  PilihMetodeBayar,
+  RibuanInput,
+  SplitBayarInput,
+  rencanaBayar,
+  splitValid,
+  type MetodeBayar,
+} from "../_components/PembayaranInput";
 import { RequireActiveShift, useActiveShift } from "../_components/RequireActiveShift";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
@@ -44,7 +53,6 @@ interface CartLine {
 }
 
 type Sheet = null | "cart" | "payment" | "drafts";
-type MetodeBayar = "CASH" | "QRIS" | "SPLIT";
 
 /// Ukuran huruf kartu tulisan produk per kelompok panjang nama — nama pendek tampil
 /// besar, nama panjang mengecil supaya muat 2–3 baris tanpa terpotong. Bertingkat
@@ -53,35 +61,6 @@ function ukuranNamaKartu(nama: string): string {
   if (nama.length <= 8) return "text-2xl";
   if (nama.length <= 16) return "text-xl";
   return "text-lg";
-}
-
-/// Input nominal Rupiah dgn pemisah ribuan otomatis saat mengetik (mis.
-/// "85.000") — `type="text"` bukan `type="number"` karena `<input
-/// type="number">` tidak bisa menampilkan titik pemisah ribuan sama sekali.
-function RibuanInput({
-  value,
-  onChange,
-  className,
-  placeholder,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-  className?: string;
-  placeholder?: string;
-}) {
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      value={value > 0 ? value.toLocaleString("id-ID") : ""}
-      onChange={(e) => {
-        const digits = e.target.value.replace(/\D/g, "");
-        onChange(digits === "" ? 0 : Number(digits));
-      }}
-      className={className}
-      placeholder={placeholder}
-    />
-  );
 }
 
 /// Nominal cepat: kelipatan Rp5.000 di atas total (mirip mockup Rp20rb/50rb/
@@ -111,8 +90,7 @@ function KasirContent() {
   const [discountInput, setDiscountInput] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<MetodeBayar>("CASH");
   const [nominalTunai, setNominalTunai] = useState<number>(0);
-  // Split: cukup simpan bagian Tunai — bagian QRIS selalu sisanya (lihat
-  // splitQris di bawah), jadi jumlah keduanya pasti sama dengan total.
+  // Split: cukup simpan bagian Tunai — bagian QRIS selalu sisanya (lihat SplitBayarInput).
   const [splitTunai, setSplitTunai] = useState<number>(0);
   // Foto bukti bayar QRIS (wajib untuk QRIS & Split). URL hasil upload
   // disimpan supaya retry Bayar tidak mengunggah ulang foto yang sama.
@@ -294,20 +272,13 @@ function KasirContent() {
 
 
   const kembalianAtauKurang = nominalTunai - total;
-  const splitQris = total - splitTunai;
-  /// Mengisi salah satu bagian Split otomatis menyesuaikan bagian lainnya;
-  /// nilai di atas total dibatasi ke total.
-  const aturSplit = (bagian: "TUNAI" | "QRIS", nilai: number) => {
-    const n = Math.min(Math.max(nilai, 0), total);
-    setSplitTunai(bagian === "TUNAI" ? n : total - n);
-  };
   const butuhBuktiQris = paymentMethod !== "CASH";
   const nominalValid =
     paymentMethod === "QRIS"
       ? true
       : paymentMethod === "CASH"
         ? nominalTunai >= total
-        : splitTunai > 0 && splitQris > 0;
+        : splitValid(total, splitTunai);
   const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
@@ -355,12 +326,7 @@ function KasirContent() {
         qrisProofPhotoUrl = qrisPhotoUrl ?? (await api.uploadPaymentProofPhoto(qrisPhoto)).photoUrl;
         setQrisPhotoUrl(qrisProofPhotoUrl);
       }
-      const payload = {
-        ...(paymentMethod === "SPLIT"
-          ? { payments: [{ method: "CASH" as const, amount: splitTunai }, { method: "QRIS" as const, amount: splitQris }] }
-          : { paymentMethod }),
-        qrisProofPhotoUrl,
-      };
+      const payload = { ...rencanaBayar(paymentMethod, total, splitTunai), qrisProofPhotoUrl };
 
       const sale = draftAktif
         ? await api.payDraftSale(draftAktif.id, payload)
@@ -850,43 +816,9 @@ function KasirContent() {
                 )}
               </div>
 
-              <div>
-                <p className="text-base font-bold text-slate-700 mb-2">Metode Pembayaran</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["CASH", "QRIS", "SPLIT"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setPaymentMethod(m)}
-                      className="rounded-xl py-3 text-base font-bold border-2"
-                      style={
-                        paymentMethod === m
-                          ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
-                          : { borderColor: "#E2E8F0", color: "#475569" }
-                      }
-                    >
-                      {m === "CASH" ? "Tunai" : m === "QRIS" ? "QRIS" : "Split"}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <PilihMetodeBayar value={paymentMethod} onChange={setPaymentMethod} />
 
-              {(paymentMethod === "QRIS" || paymentMethod === "SPLIT") && (
-                <div>
-                  <p className="text-base font-bold text-slate-700 mb-2">Kode QRIS Booth</p>
-                  {qrisImageUrl ? (
-                    <div className="rounded-2xl border border-slate-200 p-4 flex flex-col items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={qrisImageUrl} alt="Kode QRIS" className="w-48 h-48 object-contain" />
-                      <p className="text-sm text-slate-500 text-center">Tunjukkan ke pelanggan untuk dipindai.</p>
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
-                      Kode QRIS Booth ini belum diunggah Admin. Hubungi Admin untuk mengaturnya di Data Booth.
-                    </div>
-                  )}
-                </div>
-              )}
+              {(paymentMethod === "QRIS" || paymentMethod === "SPLIT") && <KodeQrisBooth imageUrl={qrisImageUrl} />}
 
               {butuhBuktiQris && (
                 <PhotoCapture
@@ -921,40 +853,11 @@ function KasirContent() {
                       </button>
                     ))}
                   </div>
-                  <RibuanInput
-                    value={nominalTunai}
-                    onChange={setNominalTunai}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
-                    placeholder="Masukkan nominal lain"
-                  />
+                  <RibuanInput value={nominalTunai} onChange={setNominalTunai} placeholder="Masukkan nominal lain" />
                 </div>
               )}
 
-              {paymentMethod === "SPLIT" && (
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian Tunai</p>
-                    <RibuanInput
-                      value={splitTunai}
-                      onChange={(n) => aturSplit("TUNAI", n)}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-600 mb-1.5">Bagian QRIS</p>
-                    <RibuanInput
-                      value={splitQris}
-                      onChange={(n) => aturSplit("QRIS", n)}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold outline-none focus:border-[#0B5D34]"
-                    />
-                  </div>
-                  {(splitTunai === 0 || splitQris === 0) && (
-                    <p className="text-sm font-semibold" style={{ color: OBBEL.accentRed }}>
-                      Split butuh bagian Tunai dan QRIS masing-masing lebih dari Rp0. Kalau hanya satu metode, pilih Tunai atau QRIS.
-                    </p>
-                  )}
-                </div>
-              )}
+              {paymentMethod === "SPLIT" && <SplitBayarInput total={total} tunai={splitTunai} onTunai={setSplitTunai} />}
 
               {paymentMethod === "CASH" && (
                 <div className="rounded-2xl bg-slate-50 p-4 flex flex-col gap-1.5 text-base">
