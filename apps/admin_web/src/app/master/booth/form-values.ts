@@ -9,6 +9,8 @@ export interface BoothFormValues {
   latitude: string;
   longitude: string;
   qrisImageUrl: string;
+  /// Uang jalan per shift (Rupiah), BR-043.
+  cashFloat: number;
   isActive: boolean;
 }
 
@@ -36,6 +38,7 @@ export function nilaiAwalBooth(nomorUrut?: number): BoothFormValues {
     latitude: "",
     longitude: "",
     qrisImageUrl: "",
+    cashFloat: 0,
     isActive: true,
   };
 }
@@ -50,6 +53,7 @@ export function keFormValues(b: Booth): BoothFormValues {
     latitude: b.latitude === null ? "" : String(b.latitude),
     longitude: b.longitude === null ? "" : String(b.longitude),
     qrisImageUrl: b.qrisImageUrl ?? "",
+    cashFloat: b.cashFloat,
     isActive: b.status === "ACTIVE",
   };
 }

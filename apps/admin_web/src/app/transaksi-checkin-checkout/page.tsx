@@ -9,17 +9,29 @@ import {
   Fingerprint,
   MapPin,
   Search,
+  ShieldCheck,
   Timer,
   X,
   XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
+import { Textarea } from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
-import { api, ApiError, type Booth, type ShiftAdminHistoryItem, type UserAccount } from "@/lib/api-client";
+import {
+  api,
+  ApiError,
+  type AttendancePermit,
+  type AttendancePoint,
+  type Booth,
+  type ShiftAdminHistoryItem,
+  type TitikAbsen,
+  type UserAccount,
+} from "@/lib/api-client";
 import { TRANSAKSI_BOOTH_FILTER_KEYS, usePersistedFilter } from "@/lib/use-persisted-filter";
 
 // Leaflet menyentuh `window`/`document` langsung — wajib no-SSR.
@@ -108,6 +120,30 @@ interface PreviewFoto {
   waktu: string | null;
   latitude: number | null;
   longitude: number | null;
+  /// Ringkasan validasi lokasi titik ini (jarak / izin / acuan kosong).
+  keterangan: string | null;
+}
+
+/// Empat titik absen per shift (BR-042), urut kolom tabel.
+const TITIK: { key: keyof ShiftAdminHistoryItem["absen"]; label: string; acuan: string }[] = [
+  { key: "berangkat", label: "Berangkat", acuan: "Gudang" },
+  { key: "tiba", label: "Tiba", acuan: "Booth" },
+  { key: "selesai", label: "Check-Out", acuan: "Booth" },
+  { key: "kembali", label: "Kembali", acuan: "Gudang" },
+];
+
+const LABEL_TITIK: Record<AttendancePoint, string> = {
+  DEPART: "Berangkat (Gudang)",
+  ARRIVE: "Tiba (Booth)",
+  FINISH: "Check-Out (Booth)",
+  RETURN: "Kembali (Gudang)",
+};
+
+function keteranganTitik(t: TitikAbsen, acuan: string): string | null {
+  if (!t.at) return null;
+  if (t.izin) return `Di luar radius, diizinkan ${t.izin.grantedBy}: ${t.izin.reason}`;
+  if (t.acuanKosong) return `Titik ${acuan} belum diatur — jarak tidak dicek`;
+  return t.distanceMeters === null ? null : `${t.distanceMeters} m dari ${acuan}`;
 }
 
 function FotoAbsen({ url, label, onOpen }: { url: string | null; label: string; onOpen: () => void }) {
@@ -121,6 +157,23 @@ function FotoAbsen({ url, label, onOpen }: { url: string | null; label: string; 
         className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-line group-hover:ring-2 group-hover:ring-(--brand-700)/30 transition-all"
       />
     </button>
+  );
+}
+
+function SelTitik({ t, acuan, onOpen }: { t: TitikAbsen; acuan: string; onOpen: () => void }) {
+  if (!t.at) return <span className="text-slate-400 dark:text-fg-muted">-</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <FotoAbsen url={t.photoUrl} label="Foto absen" onOpen={onOpen} />
+      <div className="leading-tight">
+        <p className="text-slate-600 dark:text-fg-secondary whitespace-nowrap">{jamJakarta(t.at)}</p>
+        <p
+          className={`text-[10px] whitespace-nowrap ${t.izin ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-slate-400 dark:text-fg-muted"}`}
+        >
+          {t.izin ? "Izin Admin" : t.acuanKosong ? `${acuan} belum diatur` : t.distanceMeters !== null ? `${t.distanceMeters} m` : ""}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -141,6 +194,48 @@ function TransaksiCheckinCheckoutContent() {
   const [customDari, setCustomDari] = usePersistedFilter("transaksi-checkin-checkout:custom-dari", "");
   const [customSampai, setCustomSampai] = usePersistedFilter("transaksi-checkin-checkout:custom-sampai", "");
   const [previewFoto, setPreviewFoto] = useState<PreviewFoto | null>(null);
+
+  // Izin absen dari Admin (BR-042): Barista menghubungi Admin, Admin memberi izin di sini.
+  const [izinOpen, setIzinOpen] = useState(false);
+  const [izinHariIni, setIzinHariIni] = useState<AttendancePermit[]>([]);
+  const [izinStaffId, setIzinStaffId] = useState("");
+  const [izinJenis, setIzinJenis] = useState<"LOCATION" | "EARLY_CHECKOUT">("LOCATION");
+  const [izinTitik, setIzinTitik] = useState<AttendancePoint>("DEPART");
+  const [izinAlasan, setIzinAlasan] = useState("");
+  const [memberiIzin, setMemberiIzin] = useState(false);
+
+  function muatIzin() {
+    api.getAttendancePermits().then(setIzinHariIni).catch(() => {});
+  }
+
+  function bukaIzin() {
+    setIzinStaffId("");
+    setIzinJenis("LOCATION");
+    setIzinTitik("DEPART");
+    setIzinAlasan("");
+    setIzinOpen(true);
+    muatIzin();
+  }
+
+  async function beriIzin() {
+    if (!izinStaffId || izinAlasan.trim().length < 3) return;
+    setMemberiIzin(true);
+    try {
+      await api.grantAttendancePermit({
+        staffId: izinStaffId,
+        type: izinJenis,
+        point: izinJenis === "LOCATION" ? izinTitik : undefined,
+        reason: izinAlasan.trim(),
+      });
+      toast.success("Izin absen diberikan — minta Barista mengulang absennya.");
+      setIzinAlasan("");
+      muatIzin();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal memberi izin absen.");
+    } finally {
+      setMemberiIzin(false);
+    }
+  }
 
   useEffect(() => {
     api.getBooths().then(setBooths).catch(() => {});
@@ -205,10 +300,13 @@ function TransaksiCheckinCheckoutContent() {
               Transaksi Booth - Check In-Check Out
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Riwayat absen Barista (foto selfie & waktu). Read-only — absen dilakukan Barista di app.
+              Riwayat absen 4 titik Barista: Berangkat &amp; Kembali di Gudang, Tiba &amp; Check-Out di Booth (foto, jam, jarak).
             </p>
           </div>
         </div>
+        <Button variant="primary" size="sm" leftIcon={<ShieldCheck className="w-3.5 h-3.5" />} onClick={bukaIzin}>
+          Beri Izin Absen
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -385,8 +483,11 @@ function TransaksiCheckinCheckoutContent() {
                   <th className="py-3.5 px-3">Tanggal</th>
                   <th className="py-3.5 px-3">Booth</th>
                   <th className="py-3.5 px-3">Barista</th>
-                  <th className="py-3.5 px-3">Check In</th>
-                  <th className="py-3.5 px-3">Check Out</th>
+                  {TITIK.map((t) => (
+                    <th key={t.key} className="py-3.5 px-3">
+                      {t.label}
+                    </th>
+                  ))}
                   <th className="py-3.5 px-3">Durasi</th>
                   <th className="py-3.5 px-3 text-right">Total Jual Cup</th>
                   <th className="py-3.5 px-3 text-center">Status</th>
@@ -403,42 +504,29 @@ function TransaksiCheckinCheckoutContent() {
                       </td>
                       <td className="py-3 px-3 font-semibold text-slate-800 dark:text-fg">{r.boothName}</td>
                       <td className="py-3 px-3 text-slate-700 dark:text-fg-secondary">{r.staffName}</td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <FotoAbsen
-                            url={r.checkInPhotoUrl}
-                            label="Foto Check In"
+                      {TITIK.map((t) => (
+                        <td key={t.key} className="py-3 px-3">
+                          <SelTitik
+                            t={r.absen[t.key]}
+                            acuan={t.acuan}
                             onOpen={() =>
                               setPreviewFoto({
-                                url: r.checkInPhotoUrl!,
-                                label: `Check In — ${r.staffName}`,
-                                waktu: r.openedAt,
-                                latitude: r.checkInLatitude,
-                                longitude: r.checkInLongitude,
+                                url: r.absen[t.key].photoUrl!,
+                                label: `${t.label} — ${r.staffName}`,
+                                waktu: r.absen[t.key].at,
+                                latitude: r.absen[t.key].latitude,
+                                longitude: r.absen[t.key].longitude,
+                                keterangan: keteranganTitik(r.absen[t.key], t.acuan),
                               })
                             }
                           />
-                          <span className="text-slate-600 dark:text-fg-secondary whitespace-nowrap">{jamJakarta(r.openedAt)}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <FotoAbsen
-                            url={r.checkOutPhotoUrl}
-                            label="Foto Check Out"
-                            onOpen={() =>
-                              setPreviewFoto({
-                                url: r.checkOutPhotoUrl!,
-                                label: `Check Out — ${r.staffName}`,
-                                waktu: r.closedAt,
-                                latitude: r.checkOutLatitude,
-                                longitude: r.checkOutLongitude,
-                              })
-                            }
-                          />
-                          <span className="text-slate-600 dark:text-fg-secondary whitespace-nowrap">{jamJakarta(r.closedAt)}</span>
-                        </div>
-                      </td>
+                          {t.key === "selesai" && r.izinPulangAwal && (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5 whitespace-nowrap" title={r.izinPulangAwal.reason}>
+                              Pulang awal (izin)
+                            </p>
+                          )}
+                        </td>
+                      ))}
                       <td className="py-3 px-3 text-slate-600 dark:text-fg-secondary whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <Timer className="w-3.5 h-3.5 text-slate-400 dark:text-fg-muted" />
@@ -457,7 +545,7 @@ function TransaksiCheckinCheckoutContent() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
+                    <td colSpan={11} className="text-center text-slate-500 dark:text-fg-muted py-10 text-xs">
                       Tidak ada riwayat Check In-Check Out yang cocok.
                     </td>
                   </tr>
@@ -481,6 +569,12 @@ function TransaksiCheckinCheckoutContent() {
               <Clock className="w-3.5 h-3.5 shrink-0" />
               {waktuLengkapJakarta(previewFoto.waktu)} WIB
             </p>
+            {previewFoto.keterangan && (
+              <p className="text-xs text-slate-600 dark:text-fg-secondary flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {previewFoto.keterangan}
+              </p>
+            )}
             {previewFoto.latitude !== null && previewFoto.longitude !== null ? (
               <AbsenMiniMap latitude={previewFoto.latitude} longitude={previewFoto.longitude} />
             ) : (
@@ -491,6 +585,69 @@ function TransaksiCheckinCheckoutContent() {
             )}
           </div>
         )}
+      </Modal>
+
+      <Modal isOpen={izinOpen} onClose={() => setIzinOpen(false)} title="Beri Izin Absen" size="md">
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500 dark:text-fg-muted">
+            Untuk Barista yang GPS-nya meleset di lokasi yang benar, atau harus Check-Out lebih awal karena darurat. Berlaku hari ini
+            untuk satu kali absen; Barista lalu mengulang absennya.
+          </p>
+          <Select
+            label="Barista"
+            placeholder="Pilih Barista"
+            options={staffList.map((st) => ({ value: st.id, label: st.fullName }))}
+            value={izinStaffId}
+            onChange={setIzinStaffId}
+          />
+          <Select
+            label="Jenis Izin"
+            options={[
+              { value: "LOCATION", label: "Absen di luar radius (GPS meleset)" },
+              { value: "EARLY_CHECKOUT", label: "Check-Out sebelum jam selesai (darurat)" },
+            ]}
+            value={izinJenis}
+            onChange={(v) => setIzinJenis(v as "LOCATION" | "EARLY_CHECKOUT")}
+          />
+          {izinJenis === "LOCATION" && (
+            <Select
+              label="Titik Absen"
+              options={(Object.keys(LABEL_TITIK) as AttendancePoint[]).map((p) => ({ value: p, label: LABEL_TITIK[p] }))}
+              value={izinTitik}
+              onChange={(v) => setIzinTitik(v as AttendancePoint)}
+            />
+          )}
+          <Textarea
+            label="Alasan (wajib)"
+            value={izinAlasan}
+            onChange={(e) => setIzinAlasan(e.target.value)}
+            placeholder="Mis. sudah dikonfirmasi lewat telepon, GPS HP meleset di dalam gudang"
+          />
+          <Button type="button" fullWidth isLoading={memberiIzin} disabled={!izinStaffId || izinAlasan.trim().length < 3} onClick={beriIzin}>
+            Beri Izin
+          </Button>
+
+          <div className="border-t border-slate-100 dark:border-line pt-3">
+            <p className="text-xs font-bold text-slate-700 dark:text-fg-secondary mb-2">Izin hari ini</p>
+            {izinHariIni.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-fg-muted">Belum ada izin hari ini.</p>
+            ) : (
+              <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                {izinHariIni.map((p) => (
+                  <li key={p.id} className="text-xs text-slate-600 dark:text-fg-secondary flex justify-between gap-3">
+                    <span>
+                      <span className="font-semibold text-slate-800 dark:text-fg">{p.staff.fullName}</span> ·{" "}
+                      {p.type === "EARLY_CHECKOUT" ? "Pulang awal" : LABEL_TITIK[p.point!]} — {p.reason}
+                    </span>
+                    <span className={`shrink-0 font-semibold ${p.usedAt ? "text-slate-400 dark:text-fg-muted" : "text-amber-600 dark:text-amber-400"}`}>
+                      {p.usedAt ? "Terpakai" : "Belum dipakai"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

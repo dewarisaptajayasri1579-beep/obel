@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, Save, X } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
@@ -120,6 +121,7 @@ export const BoothForm: React.FC<{
         address: form.address.trim() || undefined,
         latitude: parseKoordinat(form.latitude),
         longitude: parseKoordinat(form.longitude),
+        cashFloat: form.cashFloat,
       };
       let nomorBerikutnya: number | undefined;
       if (mode === "create") {
@@ -244,9 +246,19 @@ export const BoothForm: React.FC<{
         />
       </div>
       <p className="text-[11px] text-slate-500 dark:text-fg-muted -mt-2">
-        Titik ini dipakai peta Monitoring saat belum ada transaksi hari ini dari Booth ini. Salin dari Google Maps
-        (klik kanan titik lokasi → salin koordinat).
+        Titik ini dipakai peta Monitoring dan sebagai acuan absen Tiba &amp; Check-Out Barista (di luar radius ditolak).
+        Salin dari Google Maps (klik kanan titik lokasi → salin koordinat).
       </p>
+
+      <CurrencyInput
+        label="Uang Jalan per Shift"
+        labelClassName={COMPACT_LABEL}
+        value={form.cashFloat}
+        onChange={(n) => set("cashFloat", n)}
+        sizeVariant="sm"
+        className={COMPACT_FIELD}
+        helperText="Modal kembalian yang dibawa Barista saat Berangkat dan dikembalikan utuh saat Kembali. 0 = tanpa uang jalan."
+      />
 
       {/* Kode QRIS baru bisa diunggah setelah Booth punya id (mode edit) —
           sama polanya dengan Foto Produk yg butuh endpoint upload

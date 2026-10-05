@@ -6,6 +6,7 @@ import {
   Truck,
   PackagePlus,
   PackageX,
+  MapPinned,
   PackageCheck,
   Receipt,
   Database,
@@ -180,6 +181,12 @@ export const SETTINGS_NAV: NavGroup[] = [
         label: "Profil Perusahaan",
         href: "/pengaturan/profil-perusahaan",
         icon: Building2,
+        bottomBar: false,
+      },
+      {
+        label: "Absensi",
+        href: "/pengaturan/absensi",
+        icon: MapPinned,
         bottomBar: false,
       },
       {

@@ -13,6 +13,7 @@ import {
   PackageSearch,
   Search,
   Truck,
+  Warehouse,
   X,
   XCircle,
 } from "lucide-react";
@@ -110,6 +111,9 @@ function LaporanDetail({
     return t !== "LAINNYA" || (tindakLanjutNote[i.productId] ?? "").trim().length > 0;
   });
   const setoranAdaBeda = setoran ? depositAmount !== setoran.expectedAmount : false;
+  // Stok & uang baru sampai saat Barista absen Kembali di Gudang (BR-042) — backend
+  // menolak approve sebelum itu (BARISTA_NOT_RETURNED), tombolnya dikunci di sini.
+  const belumKembali = report.status === "CLOSED" && !report.returnedAt;
 
   async function approveRetur() {
     if (!retur) return;
@@ -161,6 +165,15 @@ function LaporanDetail({
 
   return (
     <div className="space-y-4">
+      {belumKembali && (
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/15 px-3.5 py-3 flex items-start gap-2.5">
+          <Warehouse className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            <span className="font-bold">Menunggu Barista kembali.</span> Approve Stok Kembali &amp; Setor Uang terbuka setelah Barista
+            absen Kembali di Gudang.
+          </p>
+        </div>
+      )}
       <div>
         <p className="text-xs font-bold text-slate-700 dark:text-fg mb-2">Rekap Stok Produk</p>
         <div className="overflow-x-auto rounded-lg border border-slate-200/70 dark:border-line bg-white dark:bg-surface">
@@ -353,7 +366,7 @@ function LaporanDetail({
                 <button
                   type="button"
                   onClick={approveRetur}
-                  disabled={submittingRetur || (returAdaBeda && !returTindakLanjutLengkap)}
+                  disabled={belumKembali || submittingRetur || (returAdaBeda && !returTindakLanjutLengkap)}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-(--brand-700) text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
                 >
                   {submittingRetur ? <Spinner size="sm" color="white" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
@@ -436,10 +449,27 @@ function LaporanDetail({
           <p className="text-xs text-slate-400 dark:text-fg-muted px-3.5 py-4">Tidak ada penjualan Tunai di shift ini.</p>
         ) : (
           <div className="p-3.5 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 dark:text-fg-muted">Seharusnya Disetor (Kas Tunai)</span>
-              <span className="font-bold text-slate-800 dark:text-fg">{formatRupiah(setoran.expectedAmount)}</span>
-            </div>
+            {report.uangJalan > 0 ? (
+              <>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-fg-muted">Kas Tunai</span>
+                  <span className="text-slate-700 dark:text-fg-secondary">{formatRupiah(setoran.expectedAmount - report.uangJalan)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-fg-muted">Uang Jalan (dikembalikan)</span>
+                  <span className="text-slate-700 dark:text-fg-secondary">{formatRupiah(report.uangJalan)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-fg-muted">Seharusnya Disetor</span>
+                  <span className="font-bold text-slate-800 dark:text-fg">{formatRupiah(setoran.expectedAmount)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-fg-muted">Seharusnya Disetor (Kas Tunai)</span>
+                <span className="font-bold text-slate-800 dark:text-fg">{formatRupiah(setoran.expectedAmount)}</span>
+              </div>
+            )}
 
             {setoran.status === "PENDING" ? (
               <>
@@ -466,7 +496,7 @@ function LaporanDetail({
                 <button
                   type="button"
                   onClick={approveSetoran}
-                  disabled={submittingSetoran || (setoranAdaBeda && !depositNote.trim())}
+                  disabled={belumKembali || submittingSetoran || (setoranAdaBeda && !depositNote.trim())}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-(--brand-700) text-white text-xs font-bold py-2.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed hover:opacity-90 transition"
                 >
                   {submittingSetoran ? <Spinner size="sm" color="white" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
@@ -690,6 +720,11 @@ function TransaksiLaporanKembaliContent() {
                         <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">{waktuJakarta(r.closedAt)}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {!r.returnedAt && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40">
+                            Belum kembali
+                          </span>
+                        )}
                         {r.returStatus === "SUBMITTED" && (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${RETUR_BADGE.SUBMITTED.kelas}`}>
                             Stok
