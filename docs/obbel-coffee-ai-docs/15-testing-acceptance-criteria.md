@@ -163,3 +163,7 @@ Petugas booth bayar QRIS (atau Split) tanpa foto bukti → ditolak `QRIS_PROOF_R
 
 ### AC-42 Restock dibatasi stok Gudang
 Gudang punya N cup → petugas mengajukan N+1 ditolak `RESTOCK_EXCEEDS_WAREHOUSE` (details menyebut available N); mengajukan N diterima; merevisi ke N+1 ditolak. Admin membuka Setujui → kolom Stok Gudang tampil dan qty awal = min(diminta, stok Gudang) (BR-039).
+
+### AC-43 Barista mengganti metode bayar
+Sale Tunai di shift aktif → ganti ke QRIS tanpa alasan ditolak `REASON_NOTE_REQUIRED`, tanpa foto ditolak `QRIS_PROOF_REQUIRED`; dengan keduanya → satu baris payment QRIS POSTED berfoto, `sales.payment_method` = QRIS, stok tetap, kas Tunai/QRIS laporan shift bergeser sebesar total. Split → Tunai men-supersede KEDUA baris Split. Metode sama → `PAYMENT_UNCHANGED`; pecahan Split tidak pas → `PAYMENT_AMOUNT_MISMATCH`; retry dengan key sama tercatat sekali. Sale milik Barista lain atau setelah Check-Out → `SALE_NOT_IN_ACTIVE_SHIFT`. Admin bisa tanpa foto, bukti lama ikut (BR-040). Test: `payment-method-change.e2e-spec.ts`.
+

@@ -205,3 +205,7 @@ Petugas booth WAJIB melampirkan foto bukti bayar (layar pembayaran berhasil di H
 
 ## BR-039 — Restock tidak melebihi stok Gudang
 Qty per produk di permintaan restock (saat diajukan maupun direvisi) tidak boleh melebihi stok Gudang saat itu; backend menolak dengan `RESTOCK_EXCEEDS_WAREHOUSE` (pesan menyebut stok Gudang yang tersedia). Tab Restock petugas menampilkan stok Gudang per produk, membatasi stepper dan saran restock ke angka itu, dan menandai produk yang Gudangnya kosong. Cek ini per permintaan, tidak memesan stok: dua Booth tetap bisa meminta sisa stok yang sama, jadi saat Setujui Admin melihat kolom Stok Gudang dan qty awalnya diisi `min(qty diminta, stok Gudang)` (BR-009).
+
+## BR-040 — Barista mengganti metode bayar
+Pengecualian dari "transaksi posted hanya dikoreksi Admin" (permintaan client 2026-10-05): Barista boleh mengganti metode bayar sale PAID kalau pelanggan berubah pikiran — Tunai, QRIS, atau Split — hanya untuk sale di shift miliknya yang masih OPEN (setelah Check-Out kas shift sudah disetor, jadi terkunci: `SALE_NOT_IN_ACTIVE_SHIFT`). Alasan wajib diisi, dan metode baru yang memuat QRIS wajib foto bukti (BR-038). Stok, total, dan omzet tidak berubah; hanya baris `payments` yang di-supersede dan diganti (TX-04), tercatat di koreksi & log aktivitas. Admin tetap boleh kapan saja tanpa foto; bukti QRIS lama ikut ke baris QRIS baru.
+

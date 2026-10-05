@@ -625,7 +625,13 @@ export class SalesService {
       this.prisma.sale.count({ where }),
       this.prisma.sale.findMany({
         where,
-        include: { booth: true, staff: true, items: true, shiftSession: { include: { shiftTemplate: true } } },
+        include: {
+          booth: true,
+          staff: true,
+          items: true,
+          shiftSession: { include: { shiftTemplate: true } },
+          payments: { where: { status: PaymentStatus.POSTED }, select: { method: true, amount: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -639,10 +645,13 @@ export class SalesService {
         boothName: s.booth.name,
         staffName: s.staff.fullName,
         shiftLabel: s.shiftSession.shiftTemplate.name,
+        shiftSessionId: s.shiftSessionId,
         status: s.status,
         total: Number(s.total),
         cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
         paymentMethod: s.paymentMethod,
+        // Baris Payment aktif (Split = dua baris) — Barista butuh pecahannya saat ganti metode.
+        payments: s.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
         items: s.items.map((item) => ({
           productId: item.productId,
           productName: item.productNameSnapshot,
@@ -1074,7 +1083,14 @@ export class SalesService {
   }
 
   /// TX-04 — Revisi metode pembayaran saja. Tidak ada stock/omzet effect
-  /// (COR-03): hanya ledger Payment yang berubah, Sale tetap immutable.
+  /// (COR-03): hanya ledger Payment yang berubah. SEMUA baris Payment POSTED
+  /// di-supersede (sale Split punya dua) lalu diganti baris baru sesuai rencana
+  /// bayar yang sama dengan saat bayar (Tunai / QRIS / Split). `Sale.paymentMethod`
+  /// ikut diperbarui karena itu ringkasan yang ditampilkan di daftar & laporan.
+  ///
+  /// Barista boleh (permintaan client 2026-10-05) tapi hanya untuk sale di shift
+  /// AKTIF miliknya sendiri — setelah Check-Out kas shift sudah disetor, jadi
+  /// terkunci — dengan alasan wajib dan foto bukti kalau metode barunya QRIS.
   async revisePayment(user: JwtPayload, saleId: string, dto: RevisePaymentDto) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
@@ -1082,33 +1098,62 @@ export class SalesService {
     }
 
     const sale = await this.loadVoidableSale(saleId);
+    if (user.role === UserRole.BOOTH_STAFF) {
+      await this.pastikanSaleDiShiftAktif(user, sale);
+      if (!dto.reasonNote?.trim()) {
+        throw new DomainError('REASON_NOTE_REQUIRED', 'Alasan ganti metode bayar wajib diisi.');
+      }
+    }
     this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
-    const activePayment = sale.payments.find((p) => p.status === PaymentStatus.POSTED) ?? null;
+    const plan = this.resolvePaymentPlan({ paymentMethod: dto.method, payments: dto.payments }, sale.total);
+    this.pastikanBuktiQris(user, { paymentMethod: dto.method, payments: dto.payments, qrisProofPhotoUrl: dto.qrisProofPhotoUrl });
+
+    const activePayments = sale.payments.filter((p) => p.status === PaymentStatus.POSTED);
+    const ringkas = (rows: { method: PaymentMethod; amount: bigint }[]) =>
+      rows.map((r) => `${r.method}:${r.amount}`).sort().join('|');
+    if (ringkas(activePayments) === ringkas(plan.rows)) {
+      throw new DomainError('PAYMENT_UNCHANGED', 'Metode bayar baru sama dengan yang tercatat.');
+    }
+    // Admin tidak wajib foto: bukti QRIS lama (kalau ada) tetap menempel ke baris QRIS baru.
+    const buktiLama = activePayments.find((p) => p.method === PaymentMethod.QRIS)?.proofPhotoUrl ?? null;
+    const pertama = activePayments[0] ?? null;
+    const transactionGroupId = pertama?.transactionGroupId ?? randomUUID();
+    const versionNo = Math.max(0, ...activePayments.map((p) => p.versionNo)) + 1;
+    const label = (rows: { method: PaymentMethod; amount: bigint }[]) =>
+      rows.length > 1 ? `Split (${rows.map((r) => `${r.method} Rp${r.amount}`).join(' + ')})` : (rows[0]?.method ?? sale.paymentMethod ?? '-');
 
     await this.prisma.$transaction(async (tx) => {
-      if (activePayment) {
-        await tx.payment.update({ where: { id: activePayment.id }, data: { status: PaymentStatus.SUPERSEDED } });
+      if (activePayments.length > 0) {
+        await tx.payment.updateMany({
+          where: { id: { in: activePayments.map((p) => p.id) } },
+          data: { status: PaymentStatus.SUPERSEDED },
+        });
       }
-      await tx.payment.create({
-        data: {
+      await tx.payment.createMany({
+        data: plan.rows.map((r) => ({
           saleId: sale.id,
-          method: dto.method,
-          amount: sale.total,
-          transactionGroupId: activePayment?.transactionGroupId ?? randomUUID(),
-          versionNo: (activePayment?.versionNo ?? 0) + 1,
-          revisionOfId: activePayment?.id ?? null,
-        },
+          method: r.method,
+          amount: r.amount,
+          transactionGroupId,
+          versionNo,
+          revisionOfId: activePayments.find((p) => p.method === r.method)?.id ?? pertama?.id ?? null,
+          proofPhotoUrl: r.method === PaymentMethod.QRIS ? dto.qrisProofPhotoUrl ?? buktiLama : null,
+        })),
       });
+      await tx.sale.update({ where: { id: sale.id }, data: { paymentMethod: plan.saleMethod } });
 
       await this.corrections.record(tx, {
         entityType: 'payment',
-        entityId: activePayment?.id ?? sale.id,
-        transactionGroupId: activePayment?.transactionGroupId ?? sale.transactionGroupId,
+        entityId: pertama?.id ?? sale.id,
+        transactionGroupId: pertama?.transactionGroupId ?? sale.transactionGroupId,
         correctionType: 'PAYMENT_CORRECTION',
-        originalVersionId: activePayment?.id ?? null,
+        originalVersionId: pertama?.id ?? null,
         reasonCode: dto.reasonCode,
         reasonNote: dto.reasonNote,
-        impactSnapshot: { from: activePayment?.method ?? sale.paymentMethod, to: dto.method },
+        impactSnapshot: {
+          from: activePayments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
+          to: plan.rows.map((r) => ({ method: r.method, amount: Number(r.amount) })),
+        },
         createdById: user.sub,
         idempotencyKey: dto.idempotencyKey,
       });
@@ -1119,11 +1164,23 @@ export class SalesService {
         action: 'PAYMENT_METHOD_CHANGED',
         actorId: user.sub,
         actorName: user.username,
-        note: `${sale.saleNo}: metode bayar ${activePayment?.method ?? sale.paymentMethod} → ${dto.method}.`,
+        note: `${sale.saleNo}: metode bayar ${label(activePayments)} → ${label(plan.rows)}.`,
       });
     });
 
     return this.toSaleResponse(sale.id);
+  }
+
+  /// Barista hanya boleh mengoreksi sale dari shift yang sedang ia jalankan:
+  /// shift-nya sendiri dan masih OPEN (belum Check-Out).
+  private async pastikanSaleDiShiftAktif(user: JwtPayload, sale: { shiftSessionId: string }) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: sale.shiftSessionId } });
+    if (!shift || shift.staffId !== user.sub || shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError(
+        'SALE_NOT_IN_ACTIVE_SHIFT',
+        'Metode bayar hanya bisa diganti untuk transaksi di shift Anda yang sedang berjalan.',
+      );
+    }
   }
 
   /// TX-14 — Customer Sales Return/Refund. BEDA dari Void: sale asli benar

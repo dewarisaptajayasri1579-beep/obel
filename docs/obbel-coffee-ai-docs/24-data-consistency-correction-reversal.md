@@ -460,7 +460,10 @@ V1 memiliki CASH/QRIS.
 Gunakan payment revision:
 - amount sale tidak berubah;
 - omzet tidak berubah;
-- payment channel report berubah.
+- payment channel report berubah;
+- SEMUA baris payment POSTED di-supersede (sale Split punya dua), lalu baris baru dibuat sesuai metode baru
+  (Tunai, QRIS, atau Split);
+- Barista boleh untuk sale di shift OPEN miliknya (BR-040), Admin kapan saja.
 
 ### Salah nominal karena sale berubah
 Payment mengikuti sale revision dalam transaksi atomik.

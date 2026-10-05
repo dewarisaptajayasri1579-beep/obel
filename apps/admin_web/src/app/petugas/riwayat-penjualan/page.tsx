@@ -6,6 +6,8 @@ import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatRupiah, formatJamJakarta, formatTanggalJakarta } from "../_lib/format";
+import { labelMetodeBayar } from "../_components/PembayaranInput";
+import { GantiMetodeSheet } from "./GantiMetodeSheet";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -23,13 +25,29 @@ function RiwayatPenjualanContent() {
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<SaleListItem[]>([]);
   const [filter, setFilter] = useState<Filter>("HARI_INI");
+  // Shift yang sedang berjalan (null kalau belum Check-In): hanya transaksi di
+  // shift ini yang metode bayarnya boleh diganti Barista.
+  const [shiftAktifId, setShiftAktifId] = useState<string | null>(null);
+  const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
+  const [gantiMetode, setGantiMetode] = useState<SaleListItem | null>(null);
 
-  useEffect(() => {
-    api
+  function muatPenjualan() {
+    return api
       .getSales({ status: "PAID", limit: 100 })
       .then((res) => setSales(res.rows))
-      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat riwayat penjualan."))
-      .finally(() => setLoading(false));
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat riwayat penjualan."));
+  }
+
+  useEffect(() => {
+    muatPenjualan().finally(() => setLoading(false));
+    api
+      .getActiveShift()
+      .then(async (shift) => {
+        setShiftAktifId(shift.shiftSessionId);
+        const booths = await api.getBooths().catch(() => []);
+        setQrisImageUrl(booths.find((b) => b.id === shift.booth.id)?.qrisImageUrl ?? null);
+      })
+      .catch(() => setShiftAktifId(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -97,18 +115,42 @@ function RiwayatPenjualanContent() {
               <p className="text-base text-slate-500 text-center py-10">Belum ada transaksi pada periode ini.</p>
             )}
             {filtered.map((s) => (
-              <div key={s.id} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-base text-slate-900">{s.saleNo}</p>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    {formatTanggalJakarta(s.paidAt ?? s.createdAt)} • {formatJamJakarta(s.paidAt ?? s.createdAt)} • {s.paymentMethod === "CASH" ? "Tunai" : "QRIS"}
-                  </p>
+              <div key={s.id} className="rounded-xl bg-white border border-slate-200 p-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-base text-slate-900">{s.saleNo}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {formatTanggalJakarta(s.paidAt ?? s.createdAt)} • {formatJamJakarta(s.paidAt ?? s.createdAt)} • {labelMetodeBayar(s.paymentMethod)}
+                    </p>
+                  </div>
+                  <p className="font-extrabold text-base">{formatRupiah(s.total)}</p>
                 </div>
-                <p className="font-extrabold text-base">{formatRupiah(s.total)}</p>
+                {s.shiftSessionId === shiftAktifId && (
+                  <button
+                    type="button"
+                    onClick={() => setGantiMetode(s)}
+                    className="mt-2.5 w-full rounded-lg border py-2 text-sm font-bold"
+                    style={{ borderColor: GREEN, color: GREEN }}
+                  >
+                    Ganti Metode Bayar
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {gantiMetode && (
+        <GantiMetodeSheet
+          sale={gantiMetode}
+          qrisImageUrl={qrisImageUrl}
+          onClose={() => setGantiMetode(null)}
+          onDone={() => {
+            setGantiMetode(null);
+            muatPenjualan();
+          }}
+        />
       )}
     </div>
   );

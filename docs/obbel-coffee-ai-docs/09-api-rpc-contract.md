@@ -187,7 +187,14 @@ Admin-only untuk posted transaction. Return before/after/net impact dan flag dep
 Atomic reverse original sale + payment + stock movements, create replacement version, update projections/aggregates.
 
 ### `revise_payment`
-Untuk correction metode pembayaran tanpa stock effect.
+Untuk correction metode pembayaran tanpa stock effect. `POST /sales/:id/revise-payment` dengan `method`
+(CASH/QRIS, satu metode penuh) ATAU `payments` (Split, >=2 baris, jumlahnya pas = total), plus `reason_code`,
+`reason_note`, `qris_proof_photo_url`. Semua baris payment POSTED di-supersede lalu diganti; `sales.payment_method`
+ikut diperbarui. Role ADMIN dan BOOTH_STAFF (BR-040).
+
+Error codes: `PAYMENT_UNCHANGED`, `PAYMENT_AMOUNT_MISMATCH`, `QRIS_PROOF_REQUIRED` (Barista, metode baru memuat
+QRIS), `REASON_NOTE_REQUIRED` (Barista tanpa alasan), `SALE_NOT_IN_ACTIVE_SHIFT` (Barista, sale bukan dari shift
+OPEN miliknya), `SALE_NOT_CORRECTABLE`.
 
 ### `cancel_distribution` / `revise_distribution`
 Handle DRAFT/SENT/RECEIVED sesuai state dan downstream dependency.

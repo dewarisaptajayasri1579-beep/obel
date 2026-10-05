@@ -21,6 +21,7 @@ client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini ma
 - menerima distribusi yang ditujukan ke Booth/shift sendiri;
 - membuat sale untuk Booth/shift sendiri;
 - melihat/print ulang transaksi shift sendiri;
+- mengganti metode bayar transaksi di shift sendiri yang masih OPEN, dengan alasan (BR-040);
 - membuat restock request;
 - menerima restock untuk Booth sendiri;
 - memulai/tutup shift sesuai rule;

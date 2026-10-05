@@ -777,10 +777,13 @@ export interface SaleListItem {
   boothName: string
   staffName: string
   shiftLabel: string
+  shiftSessionId: string
   status: "PENDING" | "PAID" | "VOIDED"
   total: number
   cupCount: number
   paymentMethod: SalePaymentMethod
+  /// Baris Payment aktif (Split = dua baris).
+  payments: { method: "CASH" | "QRIS"; amount: number }[]
   items: { productName: string; qty: number }[]
   paidAt: string | null
   createdAt: string
@@ -1555,7 +1558,19 @@ export const api = {
       reasonNote?: string
     },
   ) => request(`/sales/${id}/revise`, { method: "POST", body: input }),
-  revisePaymentMethod: (id: string, input: { idempotencyKey: string; method: "CASH" | "QRIS"; reasonCode: ReasonCode; reasonNote?: string }) =>
+  /// Satu metode (`method`) ATAU Split (`payments`). Barista: hanya sale di shift aktifnya,
+  /// `reasonNote` wajib, dan `qrisProofPhotoUrl` wajib kalau metode baru memuat QRIS.
+  revisePaymentMethod: (
+    id: string,
+    input: {
+      idempotencyKey: string
+      method?: "CASH" | "QRIS"
+      payments?: PaymentSplitInput[]
+      qrisProofPhotoUrl?: string
+      reasonCode: ReasonCode
+      reasonNote?: string
+    },
+  ) =>
     request(`/sales/${id}/revise-payment`, { method: "POST", body: input }),
   getSaleRefunds: (id: string) => request<SaleRefund[]>(`/sales/${id}/refunds`),
   createSaleRefund: (

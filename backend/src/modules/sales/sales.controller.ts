@@ -158,8 +158,9 @@ export class SalesController {
     return this.salesService.reviseSale(user, id, dto);
   }
 
+  /// Barista hanya untuk sale di shift aktifnya sendiri (dicek di service).
   @Post(':id/revise-payment')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BOOTH_STAFF)
   revisePayment(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: RevisePaymentDto) {
     return this.salesService.revisePayment(user, id, dto);
   }
