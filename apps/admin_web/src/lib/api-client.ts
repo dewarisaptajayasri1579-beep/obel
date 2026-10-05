@@ -568,6 +568,46 @@ export interface StokSelisihData {
   perProduk: { productName: string; totalSelisih: number; kejadian: number }[]
 }
 
+export interface FilterRekapPengembalian {
+  dateFrom?: string
+  dateTo?: string
+  boothId?: string
+  productId?: string
+}
+
+/// Angka Rekap Pengembalian Stok (per baris, subtotal Booth, grand total).
+/// Diajukan/Diterima/Selisih hanya dari Return yang sudah diterima Gudang;
+/// yang masih menunggu approve masuk `menunggu` saja.
+export interface AngkaRekapPengembalian {
+  jumlahDokumen: number
+  qtyDiajukan: number
+  qtyDiterima: number
+  selisih: number
+  rusak: number
+  gantiRugi: number
+  lainnya: number
+  menunggu: number
+}
+
+export interface RekapPengembalianData {
+  booths: {
+    boothId: string
+    boothName: string
+    rows: (AngkaRekapPengembalian & { productId: string; productName: string })[]
+    subtotal: AngkaRekapPengembalian
+  }[]
+  total: AngkaRekapPengembalian
+}
+
+function queryRekapPengembalian(filter: FilterRekapPengembalian): string {
+  const params = new URLSearchParams()
+  if (filter.dateFrom) params.set("dateFrom", filter.dateFrom)
+  if (filter.dateTo) params.set("dateTo", filter.dateTo)
+  if (filter.boothId) params.set("boothId", filter.boothId)
+  if (filter.productId) params.set("productId", filter.productId)
+  return params.toString()
+}
+
 /// Stok yang masih Diproses (in-transit) — belum dikonfirmasi diterima
 /// Petugas. Satu baris per dokumen/transaksi (bukan per produk).
 export interface StockHandoverInTransitProductItem {
@@ -1528,6 +1568,21 @@ export const api = {
     const qs = params.toString()
 
     const res = await fetch(`${BASE_URL}/reports/stock-discrepancy/${format}${qs ? `?${qs}` : ""}`, {
+      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    })
+    if (!res.ok) {
+      throw new ApiError("REPORT_FAILED", "Gagal membuat laporan. Coba lagi sebentar lagi.")
+    }
+    return res.blob()
+  },
+
+  getStockReturnRecap: (filter: FilterRekapPengembalian = {}) => {
+    const qs = queryRekapPengembalian(filter)
+    return request<RekapPengembalianData>(`/reports/stock-return-recap${qs ? `?${qs}` : ""}`)
+  },
+  getStockReturnRecapFile: async (format: "pdf" | "excel", filter: FilterRekapPengembalian = {}) => {
+    const qs = queryRekapPengembalian(filter)
+    const res = await fetch(`${BASE_URL}/reports/stock-return-recap/${format}${qs ? `?${qs}` : ""}`, {
       headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     })
     if (!res.ok) {

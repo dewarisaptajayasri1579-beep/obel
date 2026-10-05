@@ -23,6 +23,7 @@ import {
   Fingerprint,
   AlertTriangle,
   ClipboardList,
+  Undo2,
 } from "lucide-react";
 
 export interface NavItem {
@@ -124,6 +125,12 @@ export const MAIN_NAV: NavGroup[] = [
             label: "Rekap Stok Selisih",
             href: "/laporan/stok-selisih",
             icon: AlertTriangle,
+            bottomBar: false,
+          },
+          {
+            label: "Rekap Pengembalian Stok",
+            href: "/laporan/pengembalian-stok",
+            icon: Undo2,
             bottomBar: false,
           },
         ],
