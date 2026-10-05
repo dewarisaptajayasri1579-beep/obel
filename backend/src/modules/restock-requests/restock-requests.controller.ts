@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { ApproveRestockRequestDto } from './dto/approve-restock-request.dto';
 import { CreateRestockRequestDto } from './dto/create-restock-request.dto';
 import { RejectRestockRequestDto } from './dto/reject-restock-request.dto';
 import { RestockRequestsService } from './restock-requests.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('restock-requests')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +17,7 @@ export class RestockRequestsController {
   constructor(private readonly restockRequestsService: RestockRequestsService) {}
 
   @Get()
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findAll() {
     return this.restockRequestsService.findAll();
@@ -40,18 +42,21 @@ export class RestockRequestsController {
   }
 
   @Post(':id/revise')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   revise(@Param('id') id: string, @Body() dto: CreateRestockRequestDto, @CurrentUser() user: JwtPayload) {
     return this.restockRequestsService.reviseRequestedItems(id, dto, user.sub, user.username);
   }
 
   @Post(':id/approve')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   approve(@Param('id') id: string, @Body() dto: ApproveRestockRequestDto, @CurrentUser() user: JwtPayload) {
     return this.restockRequestsService.approve(id, dto, user.sub, user.username);
   }
 
   @Post(':id/reject')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   reject(@Param('id') id: string, @Body() dto: RejectRestockRequestDto, @CurrentUser() user: JwtPayload) {
     return this.restockRequestsService.reject(id, dto, user.sub, user.username);

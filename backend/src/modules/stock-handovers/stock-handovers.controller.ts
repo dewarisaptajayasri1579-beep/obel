@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,6 +11,7 @@ import { ApproveRestockRequestDto } from '../restock-requests/dto/approve-restoc
 import { RejectRestockRequestDto } from '../restock-requests/dto/reject-restock-request.dto';
 import { CreateStockHandoverDto } from './dto/create-stock-handover.dto';
 import { StockHandoversService } from './stock-handovers.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('stock-handovers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -18,6 +19,7 @@ export class StockHandoversController {
   constructor(private readonly stockHandoversService: StockHandoversService) {}
 
   @Get()
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findAll(
     @Query('page') page?: string,
@@ -36,60 +38,70 @@ export class StockHandoversController {
   }
 
   @Get('in-transit')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findInTransitSummary() {
     return this.stockHandoversService.findInTransitSummary();
   }
 
   @Get(':id')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findOne(@Param('id') id: string) {
     return this.stockHandoversService.findOne(id);
   }
 
   @Get(':id/activity-log')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findActivityLog(@Param('id') id: string) {
     return this.stockHandoversService.findActivityLog(id);
   }
 
   @Post()
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateStockHandoverDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.create(dto, user.sub, user.username);
   }
 
   @Post(':id/approve')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   approve(@Param('id') id: string, @Body() dto: ApproveRestockRequestDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.approve(id, dto, user.sub, user.username);
   }
 
   @Post(':id/reject')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   reject(@Param('id') id: string, @Body() dto: RejectRestockRequestDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.reject(id, dto, user.sub, user.username);
   }
 
   @Post(':id/receive')
+  @Menu(['SERAH_TERIMA_STOK', 'TERIMA_STOK'], AccessLevel.MANAGE)
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   receive(@Param('id') id: string, @Body() dto: ReceiveDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.receive(id, dto, user);
   }
 
   @Post(':id/cancel')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   cancel(@Param('id') id: string, @Body() dto: CancelDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.cancel(id, dto, user);
   }
 
   @Post(':id/revise')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   revise(@Param('id') id: string, @Body() dto: ReviseDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.revise(id, dto, user);
   }
 
   @Post(':id/correct-receipt')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   correctReceipt(@Param('id') id: string, @Body() dto: CorrectReceiptDto, @CurrentUser() user: JwtPayload) {
     return this.stockHandoversService.correctReceipt(id, dto, user);

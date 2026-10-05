@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { CreateDistributionDto } from './dto/create-distribution.dto';
 import { ReceiveDistributionDto } from './dto/receive-distribution.dto';
 import { CancelDistributionDto, CorrectReceiptDto, ReviseDistributionDto } from './dto/correction.dto';
 import { DistributionsService } from './distributions.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('distributions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +17,7 @@ export class DistributionsController {
   constructor(private readonly distributionsService: DistributionsService) {}
 
   @Get()
+  @Menu('TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findAll() {
     return this.distributionsService.findAll();
@@ -40,12 +42,14 @@ export class DistributionsController {
   }
 
   @Post()
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.distributionsService.create(dto, user.sub, user.username);
   }
 
   @Post(':id/receive')
+  @Menu(['SERAH_TERIMA_STOK', 'TERIMA_STOK'], AccessLevel.MANAGE)
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   receive(
     @Param('id') id: string,
@@ -56,18 +60,21 @@ export class DistributionsController {
   }
 
   @Post(':id/cancel')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   cancel(@Param('id') id: string, @Body() dto: CancelDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.distributionsService.cancelDistribution(user, id, dto);
   }
 
   @Post(':id/revise')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   revise(@Param('id') id: string, @Body() dto: ReviseDistributionDto, @CurrentUser() user: JwtPayload) {
     return this.distributionsService.reviseDistribution(user, id, dto);
   }
 
   @Post(':id/correct-receipt')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   correctReceipt(@Param('id') id: string, @Body() dto: CorrectReceiptDto, @CurrentUser() user: JwtPayload) {
     return this.distributionsService.correctReceipt(user, id, dto);

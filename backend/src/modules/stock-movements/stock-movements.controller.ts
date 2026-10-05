@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { DomainError } from '../../common/domain-error';
 import { StockMovementsService, type JenisMutasi } from './stock-movements.service';
 import { WAREHOUSE, type LokasiStok } from './arah.util';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 /// Riwayat & rekap mutasi stok. READ-ONLY — tidak ada endpoint yang menulis.
 /// Stok hanya berubah lewat domain service transaksinya masing-masing (AGENTS.md).
@@ -91,6 +92,7 @@ export class StockMovementsController {
   }
 
   @Get('rekap')
+  @Menu(['PRODUK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   rekap(
     @Query('bulan') bulan?: string,
@@ -102,6 +104,7 @@ export class StockMovementsController {
   }
 
   @Get('rekap-booth')
+  @Menu(['PRODUK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   rekapBooth(
     @Query('bulan') bulan?: string,
@@ -113,6 +116,7 @@ export class StockMovementsController {
   }
 
   @Get('ringkas')
+  @Menu(['PRODUK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   ringkas(@Query('bulan') bulan?: string, @Query('tahun') tahun?: string) {
     const { lokasi: _abaikan, ...periode } = this.resolve(bulan, tahun);
@@ -120,6 +124,7 @@ export class StockMovementsController {
   }
 
   @Get('sebaran')
+  @Menu(['PRODUK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   sebaran(@Query('tanggal') tanggal?: string) {
     const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000);
@@ -128,6 +133,7 @@ export class StockMovementsController {
   }
 
   @Get('rinci')
+  @Menu(['PRODUK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   rinci(
     @Query('productId') productId: string,

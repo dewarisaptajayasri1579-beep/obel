@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { DomainError } from '../../common/domain-error';
 import { BoothStockService } from './booth-stock.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('booth-stock')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,6 +15,7 @@ export class BoothStockController {
   constructor(private readonly boothStockService: BoothStockService) {}
 
   @Get()
+  @Menu(['SERAH_TERIMA_STOK', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findAll(@Query('boothId') boothId?: string) {
     return this.boothStockService.findAll(boothId);

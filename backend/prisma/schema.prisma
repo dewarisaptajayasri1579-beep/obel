@@ -15,6 +15,14 @@ enum UserRole {
   @@map("user_role")
 }
 
+/// Hak akses Admin per menu admin web (BR-044). Tidak ada baris izin = Tidak ada.
+enum AccessLevel {
+  VIEW
+  MANAGE
+
+  @@map("access_level")
+}
+
 enum BoothStatus {
   ACTIVE
   INACTIVE
@@ -246,6 +254,9 @@ model Profile {
   defaultBoothId String?  @map("default_booth_id")
   defaultBooth   Booth?   @relation(fields: [defaultBoothId], references: [id])
   active         Boolean  @default(true)
+  // Peran hak akses (BR-044) — hanya untuk ADMIN, dipasang Owner. Null = belum diberi peran (tanpa akses menu).
+  accessRoleId   String?     @map("access_role_id")
+  accessRole     AccessRole? @relation(fields: [accessRoleId], references: [id])
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -378,6 +389,34 @@ model StaffLiability {
 /// `actorName` di-snapshot saat penulisan (pola yang sama dengan
 /// SaleItem.productNameSnapshot) — supaya baris lama tetap terbaca kalau nama
 /// akun pelakunya berubah belakangan, tanpa join ke Profile.
+/// Peran hak akses Admin (BR-044), dibuat Owner. `fullAccess` hanya untuk peran sistem "Admin Pusat"
+/// (Kelola di semua menu, termasuk menu yang ditambahkan kemudian; tidak bisa diubah/dihapus).
+model AccessRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  fullAccess  Boolean  @default(false) @map("full_access")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  permissions AccessRolePermission[]
+  profiles    Profile[]
+
+  @@map("access_roles")
+}
+
+/// Izin satu menu di satu peran. `menu` = kunci di src/common/access/menus.ts (divalidasi di service).
+model AccessRolePermission {
+  id           String      @id @default(uuid())
+  accessRoleId String      @map("access_role_id")
+  accessRole   AccessRole  @relation(fields: [accessRoleId], references: [id], onDelete: Cascade)
+  menu         String
+  level        AccessLevel
+
+  @@unique([accessRoleId, menu])
+  @@map("access_role_permissions")
+}
+
 model ActivityLog {
   id         String   @id @default(uuid())
   entityType String   @map("entity_type") // "product" | "distribution" | "sale" | dst

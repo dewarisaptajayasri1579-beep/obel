@@ -1,6 +1,6 @@
 import { Controller, Get, Header, Param, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { SaleStatus, StockReceiptStatus, UserRole } from '@prisma/client';
+import { SaleStatus, StockReceiptStatus, UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -13,6 +13,7 @@ import { StockHandoverReportService, type FilterLaporanSerahTerima, type StockHa
 import { StockDiscrepancyReportService, type FilterLaporanStokSelisih } from './stock-discrepancy-report.service';
 import { SalesReportService, type FilterLaporanKasir } from './sales-report.service';
 import { StockReturnRecapReportService, type FilterRekapPengembalian } from './stock-return-recap-report.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,6 +45,7 @@ export class ReportsController {
   }
 
   @Get('products/excel')
+  @Menu('PRODUK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async produkExcel(
     @Res({ passthrough: true }) res: Response,
@@ -61,6 +63,7 @@ export class ReportsController {
   }
 
   @Get('products/pdf')
+  @Menu('PRODUK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async produkPdf(
     @Res({ passthrough: true }) res: Response,
@@ -88,6 +91,7 @@ export class ReportsController {
   }
 
   @Get('stock-receipts/excel')
+  @Menu('TAMBAH_STOK_GUDANG', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async penerimaanExcel(
     @Res({ passthrough: true }) res: Response,
@@ -104,6 +108,7 @@ export class ReportsController {
   }
 
   @Get('stock-receipts/pdf')
+  @Menu('TAMBAH_STOK_GUDANG', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async penerimaanPdf(
     @Res({ passthrough: true }) res: Response,
@@ -120,6 +125,7 @@ export class ReportsController {
   }
 
   @Get('stock-receipts/:id/pdf')
+  @Menu('TAMBAH_STOK_GUDANG', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async penerimaanNotaPdf(@Res({ passthrough: true }) res: Response, @Param('id') id: string) {
     const buffer = await this.stockReceiptReport.nota(id);
@@ -140,6 +146,7 @@ export class ReportsController {
   }
 
   @Get('stock-handovers/excel')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async serahTerimaExcel(
     @Res({ passthrough: true }) res: Response,
@@ -156,6 +163,7 @@ export class ReportsController {
   }
 
   @Get('stock-handovers/pdf')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async serahTerimaPdf(
     @Res({ passthrough: true }) res: Response,
@@ -172,6 +180,7 @@ export class ReportsController {
   }
 
   @Get('stock-handovers/:id/pdf')
+  @Menu('SERAH_TERIMA_STOK', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async serahTerimaNotaPdf(@Res({ passthrough: true }) res: Response, @Param('id') id: string) {
     const buffer = await this.stockHandoverReport.nota(id);
@@ -199,6 +208,7 @@ export class ReportsController {
   }
 
   @Get('stock-discrepancy')
+  @Menu('REKAP_STOK_SELISIH', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async stokSelisihData(
     @Query('dateFrom') dateFrom?: string,
@@ -210,6 +220,7 @@ export class ReportsController {
   }
 
   @Get('stock-discrepancy/excel')
+  @Menu('REKAP_STOK_SELISIH', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async stokSelisihExcel(
     @Res({ passthrough: true }) res: Response,
@@ -230,6 +241,7 @@ export class ReportsController {
   }
 
   @Get('stock-discrepancy/pdf')
+  @Menu('REKAP_STOK_SELISIH', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async stokSelisihPdf(
     @Res({ passthrough: true }) res: Response,
@@ -267,6 +279,7 @@ export class ReportsController {
   }
 
   @Get('stock-return-recap')
+  @Menu('REKAP_PENGEMBALIAN', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async rekapPengembalianData(
     @Query('dateFrom') dateFrom?: string,
@@ -278,6 +291,7 @@ export class ReportsController {
   }
 
   @Get('stock-return-recap/excel')
+  @Menu('REKAP_PENGEMBALIAN', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async rekapPengembalianExcel(
     @Res({ passthrough: true }) res: Response,
@@ -298,6 +312,7 @@ export class ReportsController {
   }
 
   @Get('stock-return-recap/pdf')
+  @Menu('REKAP_PENGEMBALIAN', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async rekapPengembalianPdf(
     @Res({ passthrough: true }) res: Response,
@@ -337,6 +352,7 @@ export class ReportsController {
   }
 
   @Get('sales/excel')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async kasirExcel(
     @Res({ passthrough: true }) res: Response,
@@ -356,6 +372,7 @@ export class ReportsController {
   }
 
   @Get('sales/pdf')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   async kasirPdf(
     @Res({ passthrough: true }) res: Response,
@@ -375,12 +392,14 @@ export class ReportsController {
   }
 
   @Get('summary')
+  @Menu('DASHBOARD', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   getSummary() {
     return this.reportsService.getSummary();
   }
 
   @Get('export')
+  @Menu('DASHBOARD', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Header('Content-Disposition', 'attachment; filename="laporan-obbel.csv"')

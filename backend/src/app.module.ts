@@ -29,6 +29,7 @@ import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/b
 import { StockHandoversModule } from './modules/stock-handovers/stock-handovers.module';
 import { AppSettingsModule } from './modules/app-settings/app-settings.module';
 import { AttendancePermitsModule } from './modules/attendance-permits/attendance-permits.module';
+import { AccessRolesModule } from './modules/access-roles/access-roles.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { AttendancePermitsModule } from './modules/attendance-permits/attendance
     CompanyProfileModule,
     AppSettingsModule,
     AttendancePermitsModule,
+    AccessRolesModule,
     BoothShiftAssignmentsModule,
     StockHandoversModule,
   ],

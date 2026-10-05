@@ -19,12 +19,13 @@ import { diskStorage } from 'multer';
 import { mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import type { Request } from 'express';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CompanyProfileService } from './company-profile.service';
 import { UpdateCompanyProfileDto } from './dto/update-company-profile.dto';
+import { Menu, Lookup } from '../../common/access/menu-access.decorator';
 
 const logoUploadDir = join(process.cwd(), 'uploads', 'company');
 mkdirSync(logoUploadDir, { recursive: true });
@@ -37,18 +38,21 @@ export class CompanyProfileController {
   /// Dibaca semua role — identitas perusahaan dipajang di header layar
   /// (bukan cuma dokumen cetak), Owner & Petugas Booth juga perlu melihatnya.
   @Get()
+  @Lookup()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   get() {
     return this.companyProfile.get();
   }
 
   @Patch()
+  @Menu('PROFIL_PERUSAHAAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   update(@Body() dto: UpdateCompanyProfileDto) {
     return this.companyProfile.update(dto);
   }
 
   @Post('upload-logo')
+  @Menu('PROFIL_PERUSAHAAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {

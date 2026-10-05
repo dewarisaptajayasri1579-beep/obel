@@ -7,6 +7,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { UserRole } from '@prisma/client';
+import { AccessService } from '../../common/access/access.service';
 import { Namespace, Socket } from 'socket.io';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { WarehouseStockService } from './warehouse-stock.service';
@@ -31,6 +32,7 @@ export class WarehouseStockGateway implements OnGatewayInit, OnGatewayConnection
   constructor(
     private readonly warehouseStockService: WarehouseStockService,
     private readonly jwtService: JwtService,
+    private readonly accessService: AccessService,
   ) {}
 
   afterInit() {
@@ -52,7 +54,8 @@ export class WarehouseStockGateway implements OnGatewayInit, OnGatewayConnection
     }
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      if (payload.role !== UserRole.ADMIN && payload.role !== UserRole.OWNER) {
+      const user = await this.accessService.resolve(payload.sub);
+      if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.OWNER)) {
         client.disconnect(true);
         return;
       }

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import type { Request } from 'express';
 import { imageFilePipe, imageUploadOptions, publicUploadUrl } from '../../common/image-upload';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -15,6 +15,7 @@ import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
 import { ShiftsService } from './shifts.service';
+import { Menu, Lookup } from '../../common/access/menu-access.decorator';
 
 @Controller('shifts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,6 +23,7 @@ export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}
 
   @Get('active')
+  @Lookup()
   getActive(@CurrentUser() user: JwtPayload) {
     return this.shiftsService.getMyActiveShift(user);
   }
@@ -34,6 +36,7 @@ export class ShiftsController {
   }
 
   @Get('active-assignments')
+  @Menu(['SERAH_TERIMA_STOK', 'CHECKIN_CHECKOUT', 'BOOTH_AKTIF'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   getActiveAssignments() {
     return this.shiftsService.findActiveAssignments();
@@ -46,12 +49,14 @@ export class ShiftsController {
   }
 
   @Get('admin-history')
+  @Menu(['CHECKIN_CHECKOUT', 'SETOR_PENGEMBALIAN'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   getAdminHistory() {
     return this.shiftsService.getAdminHistory();
   }
 
   @Get(':id/report')
+  @Menu(['SETOR_PENGEMBALIAN', 'CHECKIN_CHECKOUT'], AccessLevel.VIEW)
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN, UserRole.OWNER)
   getReport(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.getShiftReport(id, user);
@@ -86,6 +91,7 @@ export class ShiftsController {
   }
 
   @Get(':id/journey')
+  @Menu(['BOOTH_AKTIF', 'CHECKIN_CHECKOUT'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   getJourney(@Param('id') id: string) {
     return this.shiftsService.getShiftJourney(id);
@@ -99,11 +105,13 @@ export class ShiftsController {
   }
 
   @Post(':id/closing/start')
+  @Menu('CHECKIN_CHECKOUT', AccessLevel.MANAGE)
   startClosing(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.startClosing(id, user);
   }
 
   @Post(':id/closing/confirm')
+  @Menu('CHECKIN_CHECKOUT', AccessLevel.MANAGE)
   confirmClosing(
     @Param('id') id: string,
     @Body() dto: ConfirmClosingDto,
@@ -113,18 +121,21 @@ export class ShiftsController {
   }
 
   @Post(':id/cash-deposit/confirm')
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
+  @Roles(UserRole.ADMIN)
   confirmCashDeposit(@Param('id') id: string, @Body() dto: ConfirmCashDepositDto, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.confirmCashDeposit(id, dto, user);
   }
 
   @Get(':id/preview-correction')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   previewCorrection(@Param('id') id: string) {
     return this.shiftsService.previewShiftCorrection(id);
   }
 
   @Post(':id/correct')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   correct(@Param('id') id: string, @Body() dto: CorrectShiftDto, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.correctShift(id, dto, user);

@@ -7,7 +7,9 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { UserRole } from '@prisma/client';
+import { AccessLevel } from '@prisma/client';
+import { AccessService } from '../../common/access/access.service';
+import { punyaAkses } from '../../common/access/access-rules';
 import { Namespace, Socket } from 'socket.io';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { DashboardService } from './dashboard.service';
@@ -38,6 +40,7 @@ export class BoothAktifGateway implements OnGatewayInit, OnGatewayConnection, On
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly jwtService: JwtService,
+    private readonly accessService: AccessService,
   ) {}
 
   afterInit() {
@@ -51,7 +54,7 @@ export class BoothAktifGateway implements OnGatewayInit, OnGatewayConnection, On
     if (this.intervalId) clearInterval(this.intervalId);
   }
 
-  /// Sama seperti JwtAuthGuard + RolesGuard(ADMIN, OWNER) di
+  /// Sama seperti JwtAuthGuard + RolesGuard (menu Booth Aktif, BR-044) di
   /// DashboardController — namespace WebSocket ini tidak boleh jadi celah
   /// auth yang terlewat dari guard REST biasa.
   async handleConnection(client: Socket) {
@@ -62,7 +65,8 @@ export class BoothAktifGateway implements OnGatewayInit, OnGatewayConnection, On
     }
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      if (payload.role !== UserRole.ADMIN && payload.role !== UserRole.OWNER) {
+      const user = await this.accessService.resolve(payload.sub);
+      if (!user || !punyaAkses(user.access, ['BOOTH_AKTIF'], AccessLevel.VIEW)) {
         client.disconnect(true);
         return;
       }

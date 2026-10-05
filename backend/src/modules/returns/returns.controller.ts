@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { CreateReturnDto } from './dto/create-return.dto';
 import { ReceiveReturnDto } from './dto/receive-return.dto';
 import { CancelReturnDto, CorrectReturnReceiptDto, ReviseReturnDto } from './dto/correction.dto';
 import { ReturnsService } from './returns.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('returns')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +17,7 @@ export class ReturnsController {
   constructor(private readonly returnsService: ReturnsService) {}
 
   @Get()
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findAll() {
     return this.returnsService.findAll();
@@ -40,24 +42,28 @@ export class ReturnsController {
   }
 
   @Post(':id/receive')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   receive(@Param('id') id: string, @Body() dto: ReceiveReturnDto, @CurrentUser() user: JwtPayload) {
     return this.returnsService.receive(id, dto, user.sub);
   }
 
   @Post(':id/cancel')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   cancel(@Param('id') id: string, @Body() dto: CancelReturnDto, @CurrentUser() user: JwtPayload) {
     return this.returnsService.cancelReturn(user, id, dto);
   }
 
   @Post(':id/revise')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   revise(@Param('id') id: string, @Body() dto: ReviseReturnDto, @CurrentUser() user: JwtPayload) {
     return this.returnsService.reviseReturn(user, id, dto);
   }
 
   @Post(':id/correct-receipt')
+  @Menu('SETOR_PENGEMBALIAN', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   correctReceipt(@Param('id') id: string, @Body() dto: CorrectReturnReceiptDto, @CurrentUser() user: JwtPayload) {
     return this.returnsService.correctReceipt(user, id, dto);

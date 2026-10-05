@@ -21,7 +21,7 @@ import { diskStorage } from 'multer';
 import { mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import type { Request } from 'express';
-import { UserRole } from '@prisma/client';
+import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -31,6 +31,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
+import { Menu, Lookup } from '../../common/access/menu-access.decorator';
 
 const productUploadDir = join(process.cwd(), 'uploads', 'products');
 mkdirSync(productUploadDir, { recursive: true });
@@ -41,6 +42,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
+  @Lookup()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll() {
     return this.productsService.findAll();
@@ -58,24 +60,28 @@ export class ProductsController {
   }
 
   @Get('categories')
+  @Lookup()
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findCategories() {
     return this.productsService.findCategories();
   }
 
   @Post('categories')
+  @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   createCategory(@Body() dto: CreateProductCategoryDto) {
     return this.productsService.createCategory(dto);
   }
 
   @Post()
+  @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateProductDto, @CurrentUser() user: JwtPayload) {
     return this.productsService.create(dto, user.sub, user.username);
   }
 
   @Post('upload-image')
+  @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
@@ -115,6 +121,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
+  @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateProductDto, @CurrentUser() user: JwtPayload) {
     return this.productsService.update(id, dto, user.sub, user.username);
@@ -122,6 +129,7 @@ export class ProductsController {
 
   /// Soft delete — lihat ProductsService.remove() untuk syarat penolakannya.
   @Delete(':id')
+  @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.productsService.remove(id, user.sub, user.username);

@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { SaleStatus, UserRole } from '@prisma/client';
+import { SaleStatus, UserRole, AccessLevel } from '@prisma/client';
 import type { Request } from 'express';
 import { imageFilePipe, imageUploadOptions, publicUploadUrl } from '../../common/image-upload';
 import { PAYMENT_PROOF_SUBDIR } from './dto/create-sale.dto';
@@ -18,6 +18,7 @@ import { VoidSaleDto } from './dto/void-sale.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { SalesService } from './sales.service';
 import { ActivityLogService } from '../../common/activity-log.service';
+import { Menu } from '../../common/access/menu-access.decorator';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +29,7 @@ export class SalesController {
   ) {}
 
   @Get()
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll(
     @CurrentUser() user: JwtPayload,
@@ -53,6 +55,7 @@ export class SalesController {
   }
 
   @Post()
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN)
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateSaleDto) {
     return this.salesService.createPaidSale(user, dto);
@@ -100,6 +103,7 @@ export class SalesController {
   /// Bulan & tahun default ke periode berjalan Asia/Jakarta, sama seperti
   /// StockMovementsController, supaya kedua tab di halaman Booth konsisten.
   @Get('riwayat-booth')
+  @Menu(['KASIR', 'BOOTH'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   riwayatBooth(
     @Query('boothId') boothId?: string,
@@ -115,6 +119,7 @@ export class SalesController {
   }
 
   @Get('sebaran')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   sebaran(@Query('dari') dari?: string, @Query('sampai') sampai?: string) {
     const jakarta = new Date(Date.now() + 7 * 60 * 60 * 1000);
@@ -123,36 +128,42 @@ export class SalesController {
   }
 
   @Get(':id')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);
   }
 
   @Get(':id/activity-log')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   activityLogFor(@Param('id') id: string) {
     return this.activityLog.findForEntity('sale', id);
   }
 
   @Post(':id/preview-void')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   previewVoid(@Param('id') id: string) {
     return this.salesService.previewVoidSale(id);
   }
 
   @Post(':id/void')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   void(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: VoidSaleDto) {
     return this.salesService.voidSale(user, id, dto);
   }
 
   @Post(':id/preview-revise')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   previewRevise(@Param('id') id: string, @Body() dto: ReviseSaleDto) {
     return this.salesService.previewReviseSale(id, dto);
   }
 
   @Post(':id/revise')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   revise(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: ReviseSaleDto) {
     return this.salesService.reviseSale(user, id, dto);
@@ -160,18 +171,21 @@ export class SalesController {
 
   /// Barista hanya untuk sale di shift aktifnya sendiri (dicek di service).
   @Post(':id/revise-payment')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN, UserRole.BOOTH_STAFF)
   revisePayment(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: RevisePaymentDto) {
     return this.salesService.revisePayment(user, id, dto);
   }
 
   @Get(':id/refunds')
+  @Menu('KASIR', AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   listRefunds(@Param('id') id: string) {
     return this.salesService.listRefunds(id);
   }
 
   @Post(':id/refund')
+  @Menu('KASIR', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
   refund(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: CreateRefundDto) {
     return this.salesService.createRefund(user, id, dto);
