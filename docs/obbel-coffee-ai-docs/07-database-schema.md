@@ -441,3 +441,20 @@ Izin absen dari Admin: berlaku pada `business_date`, dipakai sekali.
 
 Kolom pendukung: `booths.cash_float` (uang jalan per booth, BR-043); `app_settings.warehouse_latitude/longitude`
 (acuan Gudang, nullable), `attendance_radius_meters` (default 100), `early_checkout_tolerance_minutes` (default 15).
+
+### `access_roles` (BR-044)
+Peran hak akses Admin, dibuat Owner.
+- id uuid PK
+- name text unique (dicek juga tanpa beda huruf besar/kecil di service)
+- description text nullable
+- full_access bool default false — hanya peran sistem "Admin Pusat" (Kelola semua menu, tidak bisa diubah/dihapus)
+- created_at, updated_at
+
+### `access_role_permissions` (BR-044)
+- id uuid PK
+- access_role_id uuid FK access_roles (on delete cascade)
+- menu text — kunci menu dari `backend/src/common/access/menus.ts`
+- level enum `access_level` `VIEW|MANAGE` (tidak ada baris = Tidak ada)
+- unique(access_role_id, menu)
+
+Kolom pendukung: `profiles.access_role_id` uuid nullable FK access_roles (on delete set null) — hanya untuk ADMIN.

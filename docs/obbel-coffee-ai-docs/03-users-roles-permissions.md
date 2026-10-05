@@ -8,6 +8,8 @@ Gunakan enum konseptual:
 
 Jika nanti ada role Runner/Kurir, tambahkan sebagai fase berikutnya; jangan implementasikan sekarang.
 
+Admin dibatasi lagi per menu lewat **peran** yang dibuat Owner (BR-044, §9).
+
 Label UI: `BOOTH_STAFF` ditampilkan sebagai **"Barista"** (aplikasi petugas: **"Barista Obbel"**), permintaan
 client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini masih menyebutnya "Petugas Booth".
 
@@ -40,6 +42,9 @@ client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini ma
 - melihat dashboard Owner global.
 
 ## 3. ADMIN
+Daftar di bawah adalah batas maksimum (peran sistem "Admin Pusat"); Admin dengan peran lain hanya boleh
+sebatas izin perannya (§9).
+
 ### Boleh
 - semua data operasional lintas Booth;
 - manage product, Booth, shift template, user assignment;
@@ -67,7 +72,9 @@ client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini ma
 - sales analytics;
 - stock condition;
 - discrepancy;
-- laporan dan export read-only.
+- laporan dan export read-only;
+- membuat, mengubah, menghapus, dan memasang peran hak akses Admin (BR-044);
+- membuat akun Admin/Owner dan mereset passwordnya.
 
 ### Tidak boleh
 - create/update/delete data operasional;
@@ -115,3 +122,16 @@ Mempunyai permission correction posted transaction melalui flow terkontrol: reas
 
 ### OWNER
 Read-only terhadap correction. Owner dapat melihat nilai effective terbaru dan audit/indikator data direvisi, tetapi tidak dapat melakukan mutation.
+
+## 9. Peran & hak akses Admin (BR-044)
+- Owner membuat peran berisi izin per menu admin web: **Tidak ada / Lihat / Kelola**. Lihat = baca halaman &
+  export; Kelola = juga mengubah data. Katalog menu: `backend/src/common/access/menus.ts`.
+- Tiap Admin memakai satu peran; tanpa peran = tidak bisa membuka menu apa pun. Peran sistem "Admin Pusat"
+  = Kelola semua menu, tidak bisa diubah/dihapus.
+- Owner: Lihat di semua menu (read-only) + satu-satunya pengelola peran.
+- Akun: Barista lewat Kelola Barista; Admin lewat Kelola User atau Owner (akun Admin baru tanpa peran sampai
+  Owner memasangnya); Owner hanya oleh Owner. Admin tidak bisa memasang/mengubah peran.
+- Barista di luar RBAC (aturan §2 tetap). Data pendukung dropdown (Produk/Booth/Barista/Shift) boleh dibaca semua
+  Admin. Tampilan & Dokumentasi selalu terbuka.
+- Enforcement di backend: setiap endpoint Admin/Owner ditandai menunya; endpoint tanpa tanda ditolak (fail-closed).
+  Peran & status akun dibaca dari database tiap request, jadi perubahan berlaku langsung.

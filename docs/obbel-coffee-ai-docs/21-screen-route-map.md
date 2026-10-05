@@ -52,6 +52,7 @@ Bottom nav tetap: Home, POS, Stock, Shift. Screen lain dibuka sebagai drill-down
 | `/master/booths` | Booth |
 | `/master/shifts` | Shift template/sessions |
 | `/master/users` | Users |
+| `/master/peran` | Peran & Hak Akses (Owner, BR-044) |
 
 ## C. Flutter Android — Owner
 

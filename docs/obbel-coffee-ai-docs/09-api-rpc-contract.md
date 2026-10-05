@@ -249,3 +249,16 @@ Admin-only. Input target actual quantity lebih disarankan daripada client-calcul
 Recalculate stock projection, shift summary, closing expected/discrepancy, return summary, sales/payment aggregates, owner KPI.
 
 Seluruh correction RPC: authorization, idempotency, row locks/atomic validation, audit, dan no-negative-stock rule wajib.
+
+## 18. Peran & hak akses (BR-044)
+- `GET /access-roles` — daftar peran + izin + jumlah Admin (Owner, Admin dgn Lihat User).
+- `GET /access-roles/menus` — katalog menu `{ key, label, group }` (semua Admin/Owner).
+- `POST /access-roles`, `PATCH /access-roles/:id` — `{ name, description?, permissions: [{ menu, level: VIEW|MANAGE }] }`
+  (daftar lengkap, menggantikan yang lama). `DELETE /access-roles/:id`. Owner only.
+- `PATCH /users/:id/access-role` — `{ accessRoleId: uuid | null }`, Owner only, target harus ADMIN.
+- Login & `GET /users/me` membawa `access: { roleName, levels: { [menu]: VIEW|MANAGE } }`; `GET /users` membawa
+  `accessRole { id, name }`.
+
+Error: `MENU_ACCESS_DENIED` (403, details `menus`, `level`), `MENU_ACCESS_NOT_CONFIGURED` (403, endpoint belum
+ditandai), `ACCESS_ROLE_SYSTEM`, `ACCESS_ROLE_IN_USE` (details `users`), `ACCESS_ROLE_NAME_TAKEN`,
+`ACCESS_ROLE_DUPLICATE_MENU`, `ACCESS_ROLE_ADMIN_ONLY`. Akun nonaktif → 401 di request berikutnya.

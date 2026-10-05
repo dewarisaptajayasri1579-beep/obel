@@ -9,7 +9,9 @@ Backend API custom menerbitkan JWT (access token + refresh token) setelah verifi
 
 ## 2. Authorization
 Enforce di backend API (service/domain layer), bukan hanya di UI. Backend memvalidasi role dan scope (Booth) pada setiap request sebelum menjalankan query/mutation ke PostgreSQL.
-UI role guard hanya lapisan UX.
+UI role guard hanya lapisan UX. Admin juga dibatasi per menu lewat peran (BR-044): setiap endpoint Admin/Owner
+ditandai menunya dan endpoint tanpa tanda ditolak (fail-closed). Role, status aktif, dan peran dibaca dari database
+di setiap request, bukan dari token, sehingga pencabutan akses berlaku langsung.
 
 ## 3. Booth scoping
 Booth Staff tidak boleh bisa mengganti booth_id di network request untuk membaca/menulis Booth lain.
@@ -31,7 +33,8 @@ Database connection string, JWT signing secret, dan API key pihak ketiga hanya h
 - closing discrepancy;
 - return receive discrepancy;
 - sale void;
-- user/role change.
+- user/role change;
+- peran hak akses dibuat/diubah/dihapus dan dipasang ke Admin (`activity_logs`, BR-044).
 
 ## 7. Immutable transaction history
 Jangan hard delete:

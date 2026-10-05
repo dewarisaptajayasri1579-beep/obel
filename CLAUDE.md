@@ -44,6 +44,7 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 - Nothing is hardcoded: booth list, shift times, products, prices, stock thresholds, and users all come from master/config data.
 - Authorization (role + booth scoping) is enforced in the backend service/application layer, not in the database (no RLS) and not trusted from client-supplied `role`/`booth_id`/totals.
 - Roles: Petugas Booth is restricted to their assigned booth/shift; Admin Pusat can act across booths; Owner is strictly read-only.
+- Admin access is further limited per admin-web menu by Owner-defined access roles (BR-044). Every endpoint that ADMIN/OWNER can call must carry `@Menu(key, VIEW|MANAGE)`, `@Lookup()`, `@OwnerOnly()` or `@AccessCheckedInService()` (`backend/src/common/access/`); `RolesGuard` rejects untagged ones (fail-closed) and `test/rbac.e2e-spec.ts` fails on any untagged route. Menu keys live only in `backend/src/common/access/menus.ts`; admin_web `nav-config.ts` references them per item.
 - Idempotency keys and UUIDs are required for critical transactions (sales, distributions, restock, returns, adjustments) to prevent duplicate posting on double-tap/retry.
 
 ### Backend structure (`backend/src`)
