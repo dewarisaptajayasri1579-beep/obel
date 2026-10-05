@@ -19,8 +19,6 @@ import { isiUlangGudang } from './support/warehouse';
 /// dibuat — tidak boleh menggeser Awal / Restock / Sisa shift yang sudah tutup.
 ///
 /// Booth & Petugas KHUSUS; tanpa membuat produk baru (lihat closing-snapshot spec).
-jest.setTimeout(60000);
-
 describe('Shift report after closing (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
