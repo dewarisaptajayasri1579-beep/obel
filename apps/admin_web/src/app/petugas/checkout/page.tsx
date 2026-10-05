@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, ReceiptText } from "lucide-react";
+import { CheckCircle2, Clock, MapPinOff, ReceiptText, type LucideIcon } from "lucide-react";
 import { api, ApiError, type ActiveShift, type ShiftReport, type ClosingItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -23,6 +23,43 @@ function kelasAngka(n: number) {
 }
 
 type Step = "LAPORAN" | "ABSEN";
+
+/// Layar pengganti saat Check-Out belum bisa dilakukan (draft tertunda, belum jam selesai).
+function LayarPenghalang({
+  icon: Icon,
+  judul,
+  pesan,
+  href,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  judul: string;
+  pesan: string;
+  href: string;
+  label: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto">
+      <TopBar title="Setor & Pengembalian Stok" back="/petugas" />
+      <div className="px-6 py-16 flex flex-col items-center text-center gap-3">
+        <Icon size={40} style={{ color: OBBEL.accentOrange }} />
+        <p className="font-extrabold text-lg text-slate-900">{judul}</p>
+        <p className="text-base text-slate-500 max-w-72">{pesan}</p>
+        {children}
+        <Link
+          href={href}
+          className="mt-2 w-full max-w-72 flex items-center justify-center gap-2 rounded-full py-3.5 font-extrabold text-white"
+          style={{ backgroundColor: OBBEL.primaryDark }}
+        >
+          <Icon size={18} />
+          {label}
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 /// Gabungan ShiftReportItem (stokAwal/restock/terjual/retur/sisaSistem) +
 /// ClosingItem (expectedQty/actualQty) per produk — dua sumber data yang
@@ -60,12 +97,28 @@ function CheckoutContent() {
   /// Nomor draft transaksi shift ini yang belum dibayar — Check-Out ditolak backend
   /// (PENDING_DRAFTS_EXIST) sampai semuanya dibayar atau dihapus di Kasir.
   const [draftTertunda, setDraftTertunda] = useState<string[] | null>(null);
+  /// Pesan backend kalau Check-Out sebelum jam selesai shift (EARLY_CHECKOUT, BR-042).
+  const [belumWaktunya, setBelumWaktunya] = useState<string | null>(null);
+  /// Pesan backend kalau lokasi Check-Out di luar radius Booth (OUTSIDE_ATTENDANCE_RADIUS).
+  const [lokasiDitolak, setLokasiDitolak] = useState<string | null>(null);
 
-  /// true kalau error-nya draft tertunda (layar beralih ke pemberitahuan draft).
-  function tanganiDraftTertunda(err: unknown): boolean {
-    if (!(err instanceof ApiError) || err.code !== "PENDING_DRAFTS_EXIST") return false;
-    setDraftTertunda((err.details?.saleNos as string[] | undefined) ?? []);
-    return true;
+  /// true kalau error-nya menghalangi Check-Out (layar beralih ke pemberitahuannya).
+  function tanganiPenghalang(err: unknown): boolean {
+    if (!(err instanceof ApiError)) return false;
+    if (err.code === "PENDING_DRAFTS_EXIST") {
+      setDraftTertunda((err.details?.saleNos as string[] | undefined) ?? []);
+      return true;
+    }
+    if (err.code === "EARLY_CHECKOUT") {
+      setBelumWaktunya(err.message);
+      return true;
+    }
+    if (err.code === "ARRIVAL_REQUIRED") {
+      toast.warning(err.message);
+      router.replace("/petugas/tiba");
+      return true;
+    }
+    return false;
   }
 
   /// Memuat laporan + snapshot penutupan. Dipanggil saat layar dibuka dan lagi
@@ -97,7 +150,7 @@ function CheckoutContent() {
         ),
       );
     } catch (err) {
-      if (tanganiDraftTertunda(err)) return;
+      if (tanganiPenghalang(err)) return;
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan shift.");
     } finally {
       setLoading(false);
@@ -131,9 +184,10 @@ function CheckoutContent() {
   async function handleConfirmCheckout() {
     if (!shift || !location || !photoFile) return;
     setSubmitting(true);
+    setLokasiDitolak(null);
     try {
       const { photoUrl } = await api.uploadAttendancePhoto(photoFile);
-      const result = await api.confirmClosing(shift.shiftSessionId, {
+      await api.confirmClosing(shift.shiftSessionId, {
         items: baris.map((b) => {
           const actualQty = stokFisik[b.productId] ?? b.sisaSistem;
           return {
@@ -148,12 +202,15 @@ function CheckoutContent() {
         checkOutLongitude: location.longitude,
         checkOutPhotoUrl: photoUrl,
       });
-      if (result.locationWarning) toast.warning(result.locationWarning);
       stopGpsTracking();
-      toast.success("Check-Out berhasil. Sampai jumpa di shift berikutnya!");
-      router.replace("/petugas/check-in");
+      toast.success("Check-Out berhasil. Absen Kembali saat sampai di Gudang.");
+      router.replace("/petugas");
     } catch (err) {
-      if (tanganiDraftTertunda(err)) return;
+      if (tanganiPenghalang(err)) return;
+      if (err instanceof ApiError && err.code === "OUTSIDE_ATTENDANCE_RADIUS") {
+        setLokasiDitolak(err.message);
+        return;
+      }
       if (err instanceof ApiError && err.code === "STOCK_CHANGED_DURING_CLOSING") {
         // Stok berubah sejak layar dibuka — kembali ke laporan dengan angka terbaru.
         toast.warning(err.message);
@@ -169,28 +226,20 @@ function CheckoutContent() {
 
   if (draftTertunda) {
     return (
-      <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto">
-        <TopBar title="Setor & Pengembalian Stok" back="/petugas" />
-        <div className="px-6 py-16 flex flex-col items-center text-center gap-3">
-          <ReceiptText size={40} style={{ color: OBBEL.accentOrange }} />
-          <p className="font-extrabold text-lg text-slate-900">Masih Ada Draft Transaksi</p>
-          <p className="text-base text-slate-500 max-w-72">
-            Bayar atau hapus draft berikut di Kasir sebelum Check-Out. Draft yang tertinggal tidak bisa diurus lagi setelah shift ditutup.
-          </p>
-          {draftTertunda.length > 0 && (
-            <p className="font-bold text-slate-800">{draftTertunda.join(", ")}</p>
-          )}
-          <Link
-            href="/petugas/kasir"
-            className="mt-2 w-full max-w-72 flex items-center justify-center gap-2 rounded-full py-3.5 font-extrabold text-white"
-            style={{ backgroundColor: OBBEL.primaryDark }}
-          >
-            <ReceiptText size={18} />
-            Buka Kasir
-          </Link>
-        </div>
-      </div>
+      <LayarPenghalang
+        icon={ReceiptText}
+        judul="Masih Ada Draft Transaksi"
+        pesan="Bayar atau hapus draft berikut di Kasir sebelum Check-Out. Draft yang tertinggal tidak bisa diurus lagi setelah shift ditutup."
+        href="/petugas/kasir"
+        label="Buka Kasir"
+      >
+        {draftTertunda.length > 0 && <p className="font-bold text-slate-800">{draftTertunda.join(", ")}</p>}
+      </LayarPenghalang>
     );
+  }
+
+  if (belumWaktunya) {
+    return <LayarPenghalang icon={Clock} judul="Belum Waktunya Check-Out" pesan={belumWaktunya} href="/petugas" label="Kembali ke Beranda" />;
   }
 
   if (loading || !shift || !report) {
@@ -309,6 +358,21 @@ function CheckoutContent() {
               <p className="font-extrabold text-base mt-1">{formatRupiah(report.kasQris)}</p>
             </div>
           </div>
+          {report.uangJalan > 0 && (
+            <div className="rounded-xl bg-white border border-slate-200 p-3 mb-4 text-sm flex flex-col gap-1">
+              <p className="font-bold text-slate-700">Uang disetor saat Kembali di Gudang</p>
+              <div className="flex justify-between text-slate-500">
+                <span>Kas Tunai + Uang jalan</span>
+                <span>
+                  {formatRupiah(report.kasTunai)} + {formatRupiah(report.uangJalan)}
+                </span>
+              </div>
+              <div className="flex justify-between font-extrabold text-slate-900">
+                <span>Total</span>
+                <span>{formatRupiah(report.kasTunai + report.uangJalan)}</span>
+              </div>
+            </div>
+          )}
 
           <textarea
             value={catatan}
@@ -371,7 +435,7 @@ function CheckoutContent() {
               <span className="font-semibold text-slate-800">{formatTanggalJakarta(report.businessDate)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500">Jam Check-In</span>
+              <span className="text-slate-500">Jam Berangkat</span>
               <span className="font-semibold text-slate-800">{shift.openedAt ? formatJamJakarta(shift.openedAt) : "-"}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -389,6 +453,15 @@ function CheckoutContent() {
 
         <div>
           <p className="text-base font-bold text-slate-800 mb-2">Konfirmasi Kehadiran</p>
+          {lokasiDitolak && (
+            <div className="rounded-2xl bg-red-50 border border-red-200 p-4 mb-3 flex gap-3">
+              <MapPinOff size={20} className="shrink-0 mt-0.5" style={{ color: OBBEL.accentRed }} />
+              <div className="text-sm text-red-800">
+                <p className="font-bold">Check-Out ditolak</p>
+                <p className="mt-0.5">{lokasiDitolak}</p>
+              </div>
+            </div>
+          )}
           <AttendanceCapture location={location} onLocation={setLocation} photoFile={photoFile} onPhoto={(f) => setPhotoFile(f)} />
         </div>
       </div>

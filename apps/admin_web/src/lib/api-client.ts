@@ -181,6 +181,8 @@ export interface Booth {
   /// Kode QRIS statis Booth ini, ditampilkan di layar Kasir Petugas saat
   /// metode QRIS/Split dipilih. Diunggah Admin di Data Booth.
   qrisImageUrl: string | null
+  /// Uang jalan (modal kembalian) per shift, Rupiah — dibawa Barista saat Berangkat (BR-043).
+  cashFloat: number
   status: "ACTIVE" | "INACTIVE"
 }
 
@@ -398,6 +400,13 @@ export interface AppSettings {
   id: string
   /** Detik antar ping GPS dari app petugas — lihat gpsPingIntervalSeconds di schema.prisma. */
   gpsPingIntervalSeconds: number
+  /** Acuan absen Berangkat & Kembali (BR-042); null = belum diatur, absen tidak divalidasi jarak. */
+  warehouseLatitude: number | null
+  warehouseLongitude: number | null
+  /** Radius absen (meter) dari Gudang / Booth. */
+  attendanceRadiusMeters: number
+  /** Check-Out boleh paling cepat sekian menit sebelum jam selesai shift. */
+  earlyCheckoutToleranceMinutes: number
   updatedAt: string
 }
 
@@ -1036,8 +1045,46 @@ export interface ActiveShift {
   /// Jam Check-In SESUNGGUHNYA (bukan jadwal) — null hanya utk shift yang
   /// belum pernah dibuka (seharusnya tidak terjadi di layar aktif manapun).
   openedAt: string | null
+  /// Absen Tiba di Booth (BR-042) — null sampai Barista absen Tiba.
+  arrivedAt: string | null
+  /// Uang jalan shift ini, dikembalikan saat absen Kembali (BR-043).
+  cashFloat: number
   accessToken?: string
-  locationWarning?: string
+}
+
+/// Shift yang sudah Check-Out tapi belum absen Kembali di Gudang.
+export interface PendingReturnShift {
+  shiftSessionId: string
+  booth: { id: string; code: string; name: string }
+  shiftName: string
+  closedAt: string
+  cashFloat: number
+  expectedCash: number | null
+}
+
+export type AttendancePoint = "DEPART" | "ARRIVE" | "FINISH" | "RETURN"
+
+export interface AttendancePermit {
+  id: string
+  staffId: string
+  staff: { id: string; fullName: string }
+  type: "LOCATION" | "EARLY_CHECKOUT"
+  point: AttendancePoint | null
+  reason: string
+  grantedBy: { id: string; fullName: string }
+  grantedAt: string
+  usedAt: string | null
+}
+
+/// Satu titik absen di riwayat Admin: jarak ke acuan dihitung server.
+export interface TitikAbsen {
+  at: string | null
+  photoUrl: string | null
+  latitude: number | null
+  longitude: number | null
+  distanceMeters: number | null
+  acuanKosong: boolean
+  izin: { reason: string; grantedBy: string } | null
 }
 
 export interface ClosingItem {
@@ -1055,7 +1102,6 @@ export interface ClosingResponse {
   status: "DRAFT" | "CONFIRMED"
   confirmedAt: string | null
   items: ClosingItem[]
-  locationWarning?: string
 }
 
 export interface ShiftHistoryItem {
@@ -1083,12 +1129,11 @@ export interface ShiftAdminHistoryItem {
   status: "SCHEDULED" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELLED"
   openedAt: string | null
   closedAt: string | null
-  checkInPhotoUrl: string | null
-  checkInLatitude: number | null
-  checkInLongitude: number | null
-  checkOutPhotoUrl: string | null
-  checkOutLatitude: number | null
-  checkOutLongitude: number | null
+  arrivedAt: string | null
+  returnedAt: string | null
+  cashFloat: number
+  absen: { berangkat: TitikAbsen; tiba: TitikAbsen; selesai: TitikAbsen; kembali: TitikAbsen }
+  izinPulangAwal: { reason: string; grantedBy: string } | null
   totalJualCup: number
   adaSelisih: boolean
   returStatus: "SUBMITTED" | "RECEIVED" | "DISCREPANCY" | "CANCELLED" | null
@@ -1155,6 +1200,11 @@ export interface ShiftReport {
   staffName: string
   status: "SCHEDULED" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELLED"
   businessDate: string
+  arrivedAt: string | null
+  /// null = Barista belum absen Kembali di Gudang → approve Stok Kembali & Setor Uang terkunci.
+  returnedAt: string | null
+  /// Uang jalan — sudah termasuk di setoran.expectedAmount (kas Tunai + uang jalan).
+  uangJalan: number
   items: ShiftReportItem[]
   transaksi: ShiftReportTransaksi[]
   totalPenjualan: number
@@ -1262,6 +1312,7 @@ export const api = {
     address?: string
     latitude?: number
     longitude?: number
+    cashFloat?: number
   }) => request<Booth>("/booths", { method: "POST", body: input }),
   updateBooth: (
     id: string,
@@ -1273,6 +1324,7 @@ export const api = {
       longitude?: number
       status?: "ACTIVE" | "INACTIVE"
       qrisImageUrl?: string
+      cashFloat?: number
     },
   ) => request<Booth>(`/booths/${id}`, { method: "PATCH", body: input }),
   uploadBoothQris: async (file: File) => {
@@ -1304,7 +1356,9 @@ export const api = {
     request<CompanyProfile>("/company-profile", { method: "PATCH", body: input }),
 
   getAppSettings: () => request<AppSettings>("/app-settings"),
-  updateAppSettings: (input: { gpsPingIntervalSeconds: number }) =>
+  updateAppSettings: (
+    input: Partial<Pick<AppSettings, "gpsPingIntervalSeconds" | "warehouseLatitude" | "warehouseLongitude" | "attendanceRadiusMeters" | "earlyCheckoutToleranceMinutes">>,
+  ) =>
     request<AppSettings>("/app-settings", { method: "PATCH", body: input }),
 
   getShiftJourney: (shiftId: string) => request<ShiftJourney>(`/shifts/${shiftId}/journey`),
@@ -1752,6 +1806,15 @@ export const api = {
   checkIn: (input: { boothId?: string; latitude: number; longitude: number; photoUrl: string }) =>
     request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
   uploadAttendancePhoto: (file: File) => uploadPhoto("/shifts/attendance/photo", file),
+  /// Absen Tiba di Booth & Kembali di Gudang (BR-042).
+  arriveAtBooth: (shiftSessionId: string, input: { latitude: number; longitude: number; photoUrl: string }) =>
+    request<ActiveShift>(`/shifts/${shiftSessionId}/arrive`, { method: "POST", body: input }),
+  returnToWarehouse: (shiftSessionId: string, input: { latitude: number; longitude: number; photoUrl: string }) =>
+    request<{ shiftSessionId: string; returnedAt: string }>(`/shifts/${shiftSessionId}/return`, { method: "POST", body: input }),
+  getPendingReturn: () => request<PendingReturnShift | null>("/shifts/pending-return"),
+  getAttendancePermits: (date?: string) => request<AttendancePermit[]>(`/attendance-permits${date ? `?date=${date}` : ""}`),
+  grantAttendancePermit: (input: { staffId: string; type: "LOCATION" | "EARLY_CHECKOUT"; point?: AttendancePoint; reason: string }) =>
+    request<AttendancePermit>("/attendance-permits", { method: "POST", body: input }),
   /// Foto bukti bayar QRIS — URL hasilnya dikirim sebagai `qrisProofPhotoUrl`.
   uploadPaymentProofPhoto: (file: File) => uploadPhoto("/sales/payment-proof/photo", file),
   startClosing: (shiftSessionId: string) =>

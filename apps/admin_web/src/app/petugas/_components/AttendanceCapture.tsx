@@ -13,20 +13,23 @@ export interface LocationValue {
   accuracy: number;
 }
 
-/// Dua langkah Absen GPS+Selfie dipakai dua kali (Check-In & Check-Out) —
-/// komponen ini dishare persis, bukan dua salinan hampir sama. Location &
-/// foto diangkat ke parent (bukan disimpan di sini) supaya parent bisa
+/// Dua langkah Absen GPS+Selfie dipakai di keempat titik absen (Berangkat, Tiba,
+/// Check-Out, Kembali) — komponen ini dishare persis, bukan salinan hampir sama.
+/// Location & foto diangkat ke parent (bukan disimpan di sini) supaya parent bisa
 /// menahan tombol submit sampai keduanya terisi.
 export function AttendanceCapture({
   location,
   onLocation,
   photoFile,
   onPhoto,
+  tempat = "booth",
 }: {
   location: LocationValue | null;
   onLocation: (loc: LocationValue) => void;
   photoFile: File | null;
   onPhoto: (file: File) => void;
+  /// Lokasi acuan absen ini, untuk petunjuk di kartu lokasi.
+  tempat?: "booth" | "gudang";
 }) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -62,7 +65,9 @@ export function AttendanceCapture({
           <MapPin size={16} style={{ color: GREEN }} />
           <span className="text-base font-bold text-slate-800">Konfirmasi Lokasi Anda</span>
         </div>
-        <p className="text-sm text-slate-500 mb-3">Pastikan Anda berada di area booth yang benar.</p>
+        <p className="text-sm text-slate-500 mb-3">
+          {tempat === "gudang" ? "Pastikan Anda berada di Gudang." : "Pastikan Anda berada di area booth yang benar."}
+        </p>
 
         {location ? (
           <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">

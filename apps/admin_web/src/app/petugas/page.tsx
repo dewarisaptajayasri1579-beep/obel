@@ -21,9 +21,11 @@ import {
   AlertTriangle,
   Info,
   X,
+  MapPin,
+  Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, BASE_URL, getToken, type ActiveShift, type NotificationItem, type SaleListItem } from "@/lib/api-client";
+import { api, ApiError, BASE_URL, getToken, type ActiveShift, type NotificationItem, type PendingReturnShift, type SaleListItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
@@ -77,6 +79,8 @@ function HomeContent() {
   const toast = useToast();
   const [shift, setShift] = useState<ActiveShift | null>(null);
   const [noShift, setNoShift] = useState(false);
+  // Shift yang sudah Check-Out tapi belum absen Kembali di Gudang (BR-042).
+  const [menungguKembali, setMenungguKembali] = useState<PendingReturnShift | null>(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
@@ -100,6 +104,7 @@ function HomeContent() {
           // redirect ke Check-In), dengan CTA supaya Petugas yang pertama
           // kali buka jelas melihat dulu ada di Beranda.
           setNoShift(true);
+          setMenungguKembali(await api.getPendingReturn().catch(() => null));
           return;
         }
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat status shift.");
@@ -218,20 +223,32 @@ function HomeContent() {
           >
             <Leaf size={90} className="absolute -right-3 -top-6 text-white/10 rotate-20" strokeWidth={1} />
             <Coffee size={64} className="absolute right-5 bottom-4 text-white/25" strokeWidth={1.2} />
-            <DoorOpen size={28} className="relative text-white/80 mb-2" />
-            <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Belum Ada Shift Aktif</p>
-            <p className="relative text-white/80 text-base mt-2 font-medium max-w-55">
-              Lakukan Check-In dulu untuk mulai bekerja hari ini.
-            </p>
+            {menungguKembali ? (
+              <>
+                <Warehouse size={28} className="relative text-white/80 mb-2" />
+                <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Kembali ke Gudang</p>
+                <p className="relative text-white/80 text-base mt-2 font-medium max-w-55">
+                  Shift {menungguKembali.booth.name} sudah Check-Out. Absen Kembali di Gudang, lalu serahkan stok &amp; uang ke Admin.
+                </p>
+              </>
+            ) : (
+              <>
+                <DoorOpen size={28} className="relative text-white/80 mb-2" />
+                <p className="relative text-white font-extrabold text-xl tracking-tight leading-tight">Belum Ada Shift Aktif</p>
+                <p className="relative text-white/80 text-base mt-2 font-medium max-w-55">
+                  Absen Berangkat di Gudang dulu untuk mulai bekerja hari ini.
+                </p>
+              </>
+            )}
           </div>
 
           <Link
-            href="/petugas/check-in"
+            href={menungguKembali ? "/petugas/kembali" : "/petugas/check-in"}
             className="mt-4 w-full flex items-center justify-center gap-2 rounded-full py-4 font-extrabold tracking-wide text-white active:scale-[0.99] transition relative"
             style={{ backgroundColor: GREEN }}
           >
-            <DoorOpen size={18} />
-            CHECK IN SEKARANG
+            {menungguKembali ? <Warehouse size={18} /> : <DoorOpen size={18} />}
+            {menungguKembali ? "ABSEN KEMBALI DI GUDANG" : "ABSEN BERANGKAT"}
             <ChevronRight size={16} className="absolute right-5" />
           </Link>
         </div>
@@ -300,6 +317,9 @@ function HomeContent() {
           <p className="relative text-white/80 text-base mt-2 font-medium flex items-center gap-1.5">
             <Clock size={13} /> Sejak {formatJamJakarta(shift.scheduledStartAt)}
           </p>
+          {shift.cashFloat > 0 && (
+            <p className="relative text-white/80 text-sm mt-2 font-medium">Uang jalan {formatRupiah(shift.cashFloat)} · dikembalikan saat Kembali</p>
+          )}
           <p className="relative text-white/70 text-sm mt-3 font-medium">— Kerja hebat hari ini 💚</p>
         </div>
 
@@ -363,15 +383,28 @@ function HomeContent() {
           })}
         </div>
 
-        <Link
-          href="/petugas/checkout"
-          className="mt-5 w-full flex items-center justify-center gap-2 rounded-full border-2 bg-white py-4 font-extrabold tracking-wide active:scale-[0.99] transition relative"
-          style={{ borderColor: OBBEL.accentOrange, color: OBBEL.accentOrange }}
-        >
-          <DoorOpen size={18} />
-          CHECK OUT
-          <ChevronRight size={16} className="absolute right-5" />
-        </Link>
+        {/* Check-Out baru bisa setelah absen Tiba di Booth (BR-042). */}
+        {shift.arrivedAt ? (
+          <Link
+            href="/petugas/checkout"
+            className="mt-5 w-full flex items-center justify-center gap-2 rounded-full border-2 bg-white py-4 font-extrabold tracking-wide active:scale-[0.99] transition relative"
+            style={{ borderColor: OBBEL.accentOrange, color: OBBEL.accentOrange }}
+          >
+            <DoorOpen size={18} />
+            CHECK OUT
+            <ChevronRight size={16} className="absolute right-5" />
+          </Link>
+        ) : (
+          <Link
+            href="/petugas/tiba"
+            className="mt-5 w-full flex items-center justify-center gap-2 rounded-full py-4 font-extrabold tracking-wide text-white active:scale-[0.99] transition relative"
+            style={{ backgroundColor: GREEN }}
+          >
+            <MapPin size={18} />
+            ABSEN TIBA DI BOOTH
+            <ChevronRight size={16} className="absolute right-5" />
+          </Link>
+        )}
 
         <div className="flex items-center gap-3 mt-5 px-6">
           <div className="flex-1 h-px bg-slate-200" />

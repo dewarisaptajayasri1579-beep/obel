@@ -72,7 +72,7 @@ export function RequireActiveShift({ title, children }: { title: string; childre
             {status.jenis === "belumCheckIn" ? "Belum Ada Shift Aktif" : "Status Shift Tidak Bisa Dimuat"}
           </p>
           <p className="text-base text-slate-500 max-w-72">
-            {status.jenis === "belumCheckIn" ? `Lakukan Check-In dulu untuk membuka ${title}.` : status.pesan}
+            {status.jenis === "belumCheckIn" ? `Lakukan Absen Berangkat dulu untuk membuka ${title}.` : status.pesan}
           </p>
           {status.jenis === "belumCheckIn" ? (
             <Link
@@ -81,7 +81,7 @@ export function RequireActiveShift({ title, children }: { title: string; childre
               style={{ backgroundColor: GREEN }}
             >
               <DoorOpen size={18} />
-              Check-In Sekarang
+              Absen Berangkat
             </Link>
           ) : (
             <button
