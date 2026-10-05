@@ -61,7 +61,7 @@ export class BoothsService {
       if (assignedCount > 0) {
         throw new DomainError(
           'BOOTH_HAS_ASSIGNED_STAFF',
-          `Booth "${existing.name}" masih punya petugas di Setting Petugas. Kosongkan semua penugasan booth ini dulu (pilih "Belum ditugaskan" di tiap shift) sebelum menonaktifkan.`,
+          `Booth "${existing.name}" masih punya barista di Setting Barista. Kosongkan semua penugasan booth ini dulu (pilih "Belum ditugaskan" di tiap shift) sebelum menonaktifkan.`,
         );
       }
     }

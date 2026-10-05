@@ -249,7 +249,7 @@ function PenjualanContent() {
               <TableRow>
                 <TableHead>No. Sale</TableHead>
                 <TableHead>Booth</TableHead>
-                <TableHead>Petugas</TableHead>
+                <TableHead>Barista</TableHead>
                 <TableHead>Cup</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Metode</TableHead>

@@ -479,7 +479,7 @@ export class StockHandoversService {
     if (!activeSession) {
       throw new DomainError(
         'STAFF_NOT_ACTIVE',
-        'Petugas ini sedang tidak Aktif (belum Check-In atau sudah Check-Out).',
+        'Barista ini sedang tidak Aktif (belum Check-In atau sudah Check-Out).',
       );
     }
 

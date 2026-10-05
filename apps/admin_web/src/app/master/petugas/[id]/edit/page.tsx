@@ -31,7 +31,7 @@ function PetugasEditContent({ id }: { id: string }) {
         if (!u) setTidakAda(true);
       })
       .catch((err) => {
-        toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Petugas.");
+        toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Barista.");
         setTidakAda(true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,7 +47,7 @@ function PetugasEditContent({ id }: { id: string }) {
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Data Operasional" },
-          { label: "Petugas", href: kembali },
+          { label: "Barista", href: kembali },
           { label: petugas?.fullName ?? "Ubah" },
         ]}
       />
@@ -57,17 +57,17 @@ function PetugasEditContent({ id }: { id: string }) {
           <Link
             href={kembali}
             className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
-            aria-label="Kembali ke daftar Petugas"
+            aria-label="Kembali ke daftar Barista"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <UserRound className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
-              Ubah Petugas
+              Ubah Barista
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
-              {petugas ? `${petugas.username} — ${petugas.fullName}` : "Memuat data Petugas..."}
+              {petugas ? `${petugas.username} — ${petugas.fullName}` : "Memuat data Barista..."}
             </p>
           </div>
         </div>
@@ -80,7 +80,7 @@ function PetugasEditContent({ id }: { id: string }) {
       <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
         {tidakAda ? (
           <div className="py-10 text-center text-sm text-slate-500 dark:text-fg-muted">
-            Petugas tidak ditemukan.{" "}
+            Barista tidak ditemukan.{" "}
             <Link href={kembali} className="font-semibold text-[var(--brand-700)] hover:underline">
               Kembali ke daftar
             </Link>

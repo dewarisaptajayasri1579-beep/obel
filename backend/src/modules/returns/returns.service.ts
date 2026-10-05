@@ -264,7 +264,7 @@ export class ReturnsService {
           status: hasDiscrepancy ? ReturnStatus.DISCREPANCY : ReturnStatus.RECEIVED,
           receivedAt,
           receivedById: actorId,
-          receiveNote: liabilityNotes.length > 0 ? `Ganti Rugi Petugas: ${liabilityNotes.join(', ')}` : null,
+          receiveNote: liabilityNotes.length > 0 ? `Ganti Rugi Barista: ${liabilityNotes.join(', ')}` : null,
         },
       });
     });

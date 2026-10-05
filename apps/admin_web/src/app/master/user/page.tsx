@@ -22,7 +22,7 @@ import { api, ApiError, type UserAccount } from "@/lib/api-client";
 import { KeyRound, Plus } from "lucide-react";
 
 const ROLE_LABEL: Record<UserAccount["role"], string> = {
-  BOOTH_STAFF: "Petugas Booth",
+  BOOTH_STAFF: "Barista",
   ADMIN: "Admin Pusat",
   OWNER: "Owner",
 };
@@ -106,7 +106,7 @@ function UserContent() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Master User</h1>
           <p className="text-sm text-slate-500 dark:text-fg-muted">
-            Kelola akun login Admin &amp; Owner. Petugas Booth ada di Data Operasional → Petugas.
+            Kelola akun login Admin &amp; Owner. Barista ada di Data Operasional → Barista.
           </p>
         </div>
         <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>

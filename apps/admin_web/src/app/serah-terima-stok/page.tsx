@@ -89,12 +89,12 @@ function keteranganDokumen(r: StockHandover): { label: string; kelas: string } {
     return { label: "Kirim Stok (Awal)", kelas: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20" };
   }
   if (r.kind === "request") {
-    return { label: "Pengajuan dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+    return { label: "Pengajuan dari Barista", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
   }
   if (r.sumber === "ADMIN") {
     return { label: "Kirim Stok (Re-Stok)", kelas: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20" };
   }
-  return { label: "Re-Stok dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+  return { label: "Re-Stok dari Barista", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
 }
 
 function tanggalJakarta(iso: string) {
@@ -225,7 +225,7 @@ function SerahTerimaStokContent() {
               Serah Terima Stok
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Kirim stok ke Petugas Aktif, atau proses pengajuan dari Petugas.
+              Kirim stok ke Barista Aktif, atau proses pengajuan dari Barista.
             </p>
           </div>
         </div>
@@ -296,7 +296,7 @@ function SerahTerimaStokContent() {
             <div className="flex-1">
               <p className="text-sm font-bold text-slate-900 dark:text-fg">Stok Sedang Diproses (In-Transit)</p>
               <p className="text-[11px] text-slate-500 dark:text-fg-muted mt-0.5">
-                {inTransit.length} dokumen masih dalam perjalanan, belum dikonfirmasi diterima Petugas.
+                {inTransit.length} dokumen masih dalam perjalanan, belum dikonfirmasi diterima Barista.
               </p>
             </div>
             <ChevronDown className={`w-4 h-4 text-slate-500 dark:text-fg-muted transition-transform ${showInTransit ? "rotate-180" : ""}`} />
@@ -320,7 +320,7 @@ function SerahTerimaStokContent() {
                           <span className="text-xs text-slate-600 dark:text-fg-secondary">
                             <span className="font-semibold text-slate-800 dark:text-fg">{trx.boothName}</span>
                             {" — "}
-                            {trx.staffName ?? "Petugas belum Check-In"}
+                            {trx.staffName ?? "Barista belum Check-In"}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">
@@ -462,7 +462,7 @@ function SerahTerimaStokContent() {
                 <tr>
                   <th className="py-3.5 px-3">No. Dokumen</th>
                   <th className="py-3.5 px-3">Tanggal</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3">Booth</th>
                   <th className="py-3.5 px-3">Keterangan</th>
                   <th className="py-3.5 px-3 text-center">Status</th>

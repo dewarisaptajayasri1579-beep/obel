@@ -186,10 +186,10 @@ export function TabMain({
     setTogglingId(u.id);
     try {
       await api.updateUser(u.id, { active: !u.active });
-      toast.success(`Petugas "${u.fullName}" ${u.active ? "dinonaktifkan" : "diaktifkan"}.`);
+      toast.success(`Barista "${u.fullName}" ${u.active ? "dinonaktifkan" : "diaktifkan"}.`);
       await onReload();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal mengubah status Petugas.");
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengubah status Barista.");
     } finally {
       setTogglingId(null);
     }
@@ -226,7 +226,7 @@ export function TabMain({
 
   const KARTU = [
     {
-      label: "Total Petugas",
+      label: "Total Barista",
       nilai: angka(metrics.total),
       ket: adaPenyaring ? `dari ${metrics.totalSemua} petugas` : "akun login Android",
       icon: UserRound,
@@ -263,7 +263,7 @@ export function TabMain({
             <UserRound className="w-4.5 h-4.5" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight">Petugas</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight">Barista</h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
               Akun login Android — klik menu titik-tiga untuk mengubah.
             </p>
@@ -272,7 +272,7 @@ export function TabMain({
 
         <Link href={linkBaru}>
           <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-            Tambah Petugas <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
+            Tambah Barista <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
           </Button>
         </Link>
       </div>
@@ -349,7 +349,7 @@ export function TabMain({
 
           <div className="flex flex-1 flex-wrap items-center gap-2 md:justify-end">
             <p className="text-xs font-semibold text-slate-600 dark:text-fg-muted md:text-right md:mr-0.5">
-              {adaPenyaring ? "Hasil filter" : "Semua Petugas"}
+              {adaPenyaring ? "Hasil filter" : "Semua Barista"}
               <span className="font-normal text-slate-400 dark:text-fg-muted"> · {filteredRows.length} petugas</span>
             </p>
 
@@ -433,7 +433,7 @@ export function TabMain({
               {sortedRows.length === 0 ? (
                 <tr>
                   <td colSpan={jumlahKolomTampil} className="text-center py-10 text-slate-500 dark:text-fg-muted">
-                    {users.length === 0 ? "Belum ada Petugas." : "Tidak ada Petugas yang cocok dengan filter."}
+                    {users.length === 0 ? "Belum ada Barista." : "Tidak ada Barista yang cocok dengan filter."}
                   </td>
                 </tr>
               ) : (
@@ -444,7 +444,7 @@ export function TabMain({
                         <Link
                           href={linkEdit(u.id)}
                           className="text-[var(--brand-700)] dark:text-brand-400 hover:underline"
-                          title="Ubah Petugas ini"
+                          title="Ubah Barista ini"
                         >
                           {u.username}
                         </Link>
@@ -455,7 +455,7 @@ export function TabMain({
                         <Link
                           href={linkEdit(u.id)}
                           className="font-bold text-slate-800 dark:text-fg hover:text-[var(--brand-700)] dark:hover:text-brand-400 hover:underline"
-                          title="Ubah Petugas ini"
+                          title="Ubah Barista ini"
                         >
                           {u.fullName}
                         </Link>
@@ -510,7 +510,7 @@ export function TabMain({
                                 className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
                               >
                                 <Pencil className="w-3.5 h-3.5 text-[var(--brand-700)]" />
-                                <span>Edit Petugas</span>
+                                <span>Edit Barista</span>
                               </Link>
 
                               <button

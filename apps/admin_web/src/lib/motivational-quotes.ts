@@ -8,7 +8,7 @@ const GENERIC_QUOTES = [
 
 const ADMIN_QUOTES = [
   "Stok tercatat rapi, booth berjalan lancar — kerja bagus, Admin!",
-  "Setiap distribusi yang tepat waktu bikin Petugas di booth makin semangat.",
+  "Setiap distribusi yang tepat waktu bikin Barista di booth makin semangat.",
   "Data akurat hari ini, laporan tenang di akhir bulan.",
   "Terima kasih sudah jadi jembatan gudang dan booth yang bisa diandalkan.",
   "Serah terima yang rapi adalah fondasi operasional yang sehat.",
@@ -23,7 +23,7 @@ const OWNER_QUOTES = [
 ] as const
 
 const BOOTH_STAFF_QUOTES = [
-  "Semangat pagi, Petugas! Satu shift lagi, satu cerita baru.",
+  "Semangat pagi, Barista! Satu shift lagi, satu cerita baru.",
   "Setiap gelas yang kamu sajikan bikin harinya pelanggan lebih baik.",
   "Kerja hebat hari ini, istirahat yang cukup nanti.",
   "Booth rapi, kasir tertib — kamu bagian penting dari tim ini.",
@@ -36,7 +36,7 @@ const QUOTES_BY_ROLE: Record<string, readonly string[]> = {
   OWNER: OWNER_QUOTES,
   Owner: OWNER_QUOTES,
   BOOTH_STAFF: BOOTH_STAFF_QUOTES,
-  "Petugas Booth": BOOTH_STAFF_QUOTES,
+  "Barista": BOOTH_STAFF_QUOTES,
 }
 
 export function getRandomMotivationalQuote(role?: string): string {

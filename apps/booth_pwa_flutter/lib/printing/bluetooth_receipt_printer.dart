@@ -79,7 +79,7 @@ class BluetoothReceiptPrinter implements ReceiptPrinter {
     bytes.addAll(generator.text('No: ${receipt.saleNo}'));
     bytes.addAll(generator.text(_formatDateTime(receipt.time)));
     if (receipt.staffName != null) {
-      bytes.addAll(generator.text('Petugas: ${receipt.staffName}'));
+      bytes.addAll(generator.text('Barista: ${receipt.staffName}'));
     }
     bytes.addAll(generator.hr());
 

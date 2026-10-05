@@ -220,7 +220,7 @@ function TransaksiKasirContent() {
         staffId: staffId || undefined,
         dari: awalPeriode ? awalPeriode.toISOString() : undefined,
       });
-      const header = "No. Sale,Tanggal,Shift,Petugas,Booth,Cup,Total,Metode,Status";
+      const header = "No. Sale,Tanggal,Shift,Barista,Booth,Cup,Total,Metode,Status";
       const baris = res.rows.map((s) =>
         [
           s.saleNo,
@@ -419,7 +419,7 @@ function TransaksiKasirContent() {
               options={staffList.map((s) => ({ value: s.id, label: s.fullName }))}
               value={staffId}
               onChange={setStaffId}
-              placeholder="Semua Petugas"
+              placeholder="Semua Barista"
               sizeVariant="sm"
               className="h-9!"
               active={staffId !== ""}
@@ -501,7 +501,7 @@ function TransaksiKasirContent() {
                   <th className="py-3.5 px-3">No. Sale</th>
                   <th className="py-3.5 px-3">Tanggal</th>
                   <th className="py-3.5 px-3">Shift</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3">Booth</th>
                   <th className="py-3.5 px-3 text-right">Cup</th>
                   <th className="py-3.5 px-3 text-right">Total</th>

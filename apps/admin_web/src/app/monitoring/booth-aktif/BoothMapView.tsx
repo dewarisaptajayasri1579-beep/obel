@@ -223,7 +223,7 @@ export function BoothMapView({
             opacity={selectedId && selectedId !== booth.boothId ? 0.35 : 1}
           >
             <Tooltip direction="top" offset={[0, -14]}>
-              {booth.boothCode} · {booth.staffName ?? "Tidak ada petugas"}
+              {booth.boothCode} · {booth.staffName ?? "Tidak ada barista"}
               {sumberLokasi === "realtime" && booth.lastLocationAt && (
                 <> · {menitSejak(booth.lastLocationAt)} menit lalu</>
               )}

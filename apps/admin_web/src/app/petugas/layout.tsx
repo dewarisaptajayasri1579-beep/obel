@@ -13,8 +13,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Obbel Petugas Booth",
-  description: "Check-In, Kasir, Terima Stok, dan aktivitas harian Petugas Booth.",
+  title: "Barista Obbel",
+  description: "Check-In, Kasir, Terima Stok, dan aktivitas harian Barista.",
   manifest: "/petugas/manifest.webmanifest",
   // iOS Safari TIDAK baca manifest.webmanifest sama sekali untuk "Tambah ke
   // Layar Utama" — tanpa dua field di bawah ini PWA-nya tetap "installable"
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Obbel Petugas",
+    title: "Barista Obbel",
   },
   icons: {
     icon: "/icon-192.png",

@@ -508,7 +508,7 @@ export class DashboardService {
       if (direspons) continue;
 
       const shift = shiftPadaWaktu(insiden.boothId, insiden.start);
-      if (!shift) continue; // tidak ada Petugas yang bisa dikaitkan (tidak ada shift terbuka)
+      if (!shift) continue; // tidak ada Barista yang bisa dikaitkan (tidak ada shift terbuka)
 
       const booth = boothById.get(insiden.boothId);
       const product = productById.get(insiden.productId);

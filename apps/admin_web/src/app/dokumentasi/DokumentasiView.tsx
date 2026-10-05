@@ -72,12 +72,12 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     kategori: "stok",
     alurSingkat: "Gudang Pusat → Booth Gerobak",
     diterbitkan: "Admin Pusat / Tim Logistik Gudang",
-    diterima: "Petugas Booth (Kasir Gerobak)",
+    diterima: "Barista (Kasir Gerobak)",
     efekGudang: "- Stok Gudang (Saat status SENT)",
     efekBooth: "+ Stok Booth (Saat status RECEIVED)",
     efekLedger: "WAREHOUSE_TO_BOOTH",
     deskripsi:
-      "Alokasi persediaan awal cup minuman siap jual dari Gudang Pusat ke masing-masing Booth gerobak sebelum jam dinas shift dimulai. Qty gudang berkurang seketika saat SENT dan masuk ke stok gerobak saat Petugas melakukan cek fisik dan konfirmasi RECEIVED.",
+      "Alokasi persediaan awal cup minuman siap jual dari Gudang Pusat ke masing-masing Booth gerobak sebelum jam dinas shift dimulai. Qty gudang berkurang seketika saat SENT dan masuk ke stok gerobak saat Barista melakukan cek fisik dan konfirmasi RECEIVED.",
   },
   {
     prefix: "RSTK",
@@ -86,13 +86,13 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "RSTK-[TIMESTAMP]-[RANDOM]",
     kategori: "stok",
     alurSingkat: "Booth Gerobak → Gudang Pusat",
-    diterbitkan: "Petugas Booth (Pengajuan) / Admin (Approval)",
-    diterima: "Admin Gudang Pusat & Petugas Booth",
+    diterbitkan: "Barista (Pengajuan) / Admin (Approval)",
+    diterima: "Admin Gudang Pusat & Barista",
     efekGudang: "- Stok Gudang (Saat disetujui & SENT)",
     efekBooth: "+ Stok Booth (Saat konfirmasi RECEIVED)",
     efekLedger: "RESTOCK",
     deskripsi:
-      "Penambahan pasokan darurat di tengah jam operasional saat stok suatu produk menyentuh level Menipis atau Kritis di gerobak. Petugas mengajukan kuantitas, Admin menyetujui, dan kurir gudang mendistribusikan ke lokasi gerobak.",
+      "Penambahan pasokan darurat di tengah jam operasional saat stok suatu produk menyentuh level Menipis atau Kritis di gerobak. Barista mengajukan kuantitas, Admin menyetujui, dan kurir gudang mendistribusikan ke lokasi gerobak.",
   },
   {
     prefix: "OBL",
@@ -101,7 +101,7 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "OBL-[TIMESTAMP]-[RANDOM]",
     kategori: "penjualan",
     alurSingkat: "Kasir Gerobak → Pelanggan",
-    diterbitkan: "Petugas Booth (Aplikasi Kasir Android)",
+    diterbitkan: "Barista (Aplikasi Kasir Android)",
     diterima: "Pelanggan & Sistem Finansial",
     efekGudang: "Tidak ada efek",
     efekBooth: "- Stok Fisik Cup Terjual",
@@ -116,7 +116,7 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "ID Transaksi Atomik (UUID)",
     kategori: "penjualan",
     alurSingkat: "Pelanggan → Kas / Rekening",
-    diterbitkan: "Petugas Booth POS Android",
+    diterbitkan: "Barista POS Android",
     diterima: "Laci Kas Fisik / Rekening Perusahaan",
     efekGudang: "Tidak ada efek",
     efekBooth: "+ Kas Booth (CASH) / Ledger Bank (QRIS)",
@@ -131,7 +131,7 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "RFD-[TIMESTAMP]-[RANDOM]",
     kategori: "penjualan",
     alurSingkat: "Pelanggan → Admin / Kasir",
-    diterbitkan: "Admin Pusat / Petugas Kasir",
+    diterbitkan: "Admin Pusat / Barista",
     diterima: "Pelanggan & Finansial",
     efekGudang: "Tidak ada efek",
     efekBooth: "Opsional (+ Stok hanya jika layak jual)",
@@ -145,14 +145,14 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     modelPrisma: "ShiftSession",
     formatNomor: "ID Sesi / Tanggal Kerja",
     kategori: "audit",
-    alurSingkat: "Sistem ↔ Petugas Booth",
-    diterbitkan: "Sistem Penjadwalan & Petugas Booth",
+    alurSingkat: "Sistem ↔ Barista",
+    diterbitkan: "Sistem Penjadwalan & Barista",
     diterima: "Admin Pusat & Sistem Audit",
     efekGudang: "Tidak ada efek",
     efekBooth: "Membuka / Mengunci Scope Transaksi",
     efekLedger: "Shift Lifecycle (SCHEDULED → OPEN → CLOSED)",
     deskripsi:
-      "Penetapan rentang waktu dinas petugas di gerobak tertentu (Shift 1 / Shift 2). Shift tetap OPEN dan transaksi tetap boleh berjalan selama proses hitung fisik/checkout berlangsung — baru terkunci (CLOSED) setelah checkout benar-benar dikonfirmasi (wajib lokasi, foto, dan rekap stok/uang).",
+      "Penetapan rentang waktu dinas barista di gerobak tertentu (Shift 1 / Shift 2). Shift tetap OPEN dan transaksi tetap boleh berjalan selama proses hitung fisik/checkout berlangsung — baru terkunci (CLOSED) setelah checkout benar-benar dikonfirmasi (wajib lokasi, foto, dan rekap stok/uang).",
   },
   {
     prefix: "CNT",
@@ -161,13 +161,13 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "Berita Acara Shift Session",
     kategori: "audit",
     alurSingkat: "Kasir Gerobak → Admin & Owner",
-    diterbitkan: "Petugas Booth",
+    diterbitkan: "Barista",
     diterima: "Admin Pusat & Owner",
     efekGudang: "Tidak ada efek",
     efekBooth: "Penyesuaian ke Actual Count fisik",
     efekLedger: "ADJUSTMENT (Bila terdapat selisih fisik)",
     deskripsi:
-      "Dokumen opname fisik di akhir jam kerja shift. Menghitung selisih antara saldo sistem (Expected) dengan fisik riil di gerobak (Actual). Jika terdapat selisih (discrepancy != 0), petugas wajib memilih ReasonCode resmi.",
+      "Dokumen opname fisik di akhir jam kerja shift. Menghitung selisih antara saldo sistem (Expected) dengan fisik riil di gerobak (Actual). Jika terdapat selisih (discrepancy != 0), barista wajib memilih ReasonCode resmi.",
   },
   {
     prefix: "RTN",
@@ -176,7 +176,7 @@ const DAFTAR_DOKUMEN: DokumenResmi[] = [
     formatNomor: "RTN-[TIMESTAMP]-[RANDOM]",
     kategori: "stok",
     alurSingkat: "Booth Gerobak → Gudang Pusat",
-    diterbitkan: "Petugas Booth",
+    diterbitkan: "Barista",
     diterima: "Admin Gudang Pusat",
     efekGudang: "+ Stok Gudang (Setelah verifikasi terima)",
     efekBooth: "- Stok Booth menjadi 0 (Gerobak bersih)",
@@ -331,7 +331,7 @@ const SKENARIO_KOREKSI: SkenarioKoreksi[] = [
     judul: "Koreksi Salah Input Hitung Fisik Closing (Recount)",
     kategori: "Audit Shift (Closing Recount)",
     deskripsiMasalah:
-      "Petugas salah memasukkan hitung fisik sisa Brown Sugar menjadi 8 cup (tercatat selisih -2 cup dari expected 10). Setelah dicek ulang di Gudang, fisik riil adalah 9 cup.",
+      "Barista salah memasukkan hitung fisik sisa Brown Sugar menjadi 8 cup (tercatat selisih -2 cup dari expected 10). Setelah dicek ulang di Gudang, fisik riil adalah 9 cup.",
     versiAwal: {
       dokumen: "CNT-20260908-0004 (V1)",
       detail:
@@ -364,7 +364,7 @@ const SKENARIO_KOREKSI: SkenarioKoreksi[] = [
     judul: "Koreksi Selisih Fisik Penerimaan Distribusi Awal",
     kategori: "Distribusi (Shipment Correction)",
     deskripsiMasalah:
-      "Surat jalan DIST mencatat 15 cup Kopsu Pandan dikirim dari Gudang. Saat dicek fisik oleh Petugas Booth sebelum buka shift, barang yang tiba hanya 14 cup (1 cup bocor di jalan).",
+      "Surat jalan DIST mencatat 15 cup Kopsu Pandan dikirim dari Gudang. Saat dicek fisik oleh Barista sebelum buka shift, barang yang tiba hanya 14 cup (1 cup bocor di jalan).",
     versiAwal: {
       dokumen: "DIST-20260908-0001 (SENT)",
       detail: "Gudang kirim 15 Cup Kopsu Pandan. Status In-Transit: 15 Cup",
@@ -373,7 +373,7 @@ const SKENARIO_KOREKSI: SkenarioKoreksi[] = [
     },
     reversalAction: {
       tipe: "DISCREPANCY RECORDING",
-      efek: "Petugas menekan 'Laporkan Selisih', input fisik riil 14 cup",
+      efek: "Barista menekan 'Laporkan Selisih', input fisik riil 14 cup",
       ledger: "RECEIVE DRAFT CORRECTION",
     },
     versiPengganti: {
@@ -678,7 +678,7 @@ export const DokumentasiView: React.FC = () => {
                       Cek Fisik &amp; Buka Shift (SFT)
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                      Petugas Booth login di tablet/HP Android, memeriksa
+                      Barista login di tablet/HP Android, memeriksa
                       kesesuaian fisik cup di gerobak, lalu klik{" "}
                       <strong>Terima</strong>. Status shift menjadi{" "}
                       <strong>OPEN</strong> dan siap melayani penjualan.
@@ -710,7 +710,7 @@ export const DokumentasiView: React.FC = () => {
                       Penjualan Cepat 2–4 Tap (OBL)
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                      Petugas tap produk, pilih metode bayar{" "}
+                      Barista tap produk, pilih metode bayar{" "}
                       <strong>Tunai</strong> atau <strong>QRIS</strong>, lalu
                       cetak struk thermal. Backend memeriksa stok &ge; qty
                       secara atomik dan mengurangi stok booth.
@@ -743,7 +743,7 @@ export const DokumentasiView: React.FC = () => {
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
                       Saat cup menyentuh batas minimum, kartu beranda menyala
-                      kuning/merah. Petugas tap <strong>Minta Restock</strong>,
+                      kuning/merah. Barista tap <strong>Minta Restock</strong>,
                       Admin menyetujui, dan kurir gudang mengirim tambahan cup
                       ke gerobak.
                     </p>
@@ -774,8 +774,8 @@ export const DokumentasiView: React.FC = () => {
                       Tutup Shift &amp; Hitung Fisik (CNT)
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                      Petugas klik Tutup Shift. Sistem mengunci penjualan baru,
-                      menampilkan Expected Stock, dan Petugas menginput Actual
+                      Barista klik Tutup Shift. Sistem mengunci penjualan baru,
+                      menampilkan Expected Stock, dan Barista menginput Actual
                       Stock fisik. Bila ada selisih (discrepancy), alasan wajib
                       dipilih.
                     </p>
@@ -861,7 +861,7 @@ export const DokumentasiView: React.FC = () => {
                         Peringatan Awal
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-fg-muted">
-                        Kartu produk di POS berubah oranye. Petugas dapat
+                        Kartu produk di POS berubah oranye. Barista dapat
                         mengajukan restock.
                       </p>
                     </div>
@@ -936,7 +936,7 @@ export const DokumentasiView: React.FC = () => {
                         Hitung Fisik Cup
                       </h4>
                       <p className="text-xs text-slate-600 dark:text-fg-muted leading-relaxed">
-                        Petugas menghitung sisa cup per produk. Discrepancy =
+                        Barista menghitung sisa cup per produk. Discrepancy =
                         Actual - Expected. Jika selisih, wajib memilih alasan
                         resmi.
                       </p>
@@ -983,7 +983,7 @@ export const DokumentasiView: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Store className="w-4 h-4 text-slate-700 dark:text-fg" />
                       <h3 className="text-sm font-bold text-slate-900 dark:text-fg">
-                        Petugas Booth (POS)
+                        Barista (POS)
                       </h3>
                     </div>
                     <Badge variant="secondary">Flutter</Badge>
@@ -1552,7 +1552,7 @@ export const DokumentasiView: React.FC = () => {
               {/* Sub-Section 1: Petugas Booth POS */}
               <div className="space-y-3">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-fg border-b border-slate-200 dark:border-line pb-1.5">
-                  A. Panduan Kerja Harian Petugas Booth (Kasir POS)
+                  A. Panduan Kerja Harian Barista (Kasir POS)
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -51,7 +51,7 @@ export class ShiftTemplatesService {
     if (sessionCount > 0 || assignmentCount > 0) {
       throw new DomainError(
         'SHIFT_TEMPLATE_IN_USE',
-        `Template "${template.name}" tidak bisa dihapus karena masih dipakai ${sessionCount} shift session dan ${assignmentCount} Setting Booth-Petugas. Gunakan Nonaktifkan.`,
+        `Template "${template.name}" tidak bisa dihapus karena masih dipakai ${sessionCount} shift session dan ${assignmentCount} Setting Booth-Barista. Gunakan Nonaktifkan.`,
         { sessionCount, assignmentCount },
       );
     }

@@ -78,7 +78,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
     api
       .getActiveAssignments()
       .then(setAssignments)
-      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Petugas Aktif."));
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat daftar Barista Aktif."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -232,7 +232,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
 
   function validasi(): boolean {
     if (!staffId) {
-      toast.warning("Pilih Petugas tujuan terlebih dahulu.");
+      toast.warning("Pilih Barista tujuan terlebih dahulu.");
       return false;
     }
     if (totalBaris === 0) {
@@ -253,7 +253,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
           .filter((i) => i.qty > 0),
         note: note || undefined,
       });
-      toast.success(`Stok berhasil dikirim ke ${selectedAssignment?.staffName ?? "Petugas"}.`);
+      toast.success(`Stok berhasil dikirim ke ${selectedAssignment?.staffName ?? "Barista"}.`);
       router.push("/serah-terima-stok");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal mengirim stok.");
@@ -273,8 +273,8 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div data-fokus-awal>
           <Select
-            label="Petugas (sedang Aktif)"
-            placeholder={assignments.length === 0 ? "Belum ada Petugas Aktif" : "Pilih Petugas"}
+            label="Barista (sedang Aktif)"
+            placeholder={assignments.length === 0 ? "Belum ada Barista Aktif" : "Pilih Barista"}
             options={assignments.map((a) => ({ value: a.staffId, label: a.staffName }))}
             value={staffId}
             onChange={setStaffId}
@@ -285,7 +285,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
           />
           {terisiOtomatis && (
             <p className="text-[10px] text-slate-400 dark:text-fg-muted mt-1">
-              Petugas terkunci karena Booth tujuan sudah ditentukan dari panel Booth Aktif.
+              Barista terkunci karena Booth tujuan sudah ditentukan dari panel Booth Aktif.
             </p>
           )}
         </div>
@@ -296,7 +296,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
             {selectedAssignment ? (
               <span className="text-xs font-bold text-slate-700 dark:text-fg-secondary">{selectedAssignment.boothName}</span>
             ) : (
-              <span className="text-xs italic text-slate-400 dark:text-fg-muted">Ikut Petugas yang dipilih</span>
+              <span className="text-xs italic text-slate-400 dark:text-fg-muted">Ikut Barista yang dipilih</span>
             )}
           </div>
         </div>
@@ -434,7 +434,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
       <Modal
         isOpen={konfirmasi}
         onClose={() => setKonfirmasi(false)}
-        title="Kirim Stok ke Petugas?"
+        title="Kirim Stok ke Barista?"
         size="sm"
         footer={
           <div className="flex items-center justify-end gap-2 w-full">
@@ -458,7 +458,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
         <div className="space-y-3 text-xs">
           <p className="leading-relaxed text-slate-600 dark:text-fg-secondary">
             Stok Gudang akan <strong className="font-semibold">berkurang sesuai angka di bawah</strong> dan tercatat
-            berstatus Diproses — Petugas perlu konfirmasi terima sebelum stok Booth bertambah.
+            berstatus Diproses — Barista perlu konfirmasi terima sebelum stok Booth bertambah.
           </p>
           <div className="rounded-xl border border-slate-200/80 dark:border-line overflow-hidden">
             <p className="px-3 py-1.5 bg-slate-50/80 dark:bg-surface-hover text-[11px] font-bold text-slate-600 dark:text-fg-muted uppercase tracking-wider">
@@ -466,7 +466,7 @@ export function SerahTerimaForm({ products, prefillBoothId }: { products: Produc
             </p>
             <div className="px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between gap-3 text-slate-700 dark:text-fg-secondary">
-                <span>Petugas</span>
+                <span>Barista</span>
                 <span className="font-semibold">{selectedAssignment?.staffName ?? "-"}</span>
               </div>
               <div className="flex items-center justify-between gap-3 text-slate-700 dark:text-fg-secondary">

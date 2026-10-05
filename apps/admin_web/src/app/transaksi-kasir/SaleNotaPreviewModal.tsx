@@ -59,7 +59,7 @@ export function SaleNotaPreviewModal({
           <p class="center">${sale.paidAt ? waktuJakarta(sale.paidAt) : "-"}</p>
           <hr />
           <p>No. ${sale.saleNo}</p>
-          <p>Petugas: ${sale.staffName}</p>
+          <p>Barista: ${sale.staffName}</p>
           <hr />
           <table>${baris}</table>
           <hr />
@@ -106,7 +106,7 @@ export function SaleNotaPreviewModal({
             <p className="text-center text-slate-500 mb-2">{sale.paidAt ? waktuJakarta(sale.paidAt) : "-"}</p>
             <div className="border-t border-dashed border-slate-300 dark:border-line my-2" />
             <p>No. {sale.saleNo}</p>
-            <p>Petugas: {sale.staffName}</p>
+            <p>Barista: {sale.staffName}</p>
             <div className="border-t border-dashed border-slate-300 dark:border-line my-2" />
             {sale.items.map((i) => (
               <div key={i.productId} className="flex justify-between">

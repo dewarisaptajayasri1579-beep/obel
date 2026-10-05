@@ -300,12 +300,12 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
             <Avatar nama={booth.staffName} size="lg" />
             <div className="min-w-0">
               <div className="text-sm font-bold text-slate-800 dark:text-fg truncate">{booth.staffName}</div>
-              <div className="text-[11px] text-slate-500 dark:text-fg-muted">Petugas Saat Ini</div>
+              <div className="text-[11px] text-slate-500 dark:text-fg-muted">Barista Saat Ini</div>
             </div>
           </div>
         ) : (
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-surface-hover text-xs text-slate-500 dark:text-fg-muted">
-            Tidak ada Petugas bertugas saat ini.
+            Tidak ada Barista bertugas saat ini.
           </div>
         )}
 

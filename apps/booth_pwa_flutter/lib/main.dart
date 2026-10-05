@@ -17,7 +17,7 @@ class BoothPwaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Obbel Petugas',
+      title: 'Barista Obbel',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F6B4F))),
       home: const WebViewScreen(),

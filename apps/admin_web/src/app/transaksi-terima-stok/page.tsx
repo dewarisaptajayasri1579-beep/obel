@@ -104,7 +104,7 @@ function TransaksiTerimaStokContent() {
               Transaksi Booth - Terima Stok
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Penerimaan stok gudang → booth dari semua Booth. Read-only — konfirmasi penerimaan dilakukan Petugas Booth.
+              Penerimaan stok gudang → booth dari semua Booth. Read-only — konfirmasi penerimaan dilakukan Barista.
             </p>
           </div>
         </div>
@@ -198,7 +198,7 @@ function TransaksiTerimaStokContent() {
               options={staffList.map((s) => ({ value: s.id, label: s.fullName }))}
               value={staffId}
               onChange={setStaffId}
-              placeholder="Semua Petugas"
+              placeholder="Semua Barista"
               sizeVariant="sm"
               className="!h-9"
               active={staffId !== ""}
@@ -252,7 +252,7 @@ function TransaksiTerimaStokContent() {
                   <th className="py-3.5 px-3">Booth</th>
                   <th className="py-3.5 px-3">Dikirim</th>
                   <th className="py-3.5 px-3">Diterima</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3 text-right">Item</th>
                   <th className="py-3.5 px-3 text-center">Status</th>
                 </tr>

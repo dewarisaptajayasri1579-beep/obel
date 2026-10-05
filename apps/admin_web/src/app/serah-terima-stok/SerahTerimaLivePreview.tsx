@@ -47,7 +47,7 @@ export function SerahTerimaLivePreview({
 
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Petugas</p>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-fg-muted uppercase tracking-wider">Barista</p>
           <p className="font-semibold text-slate-800 dark:text-fg mt-0.5">{staffName ?? "-"}</p>
         </div>
         <div>

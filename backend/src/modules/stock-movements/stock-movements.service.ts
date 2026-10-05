@@ -728,7 +728,7 @@ export class StockMovementsService {
     const konteks = konteksDistribusi.get(m.referenceId);
     if (konteks) {
       keterangan += ` — Booth ${konteks.boothName}`;
-      if (konteks.receivedByName) keterangan += ` (Petugas ${konteks.receivedByName})`;
+      if (konteks.receivedByName) keterangan += ` (Barista ${konteks.receivedByName})`;
     }
     if (m.referenceType === 'distribution_receipt_correction' && m.note) {
       keterangan += `: ${m.note}`;

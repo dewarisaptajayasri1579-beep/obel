@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<StockHandoverStatus, string> = {
 };
 
 const JENIS_LABEL: Record<string, string> = { STOK_AWAL: 'Stok Awal', RE_STOK: 'Re-Stok' };
-const SUMBER_LABEL: Record<string, string> = { PETUGAS: 'Petugas', ADMIN: 'Admin' };
+const SUMBER_LABEL: Record<string, string> = { PETUGAS: 'Barista', ADMIN: 'Admin' };
 
 /// Laporan Serah Terima Stok — daftar (PDF & Excel) + nota per dokumen,
 /// mengikuti pola StockReceiptReportService (kop, judul, metadata dua kolom,
@@ -122,7 +122,7 @@ export class StockHandoverReportService {
     lembar.getCell('A4').font = { bold: true, size: 14, color: { argb: 'FF0F172A' } };
 
     lembar.mergeCells('A5:C5');
-    lembar.getCell('A5').value = 'Serah terima stok Admin ke Petugas Booth';
+    lembar.getCell('A5').value = 'Serah terima stok Admin ke Barista';
     lembar.getCell('A5').font = { size: 9, italic: true, color: { argb: 'FF64748B' } };
 
     const metaKiri: [string, string][] = [
@@ -152,7 +152,7 @@ export class StockHandoverReportService {
 
     const barisKepala = 10;
     const kepala = lembar.getRow(barisKepala);
-    kepala.values = ['No.', 'No. Dokumen', 'Tanggal', 'Petugas', 'Booth', 'Item', 'Jenis', 'Sumber', 'Status'];
+    kepala.values = ['No.', 'No. Dokumen', 'Tanggal', 'Barista', 'Booth', 'Item', 'Jenis', 'Sumber', 'Status'];
     kepala.eachCell((sel) => {
       sel.fill = ISI_KEPALA;
       sel.font = HURUF_KEPALA;
@@ -214,7 +214,7 @@ export class StockHandoverReportService {
       doc.font('Helvetica-Bold').fontSize(12).fillColor('#0F172A')
         .text('Daftar Serah Terima Stok', KIRI, 28, { width: KANAN - KIRI, align: 'right' });
       doc.font('Helvetica-Oblique').fontSize(8).fillColor('#64748B')
-        .text('Serah terima stok Admin ke Petugas Booth', KIRI, 45, { width: KANAN - KIRI, align: 'right' });
+        .text('Serah terima stok Admin ke Barista', KIRI, 45, { width: KANAN - KIRI, align: 'right' });
 
       doc.moveTo(KIRI, 62).lineTo(KANAN, 62).lineWidth(1.5).strokeColor('#1E293B').stroke();
 
@@ -239,7 +239,7 @@ export class StockHandoverReportService {
         { label: 'No.', x: KIRI, w: 26, align: 'center' as const },
         { label: 'No. Dokumen', x: KIRI + 26, w: 100, align: 'left' as const },
         { label: 'Tanggal', x: KIRI + 126, w: 80, align: 'left' as const },
-        { label: 'Petugas', x: KIRI + 206, w: 110, align: 'left' as const },
+        { label: 'Barista', x: KIRI + 206, w: 110, align: 'left' as const },
         { label: 'Booth', x: KIRI + 316, w: 90, align: 'left' as const },
         { label: 'Jenis', x: KIRI + 406, w: 80, align: 'left' as const },
         { label: 'Sumber', x: KIRI + 486, w: 70, align: 'left' as const },
@@ -316,7 +316,7 @@ export class StockHandoverReportService {
       doc.font('Helvetica-Bold').fontSize(15).fillColor('#0F172A').text('BUKTI SERAH TERIMA STOK', KIRI, judulY, { width: 280 });
       doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#94A3B8').text(renggang('ADMIN KE PETUGAS BOOTH'), KIRI, judulY + 20);
       doc.font('Helvetica').fontSize(8.5).fillColor('#64748B')
-        .text('Stok Booth bertambah otomatis setelah Petugas konfirmasi terima.', KIRI, judulY + 32, { width: 280 });
+        .text('Stok Booth bertambah otomatis setelah Barista konfirmasi terima.', KIRI, judulY + 32, { width: 280 });
 
       const STATUS_LABEL_NOTA: Record<StockHandoverStatus, string> = {
         DIAJUKAN: 'Diajukan',
@@ -412,7 +412,7 @@ export class StockHandoverReportService {
         doc.text(`Nama : ${nama || '....................................'}`, x, y + 34, { width: 220 });
       };
       tandaTangan('Dikirim/Disetujui Oleh', profil.name, KIRI);
-      tandaTangan('Diterima Oleh Petugas', r.staffName ?? '', KIRI + 250);
+      tandaTangan('Diterima Oleh Barista', r.staffName ?? '', KIRI + 250);
 
       doc.end();
     });

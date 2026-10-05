@@ -46,7 +46,7 @@ export class BoothShiftAssignmentsService {
       if (bentrok) {
         throw new DomainError(
           'STAFF_ALREADY_ASSIGNED',
-          `${bentrok.staff?.fullName ?? 'Petugas ini'} sudah ditugaskan di Booth "${bentrok.booth.name}" / Shift "${bentrok.shiftTemplate.name}". Satu petugas cuma boleh satu Booth dan satu Shift — kosongkan penugasan itu dulu.`,
+          `${bentrok.staff?.fullName ?? 'Barista ini'} sudah ditugaskan di Booth "${bentrok.booth.name}" / Shift "${bentrok.shiftTemplate.name}". Satu petugas cuma boleh satu Booth dan satu Shift — kosongkan penugasan itu dulu.`,
         );
       }
     }

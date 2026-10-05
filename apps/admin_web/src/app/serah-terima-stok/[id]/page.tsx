@@ -40,7 +40,7 @@ const ALASAN_SELISIH_LABEL: Record<string, string> = {
 const TINDAK_LANJUT_LABEL: Record<TindakLanjutSelisih, string> = {
   RUSAK: "Rusak",
   SALAH_HITUNG: "Salah Hitung",
-  GANTI_RUGI_PETUGAS: "Ganti Rugi Petugas",
+  GANTI_RUGI_PETUGAS: "Ganti Rugi Barista",
   LAINNYA: "Lainnya",
 };
 
@@ -59,12 +59,12 @@ function keteranganDokumen(r: StockHandover): { label: string; kelas: string } {
     return { label: "Kirim Stok (Awal)", kelas: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20" };
   }
   if (r.kind === "request") {
-    return { label: "Pengajuan dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+    return { label: "Pengajuan dari Barista", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
   }
   if (r.sumber === "ADMIN") {
     return { label: "Kirim Stok (Re-Stok)", kelas: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20" };
   }
-  return { label: "Re-Stok dari Petugas", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
+  return { label: "Re-Stok dari Barista", kelas: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20" };
 }
 
 function tanggalJakarta(iso: string) {
@@ -331,7 +331,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                                 <span className="wrap-break-word">{item.productName}</span>
                                 {selisih !== 0 && item.discrepancyReasonCode && (
                                   <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
-                                    Alasan Petugas: {ALASAN_SELISIH_LABEL[item.discrepancyReasonCode] ?? item.discrepancyReasonCode}
+                                    Alasan Barista: {ALASAN_SELISIH_LABEL[item.discrepancyReasonCode] ?? item.discrepancyReasonCode}
                                     {item.discrepancyNote ? ` — ${item.discrepancyNote}` : ""}
                                   </p>
                                 )}

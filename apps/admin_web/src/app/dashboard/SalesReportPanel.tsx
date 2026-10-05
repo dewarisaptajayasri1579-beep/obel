@@ -125,14 +125,14 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 border border-blue-100 dark:border-blue-900/30">
                   <Users2 className="w-4 h-4" />
                 </div>
-                <CardTitle>Penjualan per Petugas</CardTitle>
+                <CardTitle>Penjualan per Barista</CardTitle>
               </div>
             </CardHeader>
             <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-line">
               <table className="w-full text-xs text-left">
                 <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
                   <tr>
-                    <th className="py-2.5 px-3">Petugas</th>
+                    <th className="py-2.5 px-3">Barista</th>
                     <th className="py-2.5 px-3">Booth</th>
                     <th className="py-2.5 px-3">Tanggal</th>
                     <th className="py-2.5 px-3">Shift</th>
@@ -172,9 +172,9 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                   <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div className="flex-1">
-                  <CardTitle>Petugas Diam — Stok Menipis/Habis Tanpa Request</CardTitle>
+                  <CardTitle>Barista Diam — Stok Menipis/Habis Tanpa Request</CardTitle>
                   <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-                    Insiden Menipis/Kritis/Habis yang bertahan ≥4 jam tanpa Petugas mengajukan Request Stok — potensi penjualan yang hilang.
+                    Insiden Menipis/Kritis/Habis yang bertahan ≥4 jam tanpa Barista mengajukan Request Stok — potensi penjualan yang hilang.
                   </p>
                 </div>
                 <button
@@ -200,11 +200,11 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                       penurunan sesaat yang langsung pulih sendiri tidak ikut terhitung.
                     </li>
                     <li>
-                      <b>Tidak ada Request Stok</b> yang diajukan Petugas untuk produk itu, baik selama insiden berlangsung maupun
-                      sampai <b>12 jam sebelum</b> insiden mulai (menghargai Petugas yang sudah minta duluan sebelum benar-benar menipis).
+                      <b>Tidak ada Request Stok</b> yang diajukan Barista untuk produk itu, baik selama insiden berlangsung maupun
+                      sampai <b>12 jam sebelum</b> insiden mulai (menghargai Barista yang sudah minta duluan sebelum benar-benar menipis).
                     </li>
                     <li>
-                      <b>Diatribusikan</b> ke Petugas yang shift-nya sedang terbuka (Check-In) di Booth itu saat insiden pertama kali mulai.
+                      <b>Diatribusikan</b> ke Barista yang shift-nya sedang terbuka (Check-In) di Booth itu saat insiden pertama kali mulai.
                     </li>
                   </ol>
                   <p className="text-[11px] text-slate-400 dark:text-fg-muted pt-1 border-t border-slate-200/70 dark:border-line">
@@ -217,7 +217,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
               <table className="w-full text-xs text-left">
                 <thead className="bg-brand-50/70 dark:bg-surface-hover/80 text-[11px] font-bold text-slate-700 dark:text-fg-secondary border-b border-slate-200/80 dark:border-line">
                   <tr>
-                    <th className="py-2.5 px-3">Petugas</th>
+                    <th className="py-2.5 px-3">Barista</th>
                     <th className="py-2.5 px-3">Booth</th>
                     <th className="py-2.5 px-3 text-right">Jumlah Insiden</th>
                     <th className="py-2.5 px-3 text-right">Total Jam Diam</th>
@@ -237,7 +237,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                   {(neglect ?? []).length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-slate-500 dark:text-fg-muted py-8">
-                        Tidak ada insiden "diam" pada periode ini — semua Petugas responsif.
+                        Tidak ada insiden "diam" pada periode ini — semua Barista responsif.
                       </td>
                     </tr>
                   )}

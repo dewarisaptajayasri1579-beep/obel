@@ -49,7 +49,7 @@ export default function PetugasLoginPage() {
         <div className="w-24 h-24 rounded-[28px] bg-white flex items-center justify-center shadow-[0_16px_40px_-12px_rgba(0,0,0,0.45)] mb-5 ring-4 ring-white/15">
           <Image src="/logo.png" alt="Obbel" width={66} height={66} className="object-contain" priority />
         </div>
-        <h1 className="text-white font-extrabold text-[26px] tracking-tight">Obbel Petugas Booth</h1>
+        <h1 className="text-white font-extrabold text-[26px] tracking-tight">Barista Obbel</h1>
         <p className="text-white/75 text-base mt-1.5 font-medium">Check-In, Kasir, dan aktivitas harian Anda</p>
       </div>
 

@@ -52,10 +52,10 @@ function KirimStokContent() {
           <Truck className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
-              Kirim Stok ke Petugas
+              Kirim Stok ke Barista
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
-              Pilih Petugas yang sedang Aktif — Booth ikut otomatis.
+              Pilih Barista yang sedang Aktif — Booth ikut otomatis.
             </p>
           </div>
         </div>

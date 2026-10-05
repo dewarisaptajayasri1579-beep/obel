@@ -117,7 +117,7 @@ function SettingContent() {
           </div>
           <div>
             <p className="font-extrabold text-slate-900">{profile.fullName}</p>
-            <p className="text-sm text-slate-500">Petugas Booth • @{profile.username}</p>
+            <p className="text-sm text-slate-500">Barista • @{profile.username}</p>
           </div>
         </div>
 

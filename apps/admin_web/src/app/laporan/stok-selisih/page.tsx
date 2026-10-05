@@ -21,7 +21,7 @@ const JENIS_BADGE: Record<JenisStokSelisih, { label: string; kelas: string }> = 
 
 const TINDAK_LANJUT_BADGE: Record<TindakLanjutStokSelisih, { label: string; kelas: string }> = {
   RUSAK: { label: "Rusak", kelas: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40" },
-  GANTI_RUGI_PETUGAS: { label: "Ganti Rugi Petugas", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
+  GANTI_RUGI_PETUGAS: { label: "Ganti Rugi Barista", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
   LAINNYA: { label: "Lainnya", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
 };
 
@@ -106,7 +106,7 @@ function StokSelisihContent() {
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight">Rekap Stok Selisih</h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Selisih Kirim Stok &amp; Pengembalian Stok yang sudah diberi Tindak Lanjut Admin (Rusak / Ganti Rugi Petugas / Lainnya).
+              Selisih Kirim Stok &amp; Pengembalian Stok yang sudah diberi Tindak Lanjut Admin (Rusak / Ganti Rugi Barista / Lainnya).
             </p>
           </div>
         </div>
@@ -162,9 +162,9 @@ function StokSelisihContent() {
             <HandCoins className="w-4.5 h-4.5" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-fg-muted">Ganti Rugi Petugas</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-fg-muted">Ganti Rugi Barista</p>
             <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight mt-0.5">{data?.totalGantiRugi ?? 0}</p>
-            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">kejadian dibebankan Petugas</p>
+            <p className="text-[11px] text-slate-400 dark:text-fg-muted mt-0.5">kejadian dibebankan Barista</p>
           </div>
         </div>
 
@@ -264,7 +264,7 @@ function StokSelisihContent() {
                   <th className="py-3.5 px-3">Tanggal</th>
                   <th className="py-3.5 px-3">Jenis</th>
                   <th className="py-3.5 px-3">Booth</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3">Produk</th>
                   <th className="py-3.5 px-3 text-right">Selisih</th>
                   <th className="py-3.5 px-3">Tindak Lanjut</th>

@@ -8,6 +8,9 @@ Gunakan enum konseptual:
 
 Jika nanti ada role Runner/Kurir, tambahkan sebagai fase berikutnya; jangan implementasikan sekarang.
 
+Label UI: `BOOTH_STAFF` ditampilkan sebagai **"Barista"** (aplikasi petugas: **"Barista Obbel"**), permintaan
+client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini masih menyebutnya "Petugas Booth".
+
 ## 2. BOOTH_STAFF
 ### Boleh
 - login;

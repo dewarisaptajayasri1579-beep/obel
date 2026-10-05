@@ -114,14 +114,14 @@ export const PetugasForm: React.FC<{
           role: "BOOTH_STAFF",
           defaultBoothId: form.defaultBoothId || undefined,
         });
-        toast.success(`Petugas "${dibuat.fullName}" ditambahkan`);
+        toast.success(`Barista "${dibuat.fullName}" ditambahkan`);
       } else {
         await api.updateUser(form.id, {
           fullName: form.fullName.trim(),
           defaultBoothId: form.defaultBoothId || undefined,
           active: form.isActive,
         });
-        toast.success(`Petugas "${form.fullName}" diperbarui`);
+        toast.success(`Barista "${form.fullName}" diperbarui`);
       }
 
       if (lanjutIsiLagi) {
@@ -133,7 +133,7 @@ export const PetugasForm: React.FC<{
       router.push(kembali);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Gagal menyimpan Petugas");
+      setError(err instanceof ApiError ? err.message : "Gagal menyimpan Barista");
     } finally {
       setSubmitting(false);
     }
@@ -205,7 +205,7 @@ export const PetugasForm: React.FC<{
 
       <div data-field="booth">
         <Select
-          label="Booth Default Login (opsional, bukan Setting Petugas)"
+          label="Booth Default Login (opsional, bukan Setting Barista)"
           options={booths}
           value={form.defaultBoothId}
           onChange={(v) => {
@@ -221,7 +221,7 @@ export const PetugasForm: React.FC<{
 
       {mode === "edit" && (
         <Switch
-          label="Petugas aktif (bisa login & bertransaksi di Android)"
+          label="Barista aktif (bisa login & bertransaksi di Android)"
           checked={form.isActive}
           onChange={(e) => set("isActive", e.target.checked)}
         />

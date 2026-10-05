@@ -66,7 +66,7 @@ const SETORAN_BADGE: Record<string, { label: string; kelas: string }> = {
 const TINDAK_LANJUT_LABEL: Record<TindakLanjutSelisih, string> = {
   RUSAK: "Rusak",
   SALAH_HITUNG: "Salah Hitung",
-  GANTI_RUGI_PETUGAS: "Ganti Rugi Petugas",
+  GANTI_RUGI_PETUGAS: "Ganti Rugi Barista",
   LAINNYA: "Lainnya",
 };
 
@@ -206,7 +206,7 @@ function LaporanDetail({
             </tbody>
           </table>
         </div>
-        {report.catatan && <p className="text-xs text-slate-500 dark:text-fg-muted mt-2">Catatan Petugas: {report.catatan}</p>}
+        {report.catatan && <p className="text-xs text-slate-500 dark:text-fg-muted mt-2">Catatan Barista: {report.catatan}</p>}
       </div>
 
       {/* Stok Kembali ke Gudang */}
@@ -260,7 +260,7 @@ function LaporanDetail({
                           <span className="wrap-break-word">{item.productName}</span>
                           {selisih !== 0 && item.catatanPetugas && (
                             <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400 mt-0.5">
-                              Alasan Petugas: {item.catatanPetugas}
+                              Alasan Barista: {item.catatanPetugas}
                             </p>
                           )}
                         </td>
@@ -598,7 +598,7 @@ function TransaksiLaporanKembaliContent() {
               Transaksi Booth - Setor & Pengembalian Stok
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Laporan stok &amp; kas dari Check Out Petugas Booth. Sisa Stok Fisik otomatis masuk sebagai Return ke Gudang —
+              Laporan stok &amp; kas dari Check Out Barista. Sisa Stok Fisik otomatis masuk sebagai Return ke Gudang —
               Admin approve Stok Kembali dan Setor Uang di sini.
             </p>
           </div>
@@ -767,7 +767,7 @@ function TransaksiLaporanKembaliContent() {
               options={staffList.map((s) => ({ value: s.id, label: s.fullName }))}
               value={staffId}
               onChange={setStaffId}
-              placeholder="Semua Petugas"
+              placeholder="Semua Barista"
               sizeVariant="sm"
               className="h-9!"
               active={staffId !== ""}
@@ -819,7 +819,7 @@ function TransaksiLaporanKembaliContent() {
                 <tr>
                   <th className="py-3.5 px-3">Tanggal</th>
                   <th className="py-3.5 px-3">Booth</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3">Waktu Check Out</th>
                   <th className="py-3.5 px-3 text-center">Total Jual Cup</th>
                   <th className="py-3.5 px-3 text-center">Stok Kembali</th>

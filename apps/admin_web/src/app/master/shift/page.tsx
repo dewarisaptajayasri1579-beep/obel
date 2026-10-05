@@ -119,7 +119,7 @@ function ShiftTemplateContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Master Shift</h1>
-          <p className="text-sm text-slate-500 dark:text-fg-muted">Kelola template jam shift Petugas Booth.</p>
+          <p className="text-sm text-slate-500 dark:text-fg-muted">Kelola template jam shift Barista.</p>
         </div>
         <Button leftIcon={<Plus className="w-4 h-4" />} onClick={bukaTambah}>
           Tambah Shift
@@ -228,7 +228,7 @@ function ShiftTemplateContent() {
         <div className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-fg-muted">
             Hapus template Shift <strong className="text-slate-800 dark:text-fg">{hapusTarget?.name}</strong>? Hanya
-            berhasil kalau belum pernah dipakai shift session atau Setting Booth-Petugas. Kalau sudah pernah dipakai,
+            berhasil kalau belum pernah dipakai shift session atau Setting Booth-Barista. Kalau sudah pernah dipakai,
             gunakan Nonaktifkan.
           </p>
           <div className="flex justify-end gap-2">

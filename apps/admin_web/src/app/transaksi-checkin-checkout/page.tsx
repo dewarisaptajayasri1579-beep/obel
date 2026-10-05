@@ -205,7 +205,7 @@ function TransaksiCheckinCheckoutContent() {
               Transaksi Booth - Check In-Check Out
             </h1>
             <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
-              Riwayat absen Petugas Booth (foto selfie & waktu). Read-only — absen dilakukan Petugas Booth di app.
+              Riwayat absen Barista (foto selfie & waktu). Read-only — absen dilakukan Barista di app.
             </p>
           </div>
         </div>
@@ -299,7 +299,7 @@ function TransaksiCheckinCheckoutContent() {
               options={staffList.map((s) => ({ value: s.id, label: s.fullName }))}
               value={staffId}
               onChange={setStaffId}
-              placeholder="Semua Petugas"
+              placeholder="Semua Barista"
               sizeVariant="sm"
               className="!h-9"
               active={staffId !== ""}
@@ -384,7 +384,7 @@ function TransaksiCheckinCheckoutContent() {
                   <th className="py-3.5 px-3">No</th>
                   <th className="py-3.5 px-3">Tanggal</th>
                   <th className="py-3.5 px-3">Booth</th>
-                  <th className="py-3.5 px-3">Petugas</th>
+                  <th className="py-3.5 px-3">Barista</th>
                   <th className="py-3.5 px-3">Check In</th>
                   <th className="py-3.5 px-3">Check Out</th>
                   <th className="py-3.5 px-3">Durasi</th>

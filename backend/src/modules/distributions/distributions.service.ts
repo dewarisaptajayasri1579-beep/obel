@@ -26,7 +26,7 @@ const MAKS_PERCOBAAN_NOMOR = 5;
 const TINDAK_LANJUT_KETERANGAN: Record<string, string> = {
   RUSAK: 'Rusak',
   SALAH_HITUNG: 'Salah Hitung',
-  GANTI_RUGI_PETUGAS: 'Ganti Rugi Petugas',
+  GANTI_RUGI_PETUGAS: 'Ganti Rugi Barista',
   LAINNYA: 'Lainnya',
 };
 
@@ -277,8 +277,8 @@ export class DistributionsService {
           ...(catatanSelisih
             ? {
                 note: distribution.note
-                  ? `${distribution.note} | Catatan Petugas (selisih): ${catatanSelisih}`
-                  : `Catatan Petugas (selisih): ${catatanSelisih}`,
+                  ? `${distribution.note} | Catatan Barista (selisih): ${catatanSelisih}`
+                  : `Catatan Barista (selisih): ${catatanSelisih}`,
               }
             : {}),
         },
@@ -292,7 +292,7 @@ export class DistributionsService {
         actorName: user.username,
         note:
           (hasDiscrepancy ? 'Diterima dengan selisih qty.' : 'Diterima sesuai qty dikirim.') +
-          (catatanSelisih ? ` Catatan Petugas: ${catatanSelisih}` : ''),
+          (catatanSelisih ? ` Catatan Barista: ${catatanSelisih}` : ''),
       });
     });
 
@@ -603,7 +603,7 @@ export class DistributionsService {
     if (adaGantiRugi && !distribution.receivedById) {
       throw new DomainError(
         'NO_RECEIVER',
-        'Tidak bisa mencatat Ganti Rugi Petugas — dokumen ini belum punya Petugas yang menerima.',
+        'Tidak bisa mencatat Ganti Rugi Barista — dokumen ini belum punya Barista yang menerima.',
       );
     }
 
@@ -710,7 +710,7 @@ export class DistributionsService {
 
         const catatanGantiRugi =
           liabilities.length > 0
-            ? ` Ganti Rugi Petugas: ${liabilities.length} produk, total Rp${liabilities.reduce((s, l) => s + BigInt(l.totalAmount), 0n).toString()}.`
+            ? ` Ganti Rugi Barista: ${liabilities.length} produk, total Rp${liabilities.reduce((s, l) => s + BigInt(l.totalAmount), 0n).toString()}.`
             : '';
         const catatanLainnyaGabungan = catatanLainnya.length > 0 ? ` Lainnya: ${catatanLainnya.join('; ')}.` : '';
         await this.activityLog.record(tx, {

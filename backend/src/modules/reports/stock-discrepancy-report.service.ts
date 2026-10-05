@@ -38,7 +38,7 @@ const JENIS_LABEL: Record<JenisStokSelisih, string> = {
 
 const TINDAK_LANJUT_LABEL: Record<TindakLanjutStokSelisih, string> = {
   RUSAK: 'Rusak',
-  GANTI_RUGI_PETUGAS: 'Ganti Rugi Petugas',
+  GANTI_RUGI_PETUGAS: 'Ganti Rugi Barista',
   LAINNYA: 'Lainnya',
 };
 
@@ -329,7 +329,7 @@ export class StockDiscrepancyReportService {
       'Tanggal',
       'Jenis',
       'Booth',
-      'Petugas',
+      'Barista',
       'Produk',
       'Qty Diajukan',
       'Qty Diterima',
@@ -429,7 +429,7 @@ export class StockDiscrepancyReportService {
         { label: 'Tanggal', x: KIRI + 100, w: 55, align: 'left' as const },
         { label: 'Jenis', x: KIRI + 155, w: 80, align: 'left' as const },
         { label: 'Booth', x: KIRI + 235, w: 75, align: 'left' as const },
-        { label: 'Petugas', x: KIRI + 310, w: 80, align: 'left' as const },
+        { label: 'Barista', x: KIRI + 310, w: 80, align: 'left' as const },
         { label: 'Produk', x: KIRI + 390, w: 85, align: 'left' as const },
         { label: 'Selisih', x: KIRI + 475, w: 45, align: 'right' as const },
         { label: 'Tindak Lanjut', x: KIRI + 520, w: 90, align: 'left' as const },

@@ -393,7 +393,7 @@ export function TabMutasiBooth({
                       <tr>
                         <th className="py-3.5 px-3 text-left w-28">Tanggal</th>
                         <th className="py-3.5 px-3 text-left">Keterangan</th>
-                        <th className="py-3.5 px-3 text-left w-36">Petugas</th>
+                        <th className="py-3.5 px-3 text-left w-36">Barista</th>
                         <th className="py-3.5 px-3 text-left w-20">Shift</th>
                         <th className="py-3.5 px-3 text-center w-24">Masuk/Keluar</th>
                         <th className="py-3.5 px-3 text-right w-20">Qty</th>

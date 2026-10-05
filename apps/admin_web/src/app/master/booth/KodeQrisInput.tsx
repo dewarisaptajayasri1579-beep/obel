@@ -81,7 +81,7 @@ export function KodeQrisInput({
             )}
           </div>
           <p className="text-[10px] text-slate-400 dark:text-fg-muted max-w-xs">
-            Ditampilkan ke Petugas Booth di layar Kasir saat pelanggan bayar pakai QRIS/Split.
+            Ditampilkan ke Barista di layar Kasir saat pelanggan bayar pakai QRIS/Split.
           </p>
           {error && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
         </div>

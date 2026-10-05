@@ -101,7 +101,7 @@ export function TabRiwayatPenjualan({ booths }: { booths: Booth[] }) {
       <div>
         <h2 className="text-sm font-bold text-slate-800 dark:text-fg">Riwayat Penjualan</h2>
         <p className="text-xs text-slate-500 dark:text-fg-muted mt-0.5">
-          Transaksi jualan per Booth, lengkap dengan Petugas &amp; shift-nya.
+          Transaksi jualan per Booth, lengkap dengan Barista &amp; shift-nya.
         </p>
       </div>
 
@@ -150,7 +150,7 @@ export function TabRiwayatPenjualan({ booths }: { booths: Booth[] }) {
                 <tr>
                   <th className="py-3.5 px-3 text-left">No. Sale</th>
                   <th className="py-3.5 px-3 text-left">Booth</th>
-                  <th className="py-3.5 px-3 text-left">Petugas</th>
+                  <th className="py-3.5 px-3 text-left">Barista</th>
                   <th className="py-3.5 px-3 text-left w-20">Shift</th>
                   <th className="py-3.5 px-3 text-right w-16">Cup</th>
                   <th className="py-3.5 px-3 text-right">Total</th>

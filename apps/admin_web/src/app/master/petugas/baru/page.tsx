@@ -41,7 +41,7 @@ function PetugasBaruContent() {
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Data Operasional" },
-          { label: "Petugas", href: kembali },
+          { label: "Barista", href: kembali },
           { label: "Tambah Baru" },
         ]}
       />
@@ -51,14 +51,14 @@ function PetugasBaruContent() {
           <Link
             href={kembali}
             className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
-            aria-label="Kembali ke daftar Petugas"
+            aria-label="Kembali ke daftar Barista"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <UserRound className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
-              Tambah Petugas
+              Tambah Barista
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
               Isi dari atas ke bawah — tekan Enter untuk lompat ke isian berikutnya.

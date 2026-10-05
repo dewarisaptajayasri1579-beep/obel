@@ -203,7 +203,7 @@ function KoreksiContent() {
         <div className="flex-1 min-w-[220px]">
           <Input
             label="Cari"
-            placeholder="Nomor transaksi, nama petugas, atau alasan..."
+            placeholder="Nomor transaksi, nama barista, atau alasan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             leftIcon={<Search className="w-4 h-4" />}

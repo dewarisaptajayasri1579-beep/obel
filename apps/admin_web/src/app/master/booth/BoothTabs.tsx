@@ -10,7 +10,7 @@ const TAB: { key: BoothTabKey; label: string; icon: typeof Store }[] = [
   { key: "mutasi-stok", label: "Mutasi Stok", icon: ArrowLeftRight },
   { key: "mutasi-penjualan", label: "Mutasi Penjualan", icon: TrendingDown },
   { key: "riwayat-penjualan", label: "Riwayat Penjualan", icon: Receipt },
-  { key: "setting-petugas", label: "Setting Petugas", icon: CalendarClock },
+  { key: "setting-petugas", label: "Setting Barista", icon: CalendarClock },
 ];
 
 /// Tab halaman Booth — pola sama persis dengan ProdukTabs.tsx (lihat komentar

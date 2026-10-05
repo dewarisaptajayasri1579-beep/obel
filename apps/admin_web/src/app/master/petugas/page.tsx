@@ -25,7 +25,7 @@ function PetugasContent() {
       setUsers(userList.filter((u) => u.role === "BOOTH_STAFF"));
       setBooths(boothList);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Petugas.");
+      toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Barista.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -45,7 +45,7 @@ function PetugasContent() {
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
       <Breadcrumb
-        items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Data Operasional" }, { label: "Petugas" }]}
+        items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Data Operasional" }, { label: "Barista" }]}
       />
 
       <PetugasTabs

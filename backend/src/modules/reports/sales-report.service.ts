@@ -98,7 +98,7 @@ export class SalesReportService {
     if (filter.q) bagian.push(`Pencarian "${filter.q}"`);
     if (filter.status) bagian.push(`Status ${STATUS_LABEL[filter.status]}`);
     if (filter.boothName) bagian.push(`Booth ${filter.boothName}`);
-    if (filter.staffName) bagian.push(`Petugas ${filter.staffName}`);
+    if (filter.staffName) bagian.push(`Barista ${filter.staffName}`);
     return bagian.length ? bagian.join(' · ') : 'Semua transaksi';
   }
 
@@ -197,7 +197,7 @@ export class SalesReportService {
 
     const barisKepala = 10;
     const kepala = lembar.getRow(barisKepala);
-    kepala.values = ['No.', 'No. Sale', 'Tanggal', 'Shift', 'Petugas', 'Booth', 'Cup', 'Total', 'Metode', 'Status'];
+    kepala.values = ['No.', 'No. Sale', 'Tanggal', 'Shift', 'Barista', 'Booth', 'Cup', 'Total', 'Metode', 'Status'];
     kepala.eachCell((sel) => {
       sel.fill = ISI_KEPALA;
       sel.font = HURUF_KEPALA;
@@ -294,7 +294,7 @@ export class SalesReportService {
         { label: 'No. Sale', x: KIRI + 24, w: 84, align: 'left' as const },
         { label: 'Tanggal', x: KIRI + 108, w: 100, align: 'left' as const },
         { label: 'Shift', x: KIRI + 208, w: 66, align: 'left' as const },
-        { label: 'Petugas', x: KIRI + 274, w: 110, align: 'left' as const },
+        { label: 'Barista', x: KIRI + 274, w: 110, align: 'left' as const },
         { label: 'Booth', x: KIRI + 384, w: 90, align: 'left' as const },
         { label: 'Cup', x: KIRI + 474, w: 40, align: 'right' as const },
         { label: 'Total', x: KIRI + 514, w: 80, align: 'right' as const },

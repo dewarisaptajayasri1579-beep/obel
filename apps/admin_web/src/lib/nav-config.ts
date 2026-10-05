@@ -147,7 +147,7 @@ export const MAIN_NAV: NavGroup[] = [
             bottomBar: false,
           },
           {
-            label: "Petugas",
+            label: "Barista",
             href: "/master/petugas",
             icon: UserRound,
             bottomBar: false,

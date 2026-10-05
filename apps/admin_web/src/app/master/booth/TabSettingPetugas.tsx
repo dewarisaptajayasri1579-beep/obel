@@ -61,7 +61,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
       setPetugas(userList.filter((u) => u.role === "BOOTH_STAFF"));
       setAssignments(assignmentList);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Setting Petugas.");
+      toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Setting Barista.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,7 +164,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500 dark:text-fg-muted">
-        Petugas default per Booth &amp; shift — pilih langsung tersimpan, tanpa tombol Simpan. Satu petugas cuma
+        Barista default per Booth &amp; shift — pilih langsung tersimpan, tanpa tombol Simpan. Satu barista cuma
         boleh satu Booth dan satu Shift.
       </p>
 
@@ -243,14 +243,14 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
         )}
       </div>
 
-      <Modal isOpen={!!peringatan} onClose={() => setPeringatan(null)} title="Petugas Masih Aktif Shift" size="sm">
+      <Modal isOpen={!!peringatan} onClose={() => setPeringatan(null)} title="Barista Masih Aktif Shift" size="sm">
         <div className="space-y-4">
           <div className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-fg-secondary">
             <AlertTriangle className="w-4.5 h-4.5 text-amber-500 flex-shrink-0 mt-0.5" />
             <p>{peringatan?.pesan}</p>
           </div>
           <p className="text-xs text-slate-500 dark:text-fg-muted">
-            Penugasan cuma menentukan roster berikutnya — mengubahnya TIDAK otomatis meng-check-out petugas yang sedang shift.
+            Penugasan cuma menentukan roster berikutnya — mengubahnya TIDAK otomatis meng-check-out barista yang sedang shift.
             Shift yang sudah berjalan tetap aktif sampai dia check-out sendiri.
           </p>
           <div className="flex justify-end gap-2">

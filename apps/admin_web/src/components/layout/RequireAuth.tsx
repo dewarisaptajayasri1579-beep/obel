@@ -7,7 +7,7 @@ import { AppLayout } from "./AppLayout";
 import { Spinner } from "../ui/Spinner";
 
 const ROLE_LABEL: Record<string, string> = {
-  BOOTH_STAFF: "Petugas Booth",
+  BOOTH_STAFF: "Barista",
   ADMIN: "Admin Pusat",
   OWNER: "Owner",
 };

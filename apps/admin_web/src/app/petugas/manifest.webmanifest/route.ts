@@ -7,9 +7,9 @@ import { NextResponse } from "next/server";
 export function GET() {
   return NextResponse.json(
     {
-      name: "Obbel Petugas Booth",
-      short_name: "Obbel Petugas",
-      description: "Check-In, Kasir, Terima Stok, dan aktivitas harian Petugas Booth Obbel Coffee & Milk.",
+      name: "Barista Obbel",
+      short_name: "Barista Obbel",
+      description: "Check-In, Kasir, Terima Stok, dan aktivitas harian Barista Obbel Coffee & Milk.",
       start_url: "/petugas",
       display: "standalone",
       background_color: "#F7F9F6",
