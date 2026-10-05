@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { absenTiba, izinPulangAwal } from './support/shift';
 
 /// Snapshot penutupan shift (Check-Out) tidak boleh basi: shift tetap OPEN
 /// sampai konfirmasi, jadi Petugas bisa membuka layar Check-Out, kembali,
@@ -80,6 +81,10 @@ describe('Closing snapshot freshness (e2e)', () => {
       .expect(201);
     staffToken = checkIn.body.accessToken ?? login.body.accessToken;
     shiftSessionId = checkIn.body.shiftSessionId;
+    // Syarat layar Check-Out (BR-042): sudah Tiba, dan izin pulang awal karena spec
+    // berjalan sebelum jam selesai shift.
+    await absenTiba(app, staffToken, shiftSessionId);
+    await izinPulangAwal(app, adminToken, staffToken);
 
     // Stok awal di booth: minimal 10 cup produk khusus.
     await kirimKeBooth(10);

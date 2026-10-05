@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
+import { bereskanShiftLama, tutupShiftLengkap } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
@@ -19,7 +20,7 @@ import { isiUlangGudang } from './support/warehouse';
 /// Jalur Admin tetap tanpa foto. Stok tidak pernah berubah.
 ///
 /// Booth & Barista KHUSUS; tanpa membuat produk baru. Shift ditutup di test terakhir
-/// (return otomatisnya diterima di awal run berikutnya).
+/// (return otomatisnya diterima di akhir test itu).
 describe('Payment method change (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -77,11 +78,7 @@ describe('Payment method change (e2e)', () => {
       .expect(200);
 
     // Shift sisa run sebelumnya (kalau test terakhir gagal sebelum menutupnya) ditutup.
-    const lama = await request(server()).get('/shifts/active').set({ Authorization: `Bearer ${login.body.accessToken}` });
-    if (lama.status === 200) {
-      staffToken = lama.body.accessToken ?? login.body.accessToken;
-      await tutupShift(lama.body.shiftSessionId);
-    }
+    staffToken = await bereskanShiftLama(app, adminToken, login.body.accessToken);
     await terimaReturnTertunda();
     const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${login.body.accessToken}` }).send(CHECKIN).expect(201);
     staffToken = checkIn.body.accessToken ?? login.body.accessToken;
@@ -98,20 +95,6 @@ describe('Payment method change (e2e)', () => {
     }
     await app.close();
   });
-
-  async function tutupShift(sid: string) {
-    const closing = (await request(server()).post(`/shifts/${sid}/closing/start`).set(staff()).expect(201)).body;
-    await request(server())
-      .post(`/shifts/${sid}/closing/confirm`)
-      .set(staff())
-      .send({
-        items: closing.items.map((i: { productId: string; expectedQty: number }) => ({ productId: i.productId, actualQty: i.expectedQty })),
-        checkOutLatitude: -6.2088,
-        checkOutLongitude: 106.8456,
-        checkOutPhotoUrl: 'https://example.com/out.jpg',
-      })
-      .expect(201);
-  }
 
   async function terimaReturnTertunda() {
     const returns = await prisma.stockReturn.findMany({ where: { boothId, status: 'SUBMITTED' }, include: { items: true } });
@@ -229,7 +212,7 @@ describe('Payment method change (e2e)', () => {
     );
 
     const { saleId } = await jualTunai();
-    await tutupShift(shiftSessionId);
+    await tutupShiftLengkap(app, adminToken, staffToken, shiftSessionId);
     expect((await ganti(saleId, { method: 'QRIS', qrisProofPhotoUrl: await uploadProof() }).expect(400)).body.code).toBe('SALE_NOT_IN_ACTIVE_SHIFT');
     expect(await aktif(saleId)).toEqual([{ method: 'CASH', amount: price, proofPhotoUrl: null }]);
     await terimaReturnTertunda();

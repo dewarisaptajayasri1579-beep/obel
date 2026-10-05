@@ -17,6 +17,7 @@ export class BoothsService {
       ...booth,
       latitude: booth.latitude === null ? null : Number(booth.latitude),
       longitude: booth.longitude === null ? null : Number(booth.longitude),
+      cashFloat: Number(booth.cashFloat),
     };
   }
 
@@ -51,6 +52,7 @@ export class BoothsService {
         address: dto.address,
         latitude: dto.latitude,
         longitude: dto.longitude,
+        cashFloat: dto.cashFloat,
       },
     });
     return this.toResponse(booth);
@@ -92,6 +94,7 @@ export class BoothsService {
         longitude: dto.longitude,
         status: dto.status,
         qrisImageUrl: dto.qrisImageUrl,
+        cashFloat: dto.cashFloat,
       },
     });
     return this.toResponse(booth);

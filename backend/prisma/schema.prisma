@@ -216,6 +216,9 @@ model Booth {
   // Kode QRIS statis milik Booth ini, ditampilkan di layar Kasir saat
   // Petugas Booth pilih metode QRIS/Split — diunggah Admin di Data Booth.
   qrisImageUrl String?     @map("qris_image_url")
+  // Uang jalan (modal kembalian) yang dibawa Barista booth ini tiap shift, Rupiah
+  // integer — disalin ke ShiftSession.cashFloat saat absen Berangkat (BR-043).
+  cashFloat    BigInt      @default(0) @map("cash_float")
   status       BoothStatus @default(ACTIVE)
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
@@ -266,6 +269,8 @@ model Profile {
   shiftAssignments        BoothShiftAssignment[]
   staffLiabilities        StaffLiability[]        @relation("StaffLiabilityStaff")
   createdStaffLiabilities StaffLiability[]        @relation("StaffLiabilityCreatedBy")
+  attendancePermits       AttendancePermit[]      @relation("AttendancePermitStaff")
+  grantedAttendancePermits AttendancePermit[]     @relation("AttendancePermitGrantedBy")
 
   @@index([role])
   @@index([defaultBoothId])
@@ -524,15 +529,27 @@ model ShiftSession {
   openedAt          DateTime?     @map("opened_at")
   closingStartedAt  DateTime?     @map("closing_started_at")
   closedAt          DateTime?     @map("closed_at")
-  // Absen GPS+Selfie (Check-In/Check-Out) — soft-check saja terhadap
-  // Booth.latitude/longitude (lihat ShiftsService.computeLocationWarning),
-  // TIDAK memblokir absen. Sama pola dgn Sale.latitude/longitude di atas.
+  // Absen 4 titik GPS+foto (BR-042), divalidasi radius terhadap acuannya
+  // (lihat ShiftsService.periksaLokasi): Berangkat = checkIn* (Gudang, membuka
+  // shift), Tiba = arrival* (Booth), Selesai = checkOut* (Booth, menutup shift),
+  // Kembali = return* (Gudang; sesudahnya Admin boleh approve Laporan Kembali).
   checkInLatitude   Decimal?      @map("check_in_latitude") @db.Decimal(9, 6)
   checkInLongitude  Decimal?      @map("check_in_longitude") @db.Decimal(9, 6)
   checkInPhotoUrl   String?       @map("check_in_photo_url")
+  arrivedAt         DateTime?     @map("arrived_at")
+  arrivalLatitude   Decimal?      @map("arrival_latitude") @db.Decimal(9, 6)
+  arrivalLongitude  Decimal?      @map("arrival_longitude") @db.Decimal(9, 6)
+  arrivalPhotoUrl   String?       @map("arrival_photo_url")
   checkOutLatitude  Decimal?      @map("check_out_latitude") @db.Decimal(9, 6)
   checkOutLongitude Decimal?      @map("check_out_longitude") @db.Decimal(9, 6)
   checkOutPhotoUrl  String?       @map("check_out_photo_url")
+  returnedAt        DateTime?     @map("returned_at")
+  returnLatitude    Decimal?      @map("return_latitude") @db.Decimal(9, 6)
+  returnLongitude   Decimal?      @map("return_longitude") @db.Decimal(9, 6)
+  returnPhotoUrl    String?       @map("return_photo_url")
+  // Uang jalan shift ini (salinan Booth.cashFloat saat Berangkat) — ikut disetor
+  // kembali bersama kas Tunai (BR-043).
+  cashFloat         BigInt        @default(0) @map("cash_float")
   // Ping lokasi berkala (interval diatur AppSettings.gpsPingIntervalSeconds)
   // selama shift OPEN/CLOSING, dikirim app petugas — lihat
   // ShiftsService.recordLocationPing. Kolom ini cuma titik TERAKHIR
@@ -1065,9 +1082,54 @@ model AppSettings {
   /// dibangunkan) — lihat diskusi di percakapan, belum ada angka baku,
   /// default 60 dipilih sebagai titik tengah aman.
   gpsPingIntervalSeconds Int      @default(60) @map("gps_ping_interval_seconds")
+  /// Acuan absen Berangkat & Kembali (BR-042). Null = belum diatur → absen tidak
+  /// divalidasi jarak, hanya ditandai.
+  warehouseLatitude      Decimal? @map("warehouse_latitude") @db.Decimal(9, 6)
+  warehouseLongitude     Decimal? @map("warehouse_longitude") @db.Decimal(9, 6)
+  /// Radius absen dari titik acuan (Gudang/Booth); di luarnya ditolak kecuali ada izin Admin.
+  attendanceRadiusMeters Int      @default(100) @map("attendance_radius_meters")
+  /// Check-Out booth boleh paling cepat sekian menit sebelum jam selesai shift.
+  earlyCheckoutToleranceMinutes Int @default(15) @map("early_checkout_tolerance_minutes")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+enum AttendancePermitType {
+  LOCATION
+  EARLY_CHECKOUT
+
+  @@map("attendance_permit_type")
+}
+
+enum AttendancePoint {
+  DEPART
+  ARRIVE
+  FINISH
+  RETURN
+
+  @@map("attendance_point")
+}
+
+/// Izin absen yang diberikan Admin langsung (BR-042): absen di luar radius untuk
+/// satu titik (GPS meleset) atau Check-Out sebelum jam selesai (darurat). Berlaku
+/// hari itu saja (`businessDate`) dan dipakai sekali (`usedAt`).
+model AttendancePermit {
+  id                 String               @id @default(uuid())
+  staffId            String               @map("staff_id")
+  staff              Profile              @relation("AttendancePermitStaff", fields: [staffId], references: [id])
+  type               AttendancePermitType
+  point              AttendancePoint?
+  reason             String
+  grantedById        String               @map("granted_by")
+  grantedBy          Profile              @relation("AttendancePermitGrantedBy", fields: [grantedById], references: [id])
+  grantedAt          DateTime             @default(now()) @map("granted_at")
+  businessDate       DateTime             @map("business_date") @db.Date
+  usedAt             DateTime?            @map("used_at")
+  usedShiftSessionId String?              @map("used_shift_session_id")
+
+  @@index([staffId, businessDate])
+  @@map("attendance_permits")
 }
 
 /// Identitas perusahaan yang dipajang di kop semua dokumen cetak (PDF/Excel

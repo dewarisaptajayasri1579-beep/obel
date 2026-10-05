@@ -170,3 +170,9 @@ Sale Tunai di shift aktif → ganti ke QRIS tanpa alasan ditolak `REASON_NOTE_RE
 
 ### AC-44 Pemusnahan Stok Gudang
 Admin memusnahkan N cup tanpa foto atau dengan URL foto asing → ditolak; N melebihi stok Gudang → `INSUFFICIENT_STOCK` (details `available`), stok tidak berubah. Dengan foto → stok Gudang berkurang N, satu movement `ADJUSTMENT` `stock_adjustment_out`, dokumen koreksi `EXPIRED` menyimpan foto & catatan; retry dengan key sama tercatat sekali. Batalkan → stok kembali; batal kedua `ADJUSTMENT_ALREADY_REVERSED`. Petugas → 403 (BR-041). Test: `stock-write-off.e2e-spec.ts`.
+
+### AC-45 Absensi 4 titik
+Koordinat Gudang & Booth diatur, radius 100 m: Berangkat 1 km dari Gudang → `OUTSIDE_ATTENDANCE_RADIUS`, tidak ada shift dibuat; Admin memberi izin lokasi Berangkat → lolos dan izin tercatat terpakai di shift itu. Check-Out tanpa Tiba → `ARRIVAL_REQUIRED`; Tiba di luar radius Booth ditolak, di Booth diterima (idempotent). Check-Out 2 jam sebelum jam selesai → `EARLY_CHECKOUT` (details `allowedFrom`); dalam toleransi tapi di luar Booth → `OUTSIDE_ATTENDANCE_RADIUS`; di Booth → CLOSED. Sebelum Kembali: terima retur & setor uang → `BARISTA_NOT_RETURNED`, Berangkat baru → `PREVIOUS_SHIFT_NOT_RETURNED`, `/shifts/pending-return` mengembalikan shift itu; setelah Kembali semuanya jalan. Izin pulang awal meloloskan Check-Out sekali. Acuan Gudang kosong → absen tetap diterima, riwayat Admin menandai `acuanKosong`. Test: `attendance-four-points.e2e-spec.ts` (BR-042).
+
+### AC-46 Uang jalan
+Booth ber-uang jalan Rp50.000, Barista Berangkat → shift `cashFloat` 50.000; jual Tunai 1 cup lalu Check-Out → `shift_cash_deposits.expected_amount` = harga + 50.000, `/shifts/pending-return` memuat `cashFloat` & `expectedCash` (BR-043). Test: `attendance-four-points.e2e-spec.ts`.

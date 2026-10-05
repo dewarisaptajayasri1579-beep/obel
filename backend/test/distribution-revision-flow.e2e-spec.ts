@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
+import { bereskanShiftLama } from './support/shift';
 import { dampakMutasi } from '../src/modules/stock-movements/arah.util';
 
 // Sama seperti main.ts: kolom bigint (harga produk) ikut di respons beberapa endpoint
@@ -76,29 +77,14 @@ describe('Distribution revision flow (e2e)', () => {
 
     // Tutup shift run sebelumnya (kalau ada) dan terima return otomatisnya penuh,
     // supaya stok booth 0 dan shift baru mulai bersih.
-    const lama = await request(server()).get('/shifts/active').set({ Authorization: `Bearer ${login.body.accessToken}` });
-    if (lama.status === 200) {
-      staffToken = lama.body.accessToken ?? login.body.accessToken;
-      const sid = lama.body.shiftSessionId as string;
-      const closing = (await request(server()).post(`/shifts/${sid}/closing/start`).set(staff()).expect(201)).body;
+    staffToken = await bereskanShiftLama(app, adminToken, login.body.accessToken);
+    const returns = await prisma.stockReturn.findMany({ where: { boothId, status: 'SUBMITTED' }, include: { items: true } });
+    for (const r of returns) {
       await request(server())
-        .post(`/shifts/${sid}/closing/confirm`)
-        .set(staff())
-        .send({
-          items: closing.items.map((i: { productId: string; expectedQty: number }) => ({ productId: i.productId, actualQty: i.expectedQty })),
-          checkOutLatitude: -6.2088,
-          checkOutLongitude: 106.8456,
-          checkOutPhotoUrl: 'https://example.com/out.jpg',
-        })
+        .post(`/returns/${r.id}/receive`)
+        .set(admin())
+        .send({ items: r.items.map((i) => ({ productId: i.productId, qtyReceived: i.qtySubmitted })) })
         .expect(201);
-      const returns = await prisma.stockReturn.findMany({ where: { boothId, status: 'SUBMITTED' }, include: { items: true } });
-      for (const r of returns) {
-        await request(server())
-          .post(`/returns/${r.id}/receive`)
-          .set(admin())
-          .send({ items: r.items.map((i) => ({ productId: i.productId, qtyReceived: i.qtySubmitted })) })
-          .expect(201);
-      }
     }
     const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${login.body.accessToken}` }).send(CHECKIN).expect(201);
     staffToken = checkIn.body.accessToken ?? login.body.accessToken;

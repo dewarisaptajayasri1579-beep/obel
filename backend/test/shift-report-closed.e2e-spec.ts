@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
+import { bereskanShiftLama, tutupShiftLengkap } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
@@ -77,11 +78,8 @@ describe('Shift report after closing (e2e)', () => {
   /// Satu skenario = satu shift baru: tutup shift lama (return otomatis diterima penuh)
   /// supaya booth mulai dari 0, lalu Check-In.
   async function shiftBaru(): Promise<string> {
-    const lama = await request(server()).get('/shifts/active').set({ Authorization: `Bearer ${staffLoginToken}` });
-    if (lama.status === 200) {
-      staffToken = lama.body.accessToken ?? staffLoginToken;
-      await tutupShift(lama.body.shiftSessionId);
-    }
+    staffToken = await bereskanShiftLama(app, adminToken, staffLoginToken);
+    await terimaReturnTertunda();
     // Void / refund oleh Admin setelah shift CLOSED mengembalikan stok ke Booth tanpa
     // shift pemilik (sisa itu terbawa ke shift berikutnya) — kosongkan dulu supaya
     // tiap skenario mulai dari 0.
@@ -96,17 +94,11 @@ describe('Shift report after closing (e2e)', () => {
   }
 
   async function tutupShift(shiftSessionId: string) {
-    const closing = (await request(server()).post(`/shifts/${shiftSessionId}/closing/start`).set(staff()).expect(201)).body;
-    await request(server())
-      .post(`/shifts/${shiftSessionId}/closing/confirm`)
-      .set(staff())
-      .send({
-        items: closing.items.map((i: { productId: string; expectedQty: number }) => ({ productId: i.productId, actualQty: i.expectedQty })),
-        checkOutLatitude: -6.2088,
-        checkOutLongitude: 106.8456,
-        checkOutPhotoUrl: 'https://example.com/out.jpg',
-      })
-      .expect(201);
+    await tutupShiftLengkap(app, adminToken, staffToken, shiftSessionId);
+    await terimaReturnTertunda();
+  }
+
+  async function terimaReturnTertunda() {
     const returns = await prisma.stockReturn.findMany({ where: { boothId, status: 'SUBMITTED' }, include: { items: true } });
     for (const r of returns) {
       await request(server())
@@ -137,17 +129,7 @@ describe('Shift report after closing (e2e)', () => {
     const restock = await kirim(3);
     const sebelumConfirm = await rekap(sid);
     expect(sebelumConfirm).toMatchObject({ stokAwal: 10, restock: 3, terjual: 2, sisaSistem: 11 });
-    const closing = (await request(server()).post(`/shifts/${sid}/closing/start`).set(staff()).expect(201)).body;
-    await request(server())
-      .post(`/shifts/${sid}/closing/confirm`)
-      .set(staff())
-      .send({
-        items: closing.items.map((i: { productId: string; expectedQty: number }) => ({ productId: i.productId, actualQty: i.expectedQty })),
-        checkOutLatitude: -6.2088,
-        checkOutLongitude: 106.8456,
-        checkOutPhotoUrl: 'https://example.com/out.jpg',
-      })
-      .expect(201);
+    await tutupShiftLengkap(app, adminToken, staffToken, sid);
     return { sid, sale, restock };
   }
 

@@ -83,3 +83,10 @@ export function rangeJakarta(startDateStr: string, endDateStr: string): { awal: 
     akhir: new Date(Date.UTC(ey, em - 1, ed + 1) - JAKARTA_OFFSET_MS),
   };
 }
+
+/// Jam Asia/Jakarta untuk pesan ke pengguna, mis. "16.15" (konvensi format UI).
+export function formatJamJakarta(date: Date): string {
+  const jakarta = new Date(date.getTime() + JAKARTA_OFFSET_MS);
+  const dua = (n: number) => String(n).padStart(2, '0');
+  return `${dua(jakarta.getUTCHours())}.${dua(jakarta.getUTCMinutes())}`;
+}

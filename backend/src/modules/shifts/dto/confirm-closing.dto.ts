@@ -37,8 +37,8 @@ export class ConfirmClosingDto {
   @Type(() => ConfirmClosingItemDto)
   items!: ConfirmClosingItemDto[];
 
-  /// GPS + foto selfie diambil saat Check-Out ("Absen Pulang") — sama pola
-  /// soft-check dgn Check-In, lihat ShiftsService.computeLocationWarning.
+  /// GPS + foto selfie absen Selesai di Booth — divalidasi radius terhadap
+  /// Booth (ShiftsService.periksaLokasi, BR-042).
   @IsLatitude()
   checkOutLatitude!: number;
 

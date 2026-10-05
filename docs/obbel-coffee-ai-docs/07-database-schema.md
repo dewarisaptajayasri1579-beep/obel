@@ -91,6 +91,9 @@ Instance aktual per Booth.
 - opened_at timestamptz nullable
 - closing_started_at timestamptz nullable
 - closed_at timestamptz nullable
+- check_in_* (lat/lng/foto) = absen Berangkat di Gudang; arrived_at + arrival_* = Tiba di Booth;
+  check_out_* = Check-Out di Booth; returned_at + return_* = Kembali di Gudang (BR-042)
+- cash_float bigint — uang jalan shift ini, salinan booths.cash_float saat Berangkat (BR-043)
 - opening_note text nullable
 - closing_note text nullable
 - created_by uuid
@@ -424,3 +427,17 @@ Jika customer refund/return diaktifkan, gunakan dokumen terpisah dari sale void:
 - `sales_return_items`: sales_return_id, sale_item_id/product_id, qty, refund_amount, return_to_stock bool.
 
 Original `sales` tetap PAID secara historis; net sales report mengurangi posted refund. Fitur ini boleh P1 bila operasional tidak membutuhkannya, tetapi semantic wajib tidak dicampur dengan VOID.
+
+### `attendance_permits` (BR-042)
+Izin absen dari Admin: berlaku pada `business_date`, dipakai sekali.
+- id uuid PK
+- staff_id uuid FK profiles
+- type `LOCATION|EARLY_CHECKOUT`
+- point `DEPART|ARRIVE|FINISH|RETURN` nullable (wajib untuk LOCATION)
+- reason text required
+- granted_by uuid FK profiles, granted_at timestamptz
+- business_date date
+- used_at timestamptz nullable, used_shift_session_id uuid nullable
+
+Kolom pendukung: `booths.cash_float` (uang jalan per booth, BR-043); `app_settings.warehouse_latitude/longitude`
+(acuan Gudang, nullable), `attendance_radius_meters` (default 100), `early_checkout_tolerance_minutes` (default 15).

@@ -109,12 +109,30 @@ Atomically validates/deducts warehouse source and sets SENT.
 Booth Staff target Booth.
 Update Booth stock + movements.
 
+## 7a. Absensi 4 titik (BR-042)
+Semua absen membawa `latitude`, `longitude`, `photo_url` (hasil `POST /shifts/attendance/photo`) dan ditolak
+`OUTSIDE_ATTENDANCE_RADIUS` (details `{ distance, radius, point }`) di luar radius acuannya, kecuali ada izin Admin.
+- Berangkat: `POST /shifts/check-in` (acuan Gudang) — error tambahan `PREVIOUS_SHIFT_NOT_RETURNED`. Response shift aktif
+  memuat `arrivedAt` dan `cashFloat`.
+- Tiba: `POST /shifts/:id/arrive` (acuan Booth, shift OPEN milik Barista, idempotent).
+- Kembali: `POST /shifts/:id/return` (acuan Gudang, shift CLOSED milik Barista, idempotent).
+- `GET /shifts/pending-return` (Barista): shift yang sudah Check-Out tapi belum Kembali, atau kosong.
+- Izin: `POST /attendance-permits` (Admin: `staff_id`, `type` LOCATION|EARLY_CHECKOUT, `point` untuk LOCATION,
+  `reason`), `GET /attendance-permits?date=YYYY-MM-DD` (Admin/Owner, default hari ini).
+- Pengaturan: `PATCH /app-settings` menerima `warehouse_latitude/longitude` (null = kosongkan),
+  `attendance_radius_meters` (20–1000), `early_checkout_tolerance_minutes` (0–180); booth menerima `cash_float`.
+
 ## 8. Start closing
 ### `start_shift_closing`
 Returns server snapshot expected stock per product.
 Shift status stays OPEN — staff can still transact normally until checkout
 is confirmed. "Closing in progress" is tracked via ShiftStockCount.status
 (DRAFT), not the shift status.
+
+Start & confirm closing (Check-Out) juga ditolak `ARRIVAL_REQUIRED` (belum Tiba) dan `EARLY_CHECKOUT` (details
+`allowedFrom`) sebelum jam selesai shift dikurangi toleransi; confirm memvalidasi lokasi terhadap Booth. Setoran
+yang dibuat saat confirm = kas Tunai + uang jalan (BR-043). Approve Stok Kembali & Setor Uang shift CLOSED ditolak
+`BARISTA_NOT_RETURNED` sebelum absen Kembali.
 
 ## 9. Confirm closing count
 ### `confirm_shift_closing`

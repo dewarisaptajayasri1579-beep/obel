@@ -7,9 +7,8 @@ export class CheckInDto {
   @IsUUID()
   boothId?: string;
 
-  /// GPS + foto selfie diambil saat Check-In (soft-check saja terhadap
-  /// lokasi Booth — lihat ShiftsService.computeLocationWarning, TIDAK
-  /// memblokir absen).
+  /// GPS + foto selfie absen Berangkat — divalidasi radius terhadap Gudang
+  /// (ShiftsService.periksaLokasi, BR-042).
   @IsLatitude()
   latitude!: number;
 

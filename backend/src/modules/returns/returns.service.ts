@@ -6,6 +6,7 @@ import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
 import { cariShiftTerbukaBoothStaff } from '../../common/active-shift.util';
 import { businessDateOf } from '../../common/jakarta-date';
+import { pastikanBaristaSudahKembali } from '../../common/shift-return-guard';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
@@ -168,6 +169,7 @@ export class ReturnsService {
     if (stockReturn.status !== ReturnStatus.SUBMITTED) {
       throw new DomainError('RETURN_NOT_PENDING', 'Return ini tidak sedang menunggu diterima.');
     }
+    if (stockReturn.shiftSessionId) await pastikanBaristaSudahKembali(this.prisma, stockReturn.shiftSessionId);
 
     const inputByProduct = new Map(dto.items.map((i) => [i.productId, i]));
     const hasDiscrepancy = stockReturn.items.some(

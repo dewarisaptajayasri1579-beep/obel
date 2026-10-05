@@ -19,8 +19,8 @@ export class AppSettingsService {
   async update(dto: UpdateAppSettingsDto) {
     return this.prisma.appSettings.upsert({
       where: { id: DEFAULT_ID },
-      create: { id: DEFAULT_ID, gpsPingIntervalSeconds: dto.gpsPingIntervalSeconds },
-      update: { gpsPingIntervalSeconds: dto.gpsPingIntervalSeconds },
+      create: { id: DEFAULT_ID, ...dto },
+      update: dto,
     });
   }
 }

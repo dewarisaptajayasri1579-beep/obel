@@ -8,6 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { AttendanceDto } from './dto/attendance.dto';
 import { CheckInDto } from './dto/check-in.dto';
 import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
@@ -23,6 +24,13 @@ export class ShiftsController {
   @Get('active')
   getActive(@CurrentUser() user: JwtPayload) {
     return this.shiftsService.getMyActiveShift(user);
+  }
+
+  /// Shift yang sudah Check-Out tapi belum absen Kembali di Gudang (null kalau tidak ada).
+  @Get('pending-return')
+  @Roles(UserRole.BOOTH_STAFF)
+  getPendingReturn(@CurrentUser() user: JwtPayload) {
+    return this.shiftsService.getMyPendingReturn(user);
   }
 
   @Get('active-assignments')
@@ -53,6 +61,18 @@ export class ShiftsController {
   @Roles(UserRole.BOOTH_STAFF)
   checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {
     return this.shiftsService.checkIn(user, dto);
+  }
+
+  @Post(':id/arrive')
+  @Roles(UserRole.BOOTH_STAFF)
+  arrive(@Param('id') id: string, @Body() dto: AttendanceDto, @CurrentUser() user: JwtPayload) {
+    return this.shiftsService.arrive(user, id, dto);
+  }
+
+  @Post(':id/return')
+  @Roles(UserRole.BOOTH_STAFF)
+  returnToWarehouse(@Param('id') id: string, @Body() dto: AttendanceDto, @CurrentUser() user: JwtPayload) {
+    return this.shiftsService.returnToWarehouse(user, id, dto);
   }
 
   @Post(':id/location-ping')

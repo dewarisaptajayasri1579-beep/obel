@@ -28,6 +28,7 @@ import { CompanyProfileModule } from './modules/company-profile/company-profile.
 import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/booth-shift-assignments.module';
 import { StockHandoversModule } from './modules/stock-handovers/stock-handovers.module';
 import { AppSettingsModule } from './modules/app-settings/app-settings.module';
+import { AttendancePermitsModule } from './modules/attendance-permits/attendance-permits.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { AppSettingsModule } from './modules/app-settings/app-settings.module';
     NotificationsModule,
     CompanyProfileModule,
     AppSettingsModule,
+    AttendancePermitsModule,
     BoothShiftAssignmentsModule,
     StockHandoversModule,
   ],

@@ -1,15 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, SaleStatus, ShiftStatus, StockCountStatus, StockMovementType, UserRole } from '@prisma/client';
+import {
+  AttendancePermitType,
+  AttendancePoint,
+  Prisma,
+  SaleStatus,
+  ShiftStatus,
+  StockCountStatus,
+  StockMovementType,
+  UserRole,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { combineJakartaDateAndTime, startOfTodayJakarta, batasBulanJakarta, businessDateOf } from '../../common/jakarta-date';
+import { pastikanBaristaSudahKembali } from '../../common/shift-return-guard';
+import {
+  batasBulanJakarta,
+  businessDateOf,
+  combineJakartaDateAndTime,
+  formatJamJakarta,
+  startOfTodayJakarta,
+} from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReturnsService } from '../returns/returns.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
+import { AttendancePermitsService } from '../attendance-permits/attendance-permits.service';
 import { JwtPayload } from '../auth/jwt-payload.interface';
+import { AttendanceDto } from './dto/attendance.dto';
 import { CheckInDto } from './dto/check-in.dto';
 import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
@@ -18,12 +37,16 @@ import { CorrectShiftDto } from './dto/correct-shift.dto';
 
 const UNIQUE_VIOLATION = 'P2002';
 
-const LOCATION_WARNING_RADIUS_METERS = 300;
 const EARTH_RADIUS_METERS = 6_371_000;
 
-/// Jarak antara dua koordinat (haversine), dipakai murni utk peringatan
-/// non-blocking — akurasi GPS device tidak bisa dipercaya utk hard block
-/// (lihat komentar checkInLatitude/dst di schema.prisma).
+const NAMA_TITIK: Record<AttendancePoint, string> = {
+  DEPART: 'Berangkat',
+  ARRIVE: 'Tiba',
+  FINISH: 'Check-Out',
+  RETURN: 'Kembali',
+};
+
+/// Jarak antara dua koordinat (haversine) untuk validasi radius absen (BR-042).
 function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(b.lat - a.lat);
@@ -41,6 +64,8 @@ export class ShiftsService {
     private readonly corrections: CorrectionsService,
     private readonly jwtService: JwtService,
     private readonly returnsService: ReturnsService,
+    private readonly appSettings: AppSettingsService,
+    private readonly permits: AttendancePermitsService,
   ) {}
 
   /// Mirrors get_my_active_shift() from
@@ -111,6 +136,19 @@ export class ShiftsService {
       return this.toActiveShiftResponse(existing, await this.reissueToken(user, existing.boothId));
     }
 
+    // Absen ke-4 (Kembali di Gudang) shift sebelumnya tidak boleh dilewati (BR-042).
+    const belumKembali = await this.prisma.shiftSession.findFirst({
+      where: { staffId: user.sub, status: ShiftStatus.CLOSED, returnedAt: null },
+      include: { booth: true },
+    });
+    if (belumKembali) {
+      throw new DomainError(
+        'PREVIOUS_SHIFT_NOT_RETURNED',
+        `Absen Kembali di Gudang untuk shift sebelumnya (${belumKembali.booth.name}) belum dilakukan.`,
+        { shiftSessionId: belumKembali.id },
+      );
+    }
+
     const assignment = await this.prisma.boothShiftAssignment.findUnique({
       where: { staffId: user.sub },
       include: { shiftTemplate: true },
@@ -127,6 +165,7 @@ export class ShiftsService {
     if (!booth || booth.status !== 'ACTIVE') {
       throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
     }
+    const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.DEPART, dto, await this.acuanGudang());
 
     const businessDate = startOfTodayJakarta();
     const openedAt = new Date();
@@ -148,6 +187,7 @@ export class ShiftsService {
           checkInLatitude: dto.latitude,
           checkInLongitude: dto.longitude,
           checkInPhotoUrl: dto.photoUrl,
+          cashFloat: booth.cashFloat,
         },
         include: { booth: true, shiftTemplate: true },
       });
@@ -161,8 +201,76 @@ export class ShiftsService {
       return this.toActiveShiftResponse(winner, await this.reissueToken(user, winner.boothId));
     }
 
-    const locationWarning = this.computeLocationWarning(dto.latitude, dto.longitude, booth);
-    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId), locationWarning);
+    if (lokasi.permitId) await this.permits.pakai(this.prisma, lokasi.permitId, created.id);
+    return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
+  }
+
+  /// Absen Tiba di Booth (BR-042) — wajib sebelum Check-Out; Kasir tidak menunggu ini.
+  /// Idempotent: kalau sudah tiba, kembalikan shift apa adanya.
+  async arrive(user: JwtPayload, shiftSessionId: string, dto: AttendanceDto) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include: { booth: true, shiftTemplate: true } });
+    if (!shift || shift.staffId !== user.sub) {
+      throw new DomainError('NOT_FOUND', 'Shift tidak ditemukan.');
+    }
+    if (shift.status !== ShiftStatus.OPEN) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Absen Tiba hanya untuk shift yang sedang berjalan.');
+    }
+    if (shift.arrivedAt) return this.toActiveShiftResponse(shift);
+
+    const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.ARRIVE, dto, this.acuanBooth(shift.booth));
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const hasil = await tx.shiftSession.update({
+        where: { id: shiftSessionId },
+        data: { arrivedAt: new Date(), arrivalLatitude: dto.latitude, arrivalLongitude: dto.longitude, arrivalPhotoUrl: dto.photoUrl },
+        include: { booth: true, shiftTemplate: true },
+      });
+      if (lokasi.permitId) await this.permits.pakai(tx, lokasi.permitId, shiftSessionId);
+      return hasil;
+    });
+    return this.toActiveShiftResponse(updated);
+  }
+
+  /// Absen Kembali di Gudang (BR-042) — setelah Check-Out; baru sesudahnya Admin
+  /// boleh approve Stok Kembali & Setor Uang shift ini. Idempotent.
+  async returnToWarehouse(user: JwtPayload, shiftSessionId: string, dto: AttendanceDto) {
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId } });
+    if (!shift || shift.staffId !== user.sub) {
+      throw new DomainError('NOT_FOUND', 'Shift tidak ditemukan.');
+    }
+    if (shift.status !== ShiftStatus.CLOSED) {
+      throw new DomainError('SHIFT_NOT_CLOSED', 'Absen Kembali dilakukan setelah Check-Out di Booth.');
+    }
+    if (shift.returnedAt) return { shiftSessionId, returnedAt: shift.returnedAt };
+
+    const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.RETURN, dto, await this.acuanGudang());
+    const returnedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shiftSession.update({
+        where: { id: shiftSessionId },
+        data: { returnedAt, returnLatitude: dto.latitude, returnLongitude: dto.longitude, returnPhotoUrl: dto.photoUrl },
+      });
+      if (lokasi.permitId) await this.permits.pakai(tx, lokasi.permitId, shiftSessionId);
+    });
+    return { shiftSessionId, returnedAt };
+  }
+
+  /// Shift milik Barista yang sudah Check-Out tapi belum absen Kembali (paling
+  /// banyak satu — Berangkat berikutnya ditolak selama masih ada). Null kalau tidak ada.
+  async getMyPendingReturn(user: JwtPayload) {
+    const shift = await this.prisma.shiftSession.findFirst({
+      where: { staffId: user.sub, status: ShiftStatus.CLOSED, returnedAt: null },
+      include: { booth: true, shiftTemplate: true, cashDeposit: true },
+      orderBy: { closedAt: 'desc' },
+    });
+    if (!shift) return null;
+    return {
+      shiftSessionId: shift.id,
+      booth: { id: shift.booth.id, code: shift.booth.code, name: shift.booth.name },
+      shiftName: shift.shiftTemplate.name,
+      closedAt: shift.closedAt,
+      cashFloat: Number(shift.cashFloat),
+      expectedCash: shift.cashDeposit ? Number(shift.cashDeposit.expectedAmount) : null,
+    };
   }
 
   /// Ping lokasi berkala (apps/booth_pwa_flutter, action `gps.start`) — dua
@@ -250,21 +358,40 @@ export class ShiftsService {
     };
   }
 
-  /// Soft-check lokasi Check-In/Check-Out terhadap Booth.latitude/longitude —
-  /// TIDAK memblokir absen (akurasi GPS device tidak bisa dipercaya utk hard
-  /// block), cuma dikembalikan sebagai peringatan non-blocking di response.
-  private computeLocationWarning(
-    latitude: number,
-    longitude: number,
-    booth: { name: string; latitude: unknown; longitude: unknown },
-  ): string | undefined {
-    if (booth.latitude == null || booth.longitude == null) return undefined;
-    const distance = distanceMeters(
-      { lat: latitude, lng: longitude },
-      { lat: Number(booth.latitude), lng: Number(booth.longitude) },
+  /// Validasi radius absen (BR-042): di luar `attendanceRadiusMeters` dari acuan →
+  /// ditolak, kecuali Admin sudah memberi izin LOCATION untuk titik ini hari ini
+  /// (izinnya dikembalikan supaya ditandai terpakai bersama absennya). Acuan yang
+  /// belum diatur Admin (null) tidak memblokir — tampil "acuan kosong" di riwayat.
+  private async periksaLokasi(
+    staffId: string,
+    point: AttendancePoint,
+    posisi: { latitude: number; longitude: number },
+    acuan: { nama: string; lat: number; lng: number } | null,
+  ): Promise<{ permitId?: string }> {
+    if (!acuan) return {};
+    const { attendanceRadiusMeters: radius } = await this.appSettings.get();
+    const jarak = Math.round(distanceMeters({ lat: posisi.latitude, lng: posisi.longitude }, acuan));
+    if (jarak <= radius) return {};
+    const izin = await this.permits.cariIzin(staffId, AttendancePermitType.LOCATION, point);
+    if (izin) return { permitId: izin.id };
+    throw new DomainError(
+      'OUTSIDE_ATTENDANCE_RADIUS',
+      `Lokasi Anda sekitar ${jarak} m dari ${acuan.nama} (maks ${radius} m). Absen ${NAMA_TITIK[point]} ditolak — kalau GPS meleset, minta izin Admin lalu ulangi.`,
+      { distance: jarak, radius, point },
     );
-    if (distance <= LOCATION_WARNING_RADIUS_METERS) return undefined;
-    return `Lokasi Anda sekitar ${Math.round(distance)}m dari Booth "${booth.name}". Pastikan Anda berada di lokasi yang benar.`;
+  }
+
+  private async acuanGudang() {
+    const s = await this.appSettings.get();
+    return s.warehouseLatitude == null || s.warehouseLongitude == null
+      ? null
+      : { nama: 'Gudang', lat: Number(s.warehouseLatitude), lng: Number(s.warehouseLongitude) };
+  }
+
+  private acuanBooth(booth: { name: string; latitude: unknown; longitude: unknown }) {
+    return booth.latitude == null || booth.longitude == null
+      ? null
+      : { nama: `Booth "${booth.name}"`, lat: Number(booth.latitude), lng: Number(booth.longitude) };
   }
 
   /// JWT `boothId` dipakai banyak endpoint booth-scoped (catalog,
@@ -292,9 +419,10 @@ export class ShiftsService {
       scheduledStartAt: Date;
       scheduledEndAt: Date;
       openedAt: Date | null;
+      arrivedAt: Date | null;
+      cashFloat: bigint;
     },
     accessToken?: string,
-    locationWarning?: string,
   ) {
     return {
       shiftSessionId: shift.id,
@@ -304,8 +432,9 @@ export class ShiftsService {
       scheduledStartAt: shift.scheduledStartAt,
       scheduledEndAt: shift.scheduledEndAt,
       openedAt: shift.openedAt,
+      arrivedAt: shift.arrivedAt,
+      cashFloat: Number(shift.cashFloat),
       ...(accessToken ? { accessToken } : {}),
-      ...(locationWarning ? { locationWarning } : {}),
     };
   }
 
@@ -320,12 +449,6 @@ export class ShiftsService {
     return shift;
   }
 
-  /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
-  /// "expected". Shift TETAP OPEN (kasir masih boleh jualan) sampai
-  /// confirmClosing sukses — status DRAFT di ShiftStockCount inilah yang
-  /// menandai closing sedang berjalan, bukan ShiftSession.status.
-  /// Idempotent — kalau closing draft sudah ada, kembalikan yang itu
-  /// (bukan bikin snapshot baru).
   /// Draft (Sale PENDING) belum memotong stok dan hanya bisa dibayar/dihapus selama
   /// shift-nya terbuka; kalau shift ditutup, draft itu yatim selamanya. Ditolak di
   /// startClosing (layar Check-Out langsung memberi tahu) dan confirmClosing (draft
@@ -345,6 +468,30 @@ export class ShiftsService {
     }
   }
 
+  /// Syarat absen Check-Out (BR-042): sudah absen Tiba, dan tidak sebelum
+  /// `scheduledEndAt − toleransi` kecuali Admin memberi izin pulang awal hari ini.
+  /// Mengembalikan izin itu supaya confirmClosing menandainya terpakai.
+  private async pastikanBolehCheckOut(shift: { staffId: string; arrivedAt: Date | null; scheduledEndAt: Date }) {
+    if (!shift.arrivedAt) {
+      throw new DomainError('ARRIVAL_REQUIRED', 'Absen Tiba di Booth dulu sebelum Check-Out.');
+    }
+    const { earlyCheckoutToleranceMinutes } = await this.appSettings.get();
+    const bolehMulai = new Date(shift.scheduledEndAt.getTime() - earlyCheckoutToleranceMinutes * 60_000);
+    if (new Date() >= bolehMulai) return null;
+    const izin = await this.permits.cariIzin(shift.staffId, AttendancePermitType.EARLY_CHECKOUT, null);
+    if (izin) return izin;
+    throw new DomainError(
+      'EARLY_CHECKOUT',
+      `Check-Out baru bisa mulai pukul ${formatJamJakarta(bolehMulai)}. Kalau harus pulang lebih awal, minta izin Admin.`,
+      { allowedFrom: bolehMulai },
+    );
+  }
+
+  /// Mirrors start_shift_closing (§09): snapshot current Booth stock jadi
+  /// "expected". Shift TETAP OPEN (kasir masih boleh jualan) sampai
+  /// confirmClosing sukses — status DRAFT di ShiftStockCount inilah yang
+  /// menandai closing sedang berjalan, bukan ShiftSession.status.
+  /// Snapshot DRAFT yang sudah ada diperbarui ke stok terkini (lihat di bawah).
   async startClosing(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
 
@@ -359,6 +506,7 @@ export class ShiftsService {
     if (shift.status !== ShiftStatus.OPEN) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk memulai closing.');
     }
+    await this.pastikanBolehCheckOut(shift);
     await this.pastikanTidakAdaDraft(shiftSessionId);
 
     const boothStocks = await this.prisma.boothStock.findMany({
@@ -443,7 +591,14 @@ export class ShiftsService {
     if (shift.status !== ShiftStatus.OPEN) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk konfirmasi checkout.');
     }
+    const izinPulangAwal = await this.pastikanBolehCheckOut(shift);
     await this.pastikanTidakAdaDraft(shiftSessionId);
+    const lokasi = await this.periksaLokasi(
+      shift.staffId,
+      AttendancePoint.FINISH,
+      { latitude: dto.checkOutLatitude, longitude: dto.checkOutLongitude },
+      this.acuanBooth(booth),
+    );
 
     // Stok Booth harus masih sama dengan snapshot yang Petugas lihat di layar
     // (mis. Admin mengirim stok atau ada penjualan setelah layar dibuka) —
@@ -519,6 +674,8 @@ export class ShiftsService {
           checkOutPhotoUrl: dto.checkOutPhotoUrl,
         },
       });
+      if (izinPulangAwal) await this.permits.pakai(tx, izinPulangAwal.id, shiftSessionId);
+      if (lokasi.permitId) await this.permits.pakai(tx, lokasi.permitId, shiftSessionId);
     });
 
     // Sisa Stok SISTEM Booth (BoothStock belum disentuh oleh selisih Stok
@@ -537,8 +694,9 @@ export class ShiftsService {
       );
     }
 
-    // Setoran kas Tunai — juga menunggu approve Admin di Laporan Kembali
-    // terpisah dari approve Stok Kembali (dua keputusan independen).
+    // Setoran kas Tunai + uang jalan (modal kembalian, BR-043) — juga menunggu
+    // approve Admin di Laporan Kembali, terpisah dari approve Stok Kembali (dua
+    // keputusan independen).
     const salesForCash = await this.prisma.sale.findMany({
       where: { shiftSessionId, status: 'PAID' },
       include: { payments: { where: { status: 'POSTED', method: 'CASH' } } },
@@ -548,15 +706,14 @@ export class ShiftsService {
       0,
     );
     await this.prisma.shiftCashDeposit.create({
-      data: { shiftSessionId, expectedAmount: kasTunai },
+      data: { shiftSessionId, expectedAmount: BigInt(kasTunai) + shift.cashFloat },
     });
 
     const final = await this.prisma.shiftStockCount.findUnique({
       where: { shiftSessionId },
       include: { items: { include: { product: true } } },
     });
-    const locationWarning = this.computeLocationWarning(dto.checkOutLatitude, dto.checkOutLongitude, booth);
-    return { ...this.toClosingResponse(final!), ...(locationWarning ? { locationWarning } : {}) };
+    return this.toClosingResponse(final!);
   }
 
   /// Admin approve setoran kas Tunai Petugas (Laporan Kembali) — terpisah
@@ -570,6 +727,7 @@ export class ShiftsService {
     if (deposit.status !== 'PENDING') {
       return deposit;
     }
+    await pastikanBaristaSudahKembali(this.prisma, shiftSessionId);
     const hasDiscrepancy = dto.depositedAmount !== Number(deposit.expectedAmount);
     if (hasDiscrepancy && !dto.note?.trim()) {
       throw new DomainError(
@@ -651,6 +809,34 @@ export class ShiftsService {
       cupByShiftId.set(s.shiftSessionId, (cupByShiftId.get(s.shiftSessionId) ?? 0) + qty);
     }
 
+    // Absen 4 titik (BR-042): jarak ke acuannya dihitung saat dibaca (acuan bisa
+    // diubah Admin kapan saja, jadi tidak disimpan), plus izin yang dipakai.
+    const gudang = await this.acuanGudang();
+    const izinDipakai = await this.prisma.attendancePermit.findMany({
+      where: { usedShiftSessionId: { in: shifts.map((s) => s.id) } },
+      include: { grantedBy: { select: SAFE_PROFILE_SELECT } },
+    });
+    const titik = (
+      point: AttendancePoint,
+      shiftId: string,
+      at: Date | null,
+      lat: Prisma.Decimal | null,
+      lng: Prisma.Decimal | null,
+      photoUrl: string | null,
+      acuan: { lat: number; lng: number } | null,
+    ) => {
+      const izin = izinDipakai.find((p) => p.usedShiftSessionId === shiftId && p.point === point);
+      return {
+        at,
+        photoUrl,
+        latitude: lat == null ? null : Number(lat),
+        longitude: lng == null ? null : Number(lng),
+        distanceMeters: lat == null || lng == null || !acuan ? null : Math.round(distanceMeters({ lat: Number(lat), lng: Number(lng) }, acuan)),
+        acuanKosong: !acuan,
+        izin: izin ? { reason: izin.reason, grantedBy: izin.grantedBy.fullName } : null,
+      };
+    };
+
     return shifts.map((s) => ({
       id: s.id,
       businessDate: s.businessDate,
@@ -661,12 +847,19 @@ export class ShiftsService {
       status: s.status,
       openedAt: s.openedAt,
       closedAt: s.closedAt,
-      checkInPhotoUrl: s.checkInPhotoUrl,
-      checkInLatitude: s.checkInLatitude ? Number(s.checkInLatitude) : null,
-      checkInLongitude: s.checkInLongitude ? Number(s.checkInLongitude) : null,
-      checkOutPhotoUrl: s.checkOutPhotoUrl,
-      checkOutLatitude: s.checkOutLatitude ? Number(s.checkOutLatitude) : null,
-      checkOutLongitude: s.checkOutLongitude ? Number(s.checkOutLongitude) : null,
+      arrivedAt: s.arrivedAt,
+      returnedAt: s.returnedAt,
+      cashFloat: Number(s.cashFloat),
+      absen: {
+        berangkat: titik(AttendancePoint.DEPART, s.id, s.openedAt, s.checkInLatitude, s.checkInLongitude, s.checkInPhotoUrl, gudang),
+        tiba: titik(AttendancePoint.ARRIVE, s.id, s.arrivedAt, s.arrivalLatitude, s.arrivalLongitude, s.arrivalPhotoUrl, this.acuanBooth(s.booth)),
+        selesai: titik(AttendancePoint.FINISH, s.id, s.closedAt, s.checkOutLatitude, s.checkOutLongitude, s.checkOutPhotoUrl, this.acuanBooth(s.booth)),
+        kembali: titik(AttendancePoint.RETURN, s.id, s.returnedAt, s.returnLatitude, s.returnLongitude, s.returnPhotoUrl, gudang),
+      },
+      izinPulangAwal: (() => {
+        const izin = izinDipakai.find((p) => p.usedShiftSessionId === s.id && p.type === AttendancePermitType.EARLY_CHECKOUT);
+        return izin ? { reason: izin.reason, grantedBy: izin.grantedBy.fullName } : null;
+      })(),
       totalJualCup: cupByShiftId.get(s.id) ?? 0,
       adaSelisih: s.stockCount?.items.some((i) => i.discrepancyQty !== 0) ?? false,
       returStatus: s.stockReturns[0]?.status ?? null,
@@ -870,6 +1063,10 @@ export class ShiftsService {
       staffName: staff.fullName,
       status: shift.status,
       businessDate: shift.businessDate,
+      arrivedAt: shift.arrivedAt,
+      returnedAt: shift.returnedAt,
+      /// Uang jalan (BR-043) — sudah termasuk di setoran.expectedAmount (kas Tunai + uang jalan).
+      uangJalan: Number(shift.cashFloat),
       items,
       transaksi,
       totalPenjualan: kasTunai + kasQris,

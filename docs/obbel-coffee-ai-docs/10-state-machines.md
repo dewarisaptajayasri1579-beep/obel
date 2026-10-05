@@ -3,12 +3,17 @@
 ## 1. Shift
 ```text
 SCHEDULED
-  ↓ open
+  ↓ open = absen Berangkat di Gudang
 OPEN
+  · absen Tiba di Booth (arrived_at; wajib sebelum Check-Out)
   ↓ start closing (snapshot stok utk hitung fisik; status TETAP OPEN)
-  ↓ confirm checkout (wajib lokasi + foto + rekap stok/uang)
+  ↓ confirm checkout = absen Check-Out di Booth (lokasi + foto + jam selesai + rekap stok/uang)
 CLOSED
+  · absen Kembali di Gudang (returned_at) → approve Stok Kembali & Setor Uang terbuka,
+    Barista boleh Berangkat lagi
 ```
+Absen di tiap titik divalidasi radius & izin Admin (BR-042); status tidak bertambah — Tiba dan Kembali adalah
+penanda waktu di ShiftSession, bukan status.
 Alternative terminal: CANCELLED sebelum OPEN.
 
 Shift tetap OPEN sepanjang proses closing berlangsung (petugas masih boleh

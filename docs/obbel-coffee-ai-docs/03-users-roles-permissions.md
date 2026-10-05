@@ -49,6 +49,8 @@ client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini ma
 - mengirim restock;
 - menerima return;
 - melakukan adjustment dengan alasan wajib;
+- memberi izin absen Barista (di luar radius / pulang awal) dengan alasan, BR-042;
+- mengatur titik Gudang, radius & toleransi absen, dan uang jalan per Booth;
 - melihat sale dan laporan;
 - export laporan.
 

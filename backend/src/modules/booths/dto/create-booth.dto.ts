@@ -1,4 +1,4 @@
-import { IsLatitude, IsLongitude, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateBoothDto {
   @IsString()
@@ -27,4 +27,10 @@ export class CreateBoothDto {
   @IsOptional()
   @IsLongitude()
   longitude?: number;
+
+  /// Uang jalan (modal kembalian) per shift, Rupiah — disalin ke shift saat Berangkat (BR-043).
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  cashFloat?: number;
 }
