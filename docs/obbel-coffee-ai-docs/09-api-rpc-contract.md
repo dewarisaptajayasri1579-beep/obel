@@ -29,6 +29,12 @@ Return KPI global, Booth cards, actionable alerts.
 ### `get_owner_dashboard(period)`
 Read-only aggregate.
 
+### `get_stock_return_recap(period, booth_id?, product_id?)`
+Rekap Pengembalian Stok, Admin & Owner (read-only). `GET /reports/stock-return-recap?dateFrom&dateTo&boothId&productId`
+(tanggal `YYYY-MM-DD`, tanpa periode = semua), plus `/excel` dan `/pdf` dengan filter yang sama. Respons
+`{ booths: [{ boothId, boothName, rows: [{ productId, productName, ...angka }], subtotal }], total }`, dengan angka
+`jumlahDokumen, qtyDiajukan, qtyDiterima, selisih, rusak, gantiRugi, lainnya, menunggu`. Definisi di 12 §8a.
+
 ## 2. Mutation RPC — receive distribution
 ### `receive_distribution`
 Input:

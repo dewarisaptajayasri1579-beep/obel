@@ -99,6 +99,18 @@ Kolom:
 - staff;
 - status review optional.
 
+## 8a. Rekap Pengembalian Stok
+Stok yang dikembalikan Booth ke Gudang, satu baris per Booth × Produk, dengan subtotal per Booth dan grand total.
+Admin & Owner, export Excel/PDF. Rincian per kejadian selisih tetap di Rekap Stok Selisih.
+- Periode = tanggal shift (`shift_sessions.business_date`) Return itu; Return tanpa shift memakai tanggal diajukan
+  (Asia/Jakarta). Approve yang telat tidak memindahkan angka ke periode lain.
+- Dihitung: Return SUBMITTED, RECEIVED, DISCREPANCY. CANCELLED (dibatalkan atau digantikan revisi) tidak dihitung.
+- Dokumen, Diajukan, Diterima, Selisih hanya dari Return yang sudah diterima Gudang. Diterima = angka efektif setelah
+  Koreksi Penerimaan; Selisih = Diterima − Diajukan. Dokumen di subtotal/total = jumlah dokumen unik.
+- Rusak / Lainnya = selisih saat approve dengan Tindak Lanjut itu; Ganti Rugi = qty `staff_liabilities` Return itu.
+  Salah Hitung tidak punya kolom (qty yang dikoreksi sudah representasinya).
+- Menunggu = qty diajukan Return yang belum di-approve; tidak ikut kolom lain.
+
 ## 9. Owner attention rules
 Urutan:
 1. discrepancy qty/value terbesar;

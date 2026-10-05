@@ -176,3 +176,6 @@ Koordinat Gudang & Booth diatur, radius 100 m: Berangkat 1 km dari Gudang → `O
 
 ### AC-46 Uang jalan
 Booth ber-uang jalan Rp50.000, Barista Berangkat → shift `cashFloat` 50.000; jual Tunai 1 cup lalu Check-Out → `shift_cash_deposits.expected_amount` = harga + 50.000, `/shifts/pending-return` memuat `cashFloat` & `expectedCash` (BR-043). Test: `attendance-four-points.e2e-spec.ts`.
+
+### AC-47 Rekap Pengembalian Stok
+Return shift 30 Sep yang diajukan 1 Okt masuk rekap September; Return tanpa shift diajukan 1 Okt 00.30 WIB masuk Oktober; Return shift 1 Okt yang diajukan 20 Sep masuk Oktober. CANCELLED tidak dihitung; SUBMITTED hanya di Menunggu. Diterima memakai angka setelah Koreksi Penerimaan; Rusak/Lainnya/Ganti Rugi dirinci; subtotal Dokumen = dokumen unik. Filter produk berlaku, Owner bisa membaca, Barista 403, Excel memuat baris & grand total yang sama, PDF valid (12 §8a). Test: `stock-return-recap.e2e-spec.ts`.
