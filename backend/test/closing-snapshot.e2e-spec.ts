@@ -175,6 +175,44 @@ describe('Closing snapshot freshness (e2e)', () => {
     expect(sesudah.stokAwal).toBe(sebelum.stokAwal);
   });
 
+  /// Draft (PENDING) hanya bisa dibayar/dihapus selama shift-nya terbuka — Check-Out
+  /// ditolak selama masih ada, baik saat layar dibuka maupun saat konfirmasi (draft
+  /// bisa dibuat setelah layar dibuka). Draft dihapus lagi di akhir test.
+  it('checkout is rejected while the shift still has unpaid drafts', async () => {
+    const buatDraft = async () =>
+      (
+        await request(server())
+          .post('/sales/draft')
+          .set(staff())
+          .send({ idempotencyKey: randomUUID(), shiftSessionId, items: [{ productId, qty: 1 }] })
+          .expect(201)
+      ).body as { id: string; saleNo: string };
+    const hapusDraft = (id: string) => request(server()).delete(`/sales/${id}/draft`).set(staff()).expect(200);
+
+    const dibuat: string[] = [];
+    try {
+      const draft = await buatDraft();
+      dibuat.push(draft.id);
+      const ditolak = await request(server()).post(`/shifts/${shiftSessionId}/closing/start`).set(staff()).expect(400);
+      expect(ditolak.body.code).toBe('PENDING_DRAFTS_EXIST');
+      expect(ditolak.body.details.saleNos).toEqual([draft.saleNo]);
+      await hapusDraft(draft.id);
+      dibuat.length = 0;
+
+      // Layar dibuka tanpa draft, lalu draft dibuat sebelum konfirmasi.
+      const closing = await mulaiClosing();
+      const draftTelat = await buatDraft();
+      dibuat.push(draftTelat.id);
+      const res = await konfirmasi(expectedProduk(closing)).expect(400);
+      expect(res.body.code).toBe('PENDING_DRAFTS_EXIST');
+      const aktif = await request(server()).get('/shifts/active').set(staff()).expect(200);
+      expect(aktif.body.shiftSessionId).toBe(shiftSessionId);
+    } finally {
+      // Draft yang tertinggal (test gagal di tengah) bikin run berikutnya ikut gagal.
+      for (const id of dibuat) await request(server()).delete(`/sales/${id}/draft`).set(staff());
+    }
+  });
+
   it('confirming is rejected when stock changed after the screen was opened', async () => {
     const closing = await mulaiClosing();
     const dilihat = expectedProduk(closing);

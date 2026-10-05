@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Clock, ReceiptText } from "lucide-react";
 import { api, ApiError, type ActiveShift, type ShiftReport, type ClosingItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -56,6 +57,16 @@ function CheckoutContent() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sekarang, setSekarang] = useState(new Date());
+  /// Nomor draft transaksi shift ini yang belum dibayar — Check-Out ditolak backend
+  /// (PENDING_DRAFTS_EXIST) sampai semuanya dibayar atau dihapus di Kasir.
+  const [draftTertunda, setDraftTertunda] = useState<string[] | null>(null);
+
+  /// true kalau error-nya draft tertunda (layar beralih ke pemberitahuan draft).
+  function tanganiDraftTertunda(err: unknown): boolean {
+    if (!(err instanceof ApiError) || err.code !== "PENDING_DRAFTS_EXIST") return false;
+    setDraftTertunda((err.details?.saleNos as string[] | undefined) ?? []);
+    return true;
+  }
 
   /// Memuat laporan + snapshot penutupan. Dipanggil saat layar dibuka dan lagi
   /// kalau stok Booth berubah selagi layar ini terbuka (STOCK_CHANGED_DURING_CLOSING).
@@ -86,6 +97,7 @@ function CheckoutContent() {
         ),
       );
     } catch (err) {
+      if (tanganiDraftTertunda(err)) return;
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan shift.");
     } finally {
       setLoading(false);
@@ -141,6 +153,7 @@ function CheckoutContent() {
       toast.success("Check-Out berhasil. Sampai jumpa di shift berikutnya!");
       router.replace("/petugas/check-in");
     } catch (err) {
+      if (tanganiDraftTertunda(err)) return;
       if (err instanceof ApiError && err.code === "STOCK_CHANGED_DURING_CLOSING") {
         // Stok berubah sejak layar dibuka — kembali ke laporan dengan angka terbaru.
         toast.warning(err.message);
@@ -152,6 +165,32 @@ function CheckoutContent() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (draftTertunda) {
+    return (
+      <div className="min-h-screen bg-[#F7F9F6] max-w-md mx-auto">
+        <TopBar title="Setor & Pengembalian Stok" back="/petugas" />
+        <div className="px-6 py-16 flex flex-col items-center text-center gap-3">
+          <ReceiptText size={40} style={{ color: OBBEL.accentOrange }} />
+          <p className="font-extrabold text-lg text-slate-900">Masih Ada Draft Transaksi</p>
+          <p className="text-base text-slate-500 max-w-72">
+            Bayar atau hapus draft berikut di Kasir sebelum Check-Out. Draft yang tertinggal tidak bisa diurus lagi setelah shift ditutup.
+          </p>
+          {draftTertunda.length > 0 && (
+            <p className="font-bold text-slate-800">{draftTertunda.join(", ")}</p>
+          )}
+          <Link
+            href="/petugas/kasir"
+            className="mt-2 w-full max-w-72 flex items-center justify-center gap-2 rounded-full py-3.5 font-extrabold text-white"
+            style={{ backgroundColor: OBBEL.primaryDark }}
+          >
+            <ReceiptText size={18} />
+            Buka Kasir
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (loading || !shift || !report) {

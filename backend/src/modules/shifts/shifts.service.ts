@@ -326,6 +326,25 @@ export class ShiftsService {
   /// menandai closing sedang berjalan, bukan ShiftSession.status.
   /// Idempotent — kalau closing draft sudah ada, kembalikan yang itu
   /// (bukan bikin snapshot baru).
+  /// Draft (Sale PENDING) belum memotong stok dan hanya bisa dibayar/dihapus selama
+  /// shift-nya terbuka; kalau shift ditutup, draft itu yatim selamanya. Ditolak di
+  /// startClosing (layar Check-Out langsung memberi tahu) dan confirmClosing (draft
+  /// bisa dibuat setelah layar dibuka).
+  private async pastikanTidakAdaDraft(shiftSessionId: string) {
+    const drafts = await this.prisma.sale.findMany({
+      where: { shiftSessionId, status: SaleStatus.PENDING },
+      select: { id: true, saleNo: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (drafts.length > 0) {
+      throw new DomainError(
+        'PENDING_DRAFTS_EXIST',
+        `Masih ada ${drafts.length} draft transaksi (${drafts.map((d) => d.saleNo).join(', ')}). Bayar atau hapus dulu di Kasir sebelum Check-Out.`,
+        { saleIds: drafts.map((d) => d.id), saleNos: drafts.map((d) => d.saleNo) },
+      );
+    }
+  }
+
   async startClosing(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
 
@@ -340,6 +359,7 @@ export class ShiftsService {
     if (shift.status !== ShiftStatus.OPEN) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk memulai closing.');
     }
+    await this.pastikanTidakAdaDraft(shiftSessionId);
 
     const boothStocks = await this.prisma.boothStock.findMany({
       where: { boothId: shift.boothId },
@@ -423,6 +443,7 @@ export class ShiftsService {
     if (shift.status !== ShiftStatus.OPEN) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Shift harus berstatus OPEN untuk konfirmasi checkout.');
     }
+    await this.pastikanTidakAdaDraft(shiftSessionId);
 
     // Stok Booth harus masih sama dengan snapshot yang Petugas lihat di layar
     // (mis. Admin mengirim stok atau ada penjualan setelah layar dibuka) —
