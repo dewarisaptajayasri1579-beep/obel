@@ -64,7 +64,7 @@ function ProfilPerusahaanContent() {
       <Breadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Pengaturan" }, { label: "Profil Perusahaan" }]} />
 
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+        <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
           <Building2 className="w-4.5 h-4.5" />
         </div>
         <div>

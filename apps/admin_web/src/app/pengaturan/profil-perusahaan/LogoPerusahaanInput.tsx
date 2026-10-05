@@ -58,7 +58,7 @@ export function LogoPerusahaanInput({ value, onChange }: { value: string; onChan
       <span className="text-xs font-semibold text-slate-700 dark:text-fg-secondary select-none">Logo Perusahaan (opsional)</span>
 
       <div className="flex items-start gap-3">
-        <div className="relative w-32 h-20 rounded-xl overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center flex-shrink-0">
+        <div className="relative w-32 h-20 rounded-xl overflow-hidden border border-slate-200/90 dark:border-line bg-slate-50 dark:bg-surface-hover/40 flex items-center justify-center shrink-0">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="Pratinjau logo perusahaan" className="w-full h-full object-contain p-1.5" />
@@ -67,7 +67,7 @@ export function LogoPerusahaanInput({ value, onChange }: { value: string; onChan
           )}
           {mengunggah && (
             <div className="absolute inset-0 bg-white/70 dark:bg-black/50 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-[var(--brand-700)] animate-spin" />
+              <Loader2 className="w-5 h-5 text-(--brand-700) animate-spin" />
             </div>
           )}
         </div>

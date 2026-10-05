@@ -116,11 +116,11 @@ export const CommandPalette: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-24 sm:pt-32 px-4">
+    <div className="fixed inset-0 z-60 flex items-start justify-center pt-24 sm:pt-32 px-4">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsOpen(false)} />
       <div className="relative w-full max-w-xl glass-modal rounded-[28px] shadow-2xl z-10 overflow-hidden flex flex-col max-h-[70vh]">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200/60 dark:border-line flex-shrink-0">
-          <Search className="w-5 h-5 text-slate-400 dark:text-fg-muted flex-shrink-0" />
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200/60 dark:border-line shrink-0">
+          <Search className="w-5 h-5 text-slate-400 dark:text-fg-muted shrink-0" />
           <input
             ref={inputRef}
             value={query}
@@ -146,7 +146,7 @@ export const CommandPalette: React.FC = () => {
                     onClick={() => go(s.href)}
                     onMouseEnter={() => setActiveIndex(i)}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-colors cursor-pointer ${
-                      active ? "bg-[var(--brand-700)] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
+                      active ? "bg-(--brand-700) text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                     }`}
                   >
                     <span>{s.label}</span>
@@ -172,7 +172,7 @@ export const CommandPalette: React.FC = () => {
                     onClick={() => go(r.href)}
                     onMouseEnter={() => setActiveIndex(idx)}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors cursor-pointer ${
-                      active ? "bg-[var(--brand-700)] text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
+                      active ? "bg-(--brand-700) text-white" : "text-slate-700 dark:text-fg-secondary hover:bg-slate-100 dark:hover:bg-surface-hover"
                     }`}
                   >
                     <div className="min-w-0">
@@ -180,7 +180,7 @@ export const CommandPalette: React.FC = () => {
                       {r.subtitle && <p className={`text-xs truncate ${active ? "text-brand-100" : "text-slate-400 dark:text-fg-muted"}`}>{r.subtitle}</p>}
                     </div>
                     <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
                         active ? "bg-white/20" : "bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-fg-muted"
                       }`}
                     >
@@ -197,7 +197,7 @@ export const CommandPalette: React.FC = () => {
           )}
         </div>
 
-        <div className="px-5 py-2.5 border-t border-slate-200/60 dark:border-line flex items-center gap-4 text-[11px] text-slate-400 dark:text-fg-muted font-medium flex-shrink-0">
+        <div className="px-5 py-2.5 border-t border-slate-200/60 dark:border-line flex items-center gap-4 text-[11px] text-slate-400 dark:text-fg-muted font-medium shrink-0">
           <span>
             <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-surface-hover border border-slate-200 dark:border-line-strong font-mono">↑↓</kbd> navigasi
           </span>

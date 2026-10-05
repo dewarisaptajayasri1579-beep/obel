@@ -152,7 +152,7 @@ export function TabPengaturan({
             value={draft.minimumQty}
             onChange={(e) => setDraftField(p.id, "minimumQty", e.target.value)}
             onBlur={() => simpanField(p, "minimumQty", "minimumQty")}
-            className="w-16 text-center rounded-lg border border-slate-200/90 dark:border-line bg-white/90 dark:bg-surface h-8 text-xs font-semibold text-slate-800 dark:text-fg outline-none tabular-nums focus:border-[var(--brand-700)]"
+            className="w-16 text-center rounded-lg border border-slate-200/90 dark:border-line bg-white/90 dark:bg-surface h-8 text-xs font-semibold text-slate-800 dark:text-fg outline-none tabular-nums focus:border-(--brand-700)"
           />
         </td>
 
@@ -163,13 +163,13 @@ export function TabPengaturan({
             value={draft.criticalQty}
             onChange={(e) => setDraftField(p.id, "criticalQty", e.target.value)}
             onBlur={() => simpanField(p, "criticalQty", "criticalQty")}
-            className="w-16 text-center rounded-lg border border-slate-200/90 dark:border-line bg-white/90 dark:bg-surface h-8 text-xs font-semibold text-rose-600 dark:text-rose-400 outline-none tabular-nums focus:border-[var(--brand-700)]"
+            className="w-16 text-center rounded-lg border border-slate-200/90 dark:border-line bg-white/90 dark:bg-surface h-8 text-xs font-semibold text-rose-600 dark:text-rose-400 outline-none tabular-nums focus:border-(--brand-700)"
           />
         </td>
 
         <td className="py-2.5 px-3 text-center w-14">
           {menyimpan && (
-            <span className="inline-block w-3.5 h-3.5 border-2 border-slate-300 dark:border-line border-t-[var(--brand-700)] rounded-full animate-spin" />
+            <span className="inline-block w-3.5 h-3.5 border-2 border-slate-300 dark:border-line border-t-(--brand-700) rounded-full animate-spin" />
           )}
         </td>
       </tr>
@@ -179,7 +179,7 @@ export function TabPengaturan({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 flex items-center justify-center flex-shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
+        <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-500/20 shadow-2xs">
           <Settings className="w-4.5 h-4.5" />
         </div>
         <div>

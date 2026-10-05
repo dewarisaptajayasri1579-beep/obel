@@ -57,14 +57,14 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; activeHref
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
           {Icon && (
-            <span className={`flex-shrink-0 ${activeChild ? "text-white" : "text-slate-400"}`}>
+            <span className={`shrink-0 ${activeChild ? "text-white" : "text-slate-400"}`}>
               <Icon className="w-4 h-4" />
             </span>
           )}
           {!isCollapsed && (
             <>
               <span className="truncate flex-1 text-left text-sm font-semibold">{item.label}</span>
-              <ChevronDown className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </>
           )}
         </button>
@@ -111,7 +111,7 @@ const SidebarNavItem: React.FC<{ item: NavItem; isCollapsed: boolean; activeHref
       } ${isCollapsed ? "justify-center px-0" : ""}`}
     >
       {Icon && (
-        <span className={`flex-shrink-0 ${isActive ? "text-white" : "text-slate-400"}`}>
+        <span className={`shrink-0 ${isActive ? "text-white" : "text-slate-400"}`}>
           <Icon className="w-4 h-4" />
         </span>
       )}
@@ -178,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
       // sebagai hijau redup; ditutup hitam di ujung bawah membuat sidebar
       // terasa gelap tanpa membuat brand-700 di puncaknya ikut digelapkan
       // (yang akan mengubah IDENTITAS warnanya, bukan cuma kesan gelapnya).
-      className={`hidden lg:flex fixed top-0 left-0 bottom-0 z-40 flex-col justify-between transition-all duration-300 select-none bg-gradient-to-b from-brand-800 via-brand-900 to-black text-white shadow-2xl border-r border-black/30 dark:bg-none dark:bg-[var(--sidebar-bg)] dark:border-r dark:border-[var(--line)] dark:shadow-none ${
+      className={`hidden lg:flex fixed top-0 left-0 bottom-0 z-40 flex-col justify-between transition-all duration-300 select-none bg-linear-to-b from-brand-800 via-brand-900 to-black text-white shadow-2xl border-r border-black/30 dark:bg-none dark:bg-(--sidebar-bg) dark:border-r dark:border-(--line) dark:shadow-none ${
         isCollapsed ? "w-20" : "w-64"
       } ${className}`}
     >

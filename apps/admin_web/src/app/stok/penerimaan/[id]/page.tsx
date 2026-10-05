@@ -13,7 +13,7 @@ import { PenerimaanForm } from "../PenerimaanForm";
 
 const STATUS_LABEL: Record<StockReceipt["status"], { label: string; kelas: string }> = {
   DRAFT: { label: "Draft", kelas: "bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line" },
-  POSTED: { label: "Posted", kelas: "bg-brand-50 dark:bg-brand-500/10 text-[var(--brand-700)] dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
+  POSTED: { label: "Posted", kelas: "bg-brand-50 dark:bg-brand-500/10 text-(--brand-700) dark:text-brand-400 border-brand-200 dark:border-brand-500/20" },
   REVISED: { label: "Revised", kelas: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40" },
 };
 
@@ -53,12 +53,12 @@ function DetailPenerimaanContent({ id }: { id: string }) {
         <div className="flex items-start gap-3">
           <Link
             href="/stok/penerimaan"
-            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center flex-shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-2xs flex items-center justify-center shrink-0 text-slate-600 dark:text-fg-muted hover:text-slate-900 dark:hover:text-fg transition-colors"
             aria-label="Kembali ke daftar Tambah Stok Gudang"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <PackagePlus className="w-5 h-5 text-[var(--brand-700)] dark:text-brand-400 mt-1.5 flex-shrink-0" />
+          <PackagePlus className="w-5 h-5 text-(--brand-700) dark:text-brand-400 mt-1.5 shrink-0" />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-fg tracking-tight">
@@ -88,11 +88,11 @@ function DetailPenerimaanContent({ id }: { id: string }) {
         )}
       </div>
 
-      <Card variant="solid" padding="md" className="!rounded-xl !shadow-2xs">
+      <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs!">
         {tidakAda ? (
           <div className="py-10 text-center text-sm text-slate-500 dark:text-fg-muted">
             Dokumen tidak ditemukan.{" "}
-            <Link href="/stok/penerimaan" className="font-semibold text-[var(--brand-700)] hover:underline">
+            <Link href="/stok/penerimaan" className="font-semibold text-(--brand-700) hover:underline">
               Kembali ke daftar
             </Link>
           </div>

@@ -17,7 +17,7 @@ import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 import { PenerimaanLivePreview } from "./PenerimaanLivePreview";
 import { PenerimaanActivityLog } from "./PenerimaanActivityLog";
 
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 const TANPA_KATEGORI = "Tanpa Kategori";
 

@@ -21,7 +21,7 @@ type Option = { value: string; label: string };
 
 // Field & label pemadat — bawaan Input/Select/CurrencyInput sizeVariant="lg"
 // (56px) terlalu tinggi untuk form isian panjang.
-const COMPACT_FIELD = "!text-xs !h-8.5 !min-h-8.5 !rounded-lg !bg-white dark:!bg-surface shadow-2xs";
+const COMPACT_FIELD = "text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs";
 const COMPACT_LABEL = "text-[11px] font-semibold text-slate-700 dark:text-fg-secondary select-none";
 
 /// Form Produk — satu komponen untuk Tambah & Edit, dipakai dua halaman
