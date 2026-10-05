@@ -12,6 +12,7 @@ import { StockReceiptReportService, type FilterLaporanPenerimaan } from './stock
 import { StockHandoverReportService, type FilterLaporanSerahTerima, type StockHandoverStatus } from './stock-handover-report.service';
 import { StockDiscrepancyReportService, type FilterLaporanStokSelisih } from './stock-discrepancy-report.service';
 import { SalesReportService, type FilterLaporanKasir } from './sales-report.service';
+import { StockReturnRecapReportService, type FilterRekapPengembalian } from './stock-return-recap-report.service';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,6 +24,7 @@ export class ReportsController {
     private readonly stockHandoverReport: StockHandoverReportService,
     private readonly stockDiscrepancyReport: StockDiscrepancyReportService,
     private readonly salesReport: SalesReportService,
+    private readonly stockReturnRecapReport: StockReturnRecapReportService,
   ) {}
 
   /// Nama berkas memuat tanggal Asia/Jakarta supaya unduhan berturut-turut
@@ -243,6 +245,74 @@ export class ReportsController {
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${this.namaBerkas('stok-selisih', 'pdf')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  private filterRekapPengembalianDari(
+    dateFrom?: string,
+    dateTo?: string,
+    boothId?: string,
+    productId?: string,
+    dicetakOleh?: string,
+  ): FilterRekapPengembalian {
+    const tanggal = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined);
+    return {
+      dateFrom: tanggal(dateFrom),
+      dateTo: tanggal(dateTo),
+      boothId: boothId || undefined,
+      productId: productId || undefined,
+      dicetakOleh,
+    };
+  }
+
+  @Get('stock-return-recap')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async rekapPengembalianData(
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('boothId') boothId?: string,
+    @Query('productId') productId?: string,
+  ) {
+    return this.stockReturnRecapReport.data(this.filterRekapPengembalianDari(dateFrom, dateTo, boothId, productId));
+  }
+
+  @Get('stock-return-recap/excel')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async rekapPengembalianExcel(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('boothId') boothId?: string,
+    @Query('productId') productId?: string,
+  ) {
+    const buffer = await this.stockReturnRecapReport.excel(
+      this.filterRekapPengembalianDari(dateFrom, dateTo, boothId, productId, user.username),
+    );
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${this.namaBerkas('rekap-pengembalian-stok', 'xlsx')}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get('stock-return-recap/pdf')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  async rekapPengembalianPdf(
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: JwtPayload,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('boothId') boothId?: string,
+    @Query('productId') productId?: string,
+  ) {
+    const buffer = await this.stockReturnRecapReport.pdf(
+      this.filterRekapPengembalianDari(dateFrom, dateTo, boothId, productId, user.username),
+    );
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${this.namaBerkas('rekap-pengembalian-stok', 'pdf')}"`,
     });
     return new StreamableFile(buffer);
   }
