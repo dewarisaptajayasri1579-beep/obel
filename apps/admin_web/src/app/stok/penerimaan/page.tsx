@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type StockReceipt } from "@/lib/api-client";
 import { usePersistedFilter } from "@/lib/use-persisted-filter";
+import { useAccess } from "@/lib/auth-context";
 import { PenerimaanReportPreviewModal } from "./PenerimaanReportPreviewModal";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 
@@ -50,6 +51,7 @@ function tanggalJakarta(iso: string) {
 
 function PenerimaanContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [receipts, setReceipts] = useState<StockReceipt[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -181,11 +183,13 @@ function PenerimaanContent() {
           </div>
         </div>
 
-        <Link href="/stok/penerimaan/baru">
-          <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-            Tambah
-          </Button>
-        </Link>
+        {canManage("TAMBAH_STOK_GUDANG") && (
+          <Link href="/stok/penerimaan/baru">
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
+              Tambah
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -436,7 +440,7 @@ function PenerimaanContent() {
                                 <span>Cetak Nota</span>
                               </button>
 
-                              {r.status === "DRAFT" && (
+                              {canManage("TAMBAH_STOK_GUDANG") && r.status === "DRAFT" && (
                                 <>
                                   <div className="my-1 border-t border-slate-100 dark:border-line" />
                                   <button

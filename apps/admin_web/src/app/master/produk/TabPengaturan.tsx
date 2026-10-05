@@ -5,6 +5,7 @@ import { Settings } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { formatThousands, parseDigits } from "@/components/ui/CurrencyInput";
 import { api, ApiError, type Product } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 
 function angka(n: number) {
   return n.toLocaleString("id-ID");
@@ -46,6 +47,8 @@ export function TabPengaturan({
   onReload: () => Promise<void>;
 }) {
   const toast = useToast();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("PRODUK");
   const [drafts, setDrafts] = useState<Map<string, Draft>>(new Map());
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -95,7 +98,7 @@ export function TabPengaturan({
   /// memicu request percuma.
   async function simpanField(p: Product, field: keyof Draft, apiField: "sellPrice" | "minimumQty" | "criticalQty") {
     const draft = drafts.get(p.id);
-    if (!draft) return;
+    if (!draft || !bolehKelola) return;
     const parsed = Math.max(0, Math.trunc(Number(draft[field]) || 0));
     if (parsed === p[apiField]) {
       setDraftField(p.id, field, String(parsed));
@@ -131,6 +134,7 @@ export function TabPengaturan({
             <input
               type="text"
               inputMode="numeric"
+              disabled={!bolehKelola}
               value={formatThousands(Number(draft.sellPrice) || 0)}
               onChange={(e) => setDraftField(p.id, "sellPrice", String(parseDigits(e.target.value)))}
               onBlur={() => simpanField(p, "sellPrice", "sellPrice")}
@@ -149,6 +153,7 @@ export function TabPengaturan({
           <input
             type="number"
             min={0}
+            disabled={!bolehKelola}
             value={draft.minimumQty}
             onChange={(e) => setDraftField(p.id, "minimumQty", e.target.value)}
             onBlur={() => simpanField(p, "minimumQty", "minimumQty")}
@@ -160,6 +165,7 @@ export function TabPengaturan({
           <input
             type="number"
             min={0}
+            disabled={!bolehKelola}
             value={draft.criticalQty}
             onChange={(e) => setDraftField(p.id, "criticalQty", e.target.value)}
             onBlur={() => simpanField(p, "criticalQty", "criticalQty")}
@@ -186,7 +192,8 @@ export function TabPengaturan({
           <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-fg tracking-tight leading-tight">Pengaturan</h1>
           <p className="text-xs text-slate-500 dark:text-fg-muted font-normal mt-0.5">
             Harga jual & default batas Stok Menipis/Kritis per produk, berlaku ke seluruh booth. Booth tertentu bisa
-            dikustomisasi lewat halaman Threshold Stok Booth. Perubahan tersimpan otomatis.
+            dikustomisasi lewat halaman Threshold Stok Booth.{" "}
+            {bolehKelola ? "Perubahan tersimpan otomatis." : "Anda hanya punya akses Lihat."}
           </p>
         </div>
       </div>

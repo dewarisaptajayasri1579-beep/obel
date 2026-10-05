@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 
 /// Sisi gambar yang disimpan (piksel). Foto produk cuma dipakai sebagai penanda
 /// visual di daftar dan form — 800px sudah lebih dari cukup, sementara foto
@@ -48,6 +49,7 @@ export function FotoProdukInput({
   onChange: (url: string) => void;
   labelClassName?: string;
 }) {
+  const { canManage } = useAccess();
   const inputRef = useRef<HTMLInputElement>(null);
   const [mengunggah, setMengunggah] = useState(false);
   const [error, setError] = useState("");
@@ -91,37 +93,39 @@ export function FotoProdukInput({
           )}
         </div>
 
-        <div className="flex flex-col gap-1.5 pt-0.5">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={mengunggah}
-              className="h-8 px-3 rounded-lg border border-slate-200/80 dark:border-line bg-white dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-700 dark:text-fg text-xs font-semibold shadow-2xs cursor-pointer transition-colors disabled:opacity-50"
-            >
-              {value ? "Ganti Foto" : "Pilih Foto"}
-            </button>
-            {value && (
+        {canManage("PRODUK") && (
+          <div className="flex flex-col gap-1.5 pt-0.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  onChange("");
-                  setError("");
-                }}
+                onClick={() => inputRef.current?.click()}
                 disabled={mengunggah}
-                className="h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                className="h-8 px-3 rounded-lg border border-slate-200/80 dark:border-line bg-white dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-700 dark:text-fg text-xs font-semibold shadow-2xs cursor-pointer transition-colors disabled:opacity-50"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Hapus
+                {value ? "Ganti Foto" : "Pilih Foto"}
               </button>
-            )}
+              {value && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("");
+                    setError("");
+                  }}
+                  disabled={mengunggah}
+                  className="h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400 dark:text-fg-muted max-w-xs">
+              Dipotong otomatis jadi 1:1 (tengah) dan diperkecil sebelum diunggah, jadi foto dari HP
+              boleh langsung dipakai.
+            </p>
+            {error && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-fg-muted max-w-xs">
-            Dipotong otomatis jadi 1:1 (tengah) dan diperkecil sebelum diunggah, jadi foto dari HP
-            boleh langsung dipakai.
-          </p>
-          {error && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
-        </div>
+        )}
       </div>
 
       {/* `tabIndex={-1}`: alur Enter di form ini melompati isian yang tidak bisa

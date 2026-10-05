@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Save } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +14,8 @@ import { LogoPerusahaanInput } from "./LogoPerusahaanInput";
 
 function ProfilPerusahaanContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("PROFIL_PERUSAHAAN");
   const [profil, setProfil] = useState<CompanyProfile | null>(null);
   const [name, setName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -102,11 +105,13 @@ function ProfilPerusahaanContent() {
 
           <Input label="Telepon (opsional)" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="mis. 0812xxxxxxx" />
 
-          <div className="flex justify-end pt-1">
-            <Button variant="primary" size="sm" leftIcon={<Save className="w-3.5 h-3.5" />} onClick={simpan} isLoading={menyimpan}>
-              Simpan
-            </Button>
-          </div>
+          {bolehKelola && (
+            <div className="flex justify-end pt-1">
+              <Button variant="primary" size="sm" leftIcon={<Save className="w-3.5 h-3.5" />} onClick={simpan} isLoading={menyimpan}>
+                Simpan
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -29,6 +30,8 @@ function ShiftTemplateContent() {
   const [templates, setTemplates] = useState<ShiftTemplate[] | null>(null);
 
   const [modalMode, setModalMode] = useState<FormMode | null>(null);
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("SHIFT");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM_KOSONG);
   const [saving, setSaving] = useState(false);
@@ -121,9 +124,11 @@ function ShiftTemplateContent() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-fg">Master Shift</h1>
           <p className="text-sm text-slate-500 dark:text-fg-muted">Kelola template jam shift Barista.</p>
         </div>
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={bukaTambah}>
-          Tambah Shift
-        </Button>
+        {bolehKelola && (
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={bukaTambah}>
+            Tambah Shift
+          </Button>
+        )}
       </div>
 
       {!templates ? (
@@ -155,26 +160,28 @@ function ShiftTemplateContent() {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" leftIcon={<Pencil className="w-3.5 h-3.5" />} onClick={() => bukaEdit(t)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        leftIcon={<Power className="w-3.5 h-3.5" />}
-                        isLoading={togglingId === t.id}
-                        onClick={() => toggleAktif(t)}
-                      >
-                        {t.active ? "Nonaktifkan" : "Aktifkan"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-                        onClick={() => setHapusTarget(t)}
-                      >
-                        Hapus
-                      </Button>
-                    </div>
+                    {bolehKelola && (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" leftIcon={<Pencil className="w-3.5 h-3.5" />} onClick={() => bukaEdit(t)}>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          leftIcon={<Power className="w-3.5 h-3.5" />}
+                          isLoading={togglingId === t.id}
+                          onClick={() => toggleAktif(t)}
+                        >
+                          {t.active ? "Nonaktifkan" : "Aktifkan"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                          onClick={() => setHapusTarget(t)}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

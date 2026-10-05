@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { io, type Socket } from "socket.io-client";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
@@ -264,6 +265,7 @@ function KartuBooth({ booth, dipilih, onClick }: { booth: BoothAktifCard; dipili
 }
 
 function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date; onClose: () => void }) {
+  const { canManage } = useAccess();
   const trend =
     booth.cupSoldYesterday > 0
       ? Math.round(((booth.cupSoldToday - booth.cupSoldYesterday) / booth.cupSoldYesterday) * 100)
@@ -409,6 +411,7 @@ function PanelDetail({ booth, now, onClose }: { booth: BoothAktifCard; now: Date
         )}
 
         {perluKirimStok &&
+          canManage("SERAH_TERIMA_STOK") &&
           (sedangKirimStok ? (
             <button
               type="button"
@@ -452,6 +455,7 @@ const INTERVAL_OPTIONS = [15, 30, 60, 180, 300] as const;
 
 function BoothAktifContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [data, setData] = useState<BoothAktifCard[] | null>(null);
   const [status, setStatus] = useState<SocketStatus>("connecting");
   const [now, setNow] = useState(new Date());
@@ -658,7 +662,7 @@ function BoothAktifContent() {
                   <select
                     value={gpsIntervalDetik ?? ""}
                     onChange={(e) => ubahIntervalGps(Number(e.target.value))}
-                    disabled={gpsIntervalDetik === null}
+                    disabled={gpsIntervalDetik === null || !canManage("BOOTH_AKTIF")}
                     className="h-7 rounded-lg border border-slate-200/90 dark:border-line bg-white dark:bg-surface px-2 text-xs font-bold text-slate-700 dark:text-fg-secondary cursor-pointer disabled:opacity-50"
                   >
                     {INTERVAL_OPTIONS.map((detik) => (

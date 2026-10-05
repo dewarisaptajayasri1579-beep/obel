@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ShoppingCart, MapPin, Printer, Ban, Pencil, Undo2, CreditCard, Image as ImageIcon } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -74,6 +75,7 @@ function ImpactPreview({ impact }: { impact: SaleCorrectionImpact }) {
 }
 
 function DetailTransaksiKasirContent({ id }: { id: string }) {
+  const { canManage } = useAccess();
   const toast = useToast();
   const [detail, setDetail] = useState<SaleDetail | null>(null);
   const [tidakAda, setTidakAda] = useState(false);
@@ -519,7 +521,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
               </div>
             )}
 
-            {!mode && detail.status === "PAID" && (
+            {!mode && detail.status === "PAID" && canManage("KASIR") && (
               <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
                 <Button variant="danger" leftIcon={<Ban className="w-4 h-4" />} onClick={loadVoidPreview}>
                   Batalkan Transaksi

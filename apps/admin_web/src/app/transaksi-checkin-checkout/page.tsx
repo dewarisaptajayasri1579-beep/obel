@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -179,6 +180,7 @@ function SelTitik({ t, acuan, onOpen }: { t: TitikAbsen; acuan: string; onOpen: 
 
 function TransaksiCheckinCheckoutContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [rows, setRows] = useState<ShiftAdminHistoryItem[] | null>(null);
   const [booths, setBooths] = useState<Booth[]>([]);
   const [staffList, setStaffList] = useState<UserAccount[]>([]);
@@ -304,9 +306,11 @@ function TransaksiCheckinCheckoutContent() {
             </p>
           </div>
         </div>
-        <Button variant="primary" size="sm" leftIcon={<ShieldCheck className="w-3.5 h-3.5" />} onClick={bukaIzin}>
-          Beri Izin Absen
-        </Button>
+        {canManage("CHECKIN_CHECKOUT") && (
+          <Button variant="primary" size="sm" leftIcon={<ShieldCheck className="w-3.5 h-3.5" />} onClick={bukaIzin}>
+            Beri Izin Absen
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

@@ -25,6 +25,7 @@ import { PortalMenu } from "@/components/ui/PortalMenu";
 import { useToast } from "@/components/ui/Toast";
 import { useColumnVisibility, type ColumnDef } from "@/lib/use-column-visibility";
 import { useHotkey } from "@/hooks/useHotkey";
+import { useAccess } from "@/lib/auth-context";
 import { api, ApiError, type Booth } from "@/lib/api-client";
 
 function angka(n: number) {
@@ -55,6 +56,8 @@ const OPSI_STATUS = [
 export function TabMain({ booths, onReload }: { booths: Booth[]; onReload: () => Promise<void> }) {
   const toast = useToast();
   const router = useRouter();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("BOOTH");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -165,7 +168,9 @@ export function TabMain({ booths, onReload }: { booths: Booth[]; onReload: () =>
   const linkBaru = `/master/booth/baru${kembaliKe ? `?${kembaliKe}` : ""}`;
   const linkEdit = (id: string) => `/master/booth/${id}/edit${kembaliKe ? `?${kembaliKe}` : ""}`;
 
-  useHotkey({ key: "n", ctrl: true, allowInEditable: true }, () => router.push(linkBaru));
+  useHotkey({ key: "n", ctrl: true, allowInEditable: true }, () => {
+    if (bolehKelola) router.push(linkBaru);
+  });
 
   async function toggleAktif(b: Booth) {
     setTogglingId(b.id);
@@ -240,11 +245,13 @@ export function TabMain({ booths, onReload }: { booths: Booth[]; onReload: () =>
           </div>
         </div>
 
-        <Link href={linkBaru}>
-          <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-            Tambah Booth <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
-          </Button>
-        </Link>
+        {bolehKelola && (
+          <Link href={linkBaru}>
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
+              Tambah Booth <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {adaPenyaring && (
@@ -452,63 +459,65 @@ export function TabMain({ booths, onReload }: { booths: Booth[]; onReload: () =>
                     )}
                     {tampil("action") && (
                       <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center">
-                          {/* `data-action-menu` WAJIB ada — sama seperti pola di Produk,
-                              penutup-saat-klik-di-luar memeriksanya. */}
-                          <div className="relative" data-action-menu>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const buka = actionMenuRowId !== b.id;
-                                setActionMenuAnchor(buka ? e.currentTarget : null);
-                                setActionMenuRowId(buka ? b.id : null);
-                              }}
-                              className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
-                                actionMenuRowId === b.id
-                                  ? "bg-brand-50 text-(--brand-700) border-brand-300"
-                                  : "bg-white/80 dark:bg-surface hover:bg-slate-50"
-                              }`}
-                              title="Aksi Lainnya"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            <PortalMenu
-                              open={actionMenuRowId === b.id}
-                              anchor={actionMenuAnchor}
-                              width={200}
-                              onClose={() => setActionMenuRowId(null)}
-                              className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
-                            >
-                              <Link
-                                href={linkEdit(b.id)}
-                                onClick={() => setActionMenuRowId(null)}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-(--brand-700)" />
-                                <span>Edit Booth</span>
-                              </Link>
-
+                        {bolehKelola && (
+                          <div className="flex items-center justify-center">
+                            {/* `data-action-menu` WAJIB ada — sama seperti pola di Produk,
+                                penutup-saat-klik-di-luar memeriksanya. */}
+                            <div className="relative" data-action-menu>
                               <button
                                 type="button"
-                                disabled={togglingId === b.id}
-                                onClick={() => {
-                                  setActionMenuRowId(null);
-                                  toggleAktif(b);
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const buka = actionMenuRowId !== b.id;
+                                  setActionMenuAnchor(buka ? e.currentTarget : null);
+                                  setActionMenuRowId(buka ? b.id : null);
                                 }}
-                                className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
-                                  b.status === "ACTIVE"
-                                    ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                                    : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
+                                className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
+                                  actionMenuRowId === b.id
+                                    ? "bg-brand-50 text-(--brand-700) border-brand-300"
+                                    : "bg-white/80 dark:bg-surface hover:bg-slate-50"
                                 }`}
+                                title="Aksi Lainnya"
                               >
-                                <Power className="w-3.5 h-3.5" />
-                                <span>{b.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}</span>
+                                <MoreVertical className="w-4 h-4" />
                               </button>
-                            </PortalMenu>
+
+                              <PortalMenu
+                                open={actionMenuRowId === b.id}
+                                anchor={actionMenuAnchor}
+                                width={200}
+                                onClose={() => setActionMenuRowId(null)}
+                                className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
+                              >
+                                <Link
+                                  href={linkEdit(b.id)}
+                                  onClick={() => setActionMenuRowId(null)}
+                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-(--brand-700)" />
+                                  <span>Edit Booth</span>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  disabled={togglingId === b.id}
+                                  onClick={() => {
+                                    setActionMenuRowId(null);
+                                    toggleAktif(b);
+                                  }}
+                                  className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
+                                    b.status === "ACTIVE"
+                                      ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                      : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
+                                  }`}
+                                >
+                                  <Power className="w-3.5 h-3.5" />
+                                  <span>{b.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}</span>
+                                </button>
+                              </PortalMenu>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </td>
                     )}
                   </tr>

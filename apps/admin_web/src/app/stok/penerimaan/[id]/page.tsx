@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type Product, type StockReceipt } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { PenerimaanForm } from "../PenerimaanForm";
 
 const STATUS_LABEL: Record<StockReceipt["status"], { label: string; kelas: string }> = {
@@ -19,6 +20,7 @@ const STATUS_LABEL: Record<StockReceipt["status"], { label: string; kelas: strin
 
 function DetailPenerimaanContent({ id }: { id: string }) {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [receipt, setReceipt] = useState<StockReceipt | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
   const [tidakAda, setTidakAda] = useState(false);
@@ -80,7 +82,7 @@ function DetailPenerimaanContent({ id }: { id: string }) {
             </p>
           </div>
         </div>
-        {receipt?.status === "DRAFT" && (
+        {receipt?.status === "DRAFT" && canManage("TAMBAH_STOK_GUDANG") && (
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-fg-muted">
             <Keyboard className="w-3.5 h-3.5" />
             Ctrl+S Simpan Draft · Ctrl+Enter Posting

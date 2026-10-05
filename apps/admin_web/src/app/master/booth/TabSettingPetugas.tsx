@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
+import { useAccess } from "@/lib/auth-context";
 import {
   api,
   ApiError,
@@ -43,6 +44,7 @@ interface PeringatanShiftAktif {
 
 export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
   const [petugas, setPetugas] = useState<UserAccount[]>([]);
   const [assignments, setAssignments] = useState<BoothShiftAssignment[] | null>(null);
@@ -223,6 +225,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                                 options={opsiPetugasUntuk(b.id, t.id)}
                                 value={assignmentByKey.get(key) ?? ""}
                                 onChange={(v) => pilihPetugas(b.id, t.id, v)}
+                                disabled={!canManage("BOOTH")}
                                 placeholder="Belum ditugaskan"
                                 sizeVariant="sm"
                                 className="text-xs! h-8.5! min-h-8.5! rounded-lg! bg-white! dark:bg-surface! shadow-2xs"

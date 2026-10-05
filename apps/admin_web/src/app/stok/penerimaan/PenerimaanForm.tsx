@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useHotkey } from "@/hooks/useHotkey";
 import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError, type Product, type StockReceipt } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { randomUUID } from "@/lib/uuid";
 import { PenerimaanNotaPreviewModal } from "./PenerimaanNotaPreviewModal";
 import { PenerimaanLivePreview } from "./PenerimaanLivePreview";
@@ -64,7 +65,9 @@ export function PenerimaanForm({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const readOnly = !!initial && initial.status !== "DRAFT";
+  const bisaKelola = useAccess().canManage("TAMBAH_STOK_GUDANG");
+  const sudahFinal = !!initial && initial.status !== "DRAFT";
+  const readOnly = sudahFinal || !bisaKelola;
 
   const [receiptDate, setReceiptDate] = useState(initial?.receiptDate.slice(0, 10) ?? hariIni());
   const [note, setNote] = useState(initial?.note ?? "");
@@ -382,7 +385,7 @@ export function PenerimaanForm({
         </div>
       </div>
 
-      {readOnly && (
+      {sudahFinal && (
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface p-4 text-xs text-slate-600 dark:text-fg-muted space-y-1">
           <p>
             Diposting oleh <strong className="text-slate-800 dark:text-fg">{initial?.postedBy?.fullName ?? "-"}</strong>{" "}
@@ -413,6 +416,7 @@ export function PenerimaanForm({
             Ctrl+P Pratinjau · Ctrl+S Simpan Draft · Ctrl+Enter Posting
           </p>
         )}
+        {!bisaKelola && <p className="text-[11px] text-slate-500 dark:text-fg-muted">Anda hanya punya akses Lihat.</p>}
 
         <div className="flex items-center justify-end gap-2">
           <button
@@ -447,7 +451,7 @@ export function PenerimaanForm({
             </button>
           )}
 
-          {readOnly && initial?.status === "POSTED" && (
+          {bisaKelola && initial?.status === "POSTED" && (
             <button
               type="button"
               onClick={mulaiRevisi}

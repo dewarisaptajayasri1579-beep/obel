@@ -18,6 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Select } from "@/components/ui/Select";
@@ -89,6 +90,7 @@ function LaporanDetail({
   onChanged: () => void;
 }) {
   const toast = useToast();
+  const { canManage } = useAccess();
   const retur = report.retur;
   const setoran = report.setoran;
 
@@ -114,6 +116,7 @@ function LaporanDetail({
   // Stok & uang baru sampai saat Barista absen Kembali di Gudang (BR-042) — backend
   // menolak approve sebelum itu (BARISTA_NOT_RETURNED), tombolnya dikunci di sini.
   const belumKembali = report.status === "CLOSED" && !report.returnedAt;
+  const bolehKelola = canManage("SETOR_PENGEMBALIAN");
 
   async function approveRetur() {
     if (!retur) return;
@@ -235,7 +238,7 @@ function LaporanDetail({
               {RETUR_BADGE[retur.status].label}
             </span>
           )}
-          {retur && (retur.status === "RECEIVED" || retur.status === "DISCREPANCY") && (
+          {bolehKelola && retur && (retur.status === "RECEIVED" || retur.status === "DISCREPANCY") && (
             <Link
               href={`/return?id=${retur.id}&aksi=koreksi`}
               title="Koreksi angka penerimaan kalau ternyata salah catat"
@@ -356,7 +359,9 @@ function LaporanDetail({
               </table>
             </div>
 
-            {retur.status === "SUBMITTED" ? (
+            {retur.status === "SUBMITTED" && !bolehKelola ? (
+              <p className="text-xs text-slate-500 dark:text-fg-muted">Menunggu approve Admin. Anda hanya punya akses Lihat.</p>
+            ) : retur.status === "SUBMITTED" ? (
               <>
                 {returAdaBeda && !returTindakLanjutLengkap && (
                   <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 text-right">
@@ -471,7 +476,9 @@ function LaporanDetail({
               </div>
             )}
 
-            {setoran.status === "PENDING" ? (
+            {setoran.status === "PENDING" && !bolehKelola ? (
+              <p className="text-xs text-slate-500 dark:text-fg-muted">Menunggu approve Admin. Anda hanya punya akses Lihat.</p>
+            ) : setoran.status === "PENDING" ? (
               <>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 dark:text-fg-muted shrink-0">Diterima Admin</span>

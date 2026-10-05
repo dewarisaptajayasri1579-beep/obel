@@ -29,6 +29,7 @@ import { PortalMenu } from "@/components/ui/PortalMenu";
 import { useToast } from "@/components/ui/Toast";
 import { useColumnVisibility, type ColumnDef } from "@/lib/use-column-visibility";
 import { useHotkey } from "@/hooks/useHotkey";
+import { useAccess } from "@/lib/auth-context";
 import { api, ApiError, type Booth, type UserAccount } from "@/lib/api-client";
 
 function angka(n: number) {
@@ -64,6 +65,8 @@ export function TabMain({
   onReload: () => Promise<void>;
 }) {
   const toast = useToast();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("BARISTA");
   const router = useRouter();
 
   const [search, setSearch] = useState("");
@@ -180,7 +183,9 @@ export function TabMain({
   const linkBaru = `/master/petugas/baru${kembaliKe ? `?${kembaliKe}` : ""}`;
   const linkEdit = (id: string) => `/master/petugas/${id}/edit${kembaliKe ? `?${kembaliKe}` : ""}`;
 
-  useHotkey({ key: "n", ctrl: true, allowInEditable: true }, () => router.push(linkBaru));
+  useHotkey({ key: "n", ctrl: true, allowInEditable: true }, () => {
+    if (bolehKelola) router.push(linkBaru);
+  });
 
   async function toggleAktif(u: UserAccount) {
     setTogglingId(u.id);
@@ -270,11 +275,13 @@ export function TabMain({
           </div>
         </div>
 
-        <Link href={linkBaru}>
-          <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-            Tambah Barista <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
-          </Button>
-        </Link>
+        {bolehKelola && (
+          <Link href={linkBaru}>
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
+              Tambah Barista <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {adaPenyaring && (
@@ -476,75 +483,77 @@ export function TabMain({
                     {tampil("status") && <td className="py-3 px-3 text-center">{renderStatusBadge(u.active)}</td>}
                     {tampil("action") && (
                       <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center">
-                          {/* `data-action-menu` WAJIB ada — sama seperti pola di Produk/Booth. */}
-                          <div className="relative" data-action-menu>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const buka = actionMenuRowId !== u.id;
-                                setActionMenuAnchor(buka ? e.currentTarget : null);
-                                setActionMenuRowId(buka ? u.id : null);
-                              }}
-                              className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
-                                actionMenuRowId === u.id
-                                  ? "bg-brand-50 text-(--brand-700) border-brand-300"
-                                  : "bg-white/80 dark:bg-surface hover:bg-slate-50"
-                              }`}
-                              title="Aksi Lainnya"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            <PortalMenu
-                              open={actionMenuRowId === u.id}
-                              anchor={actionMenuAnchor}
-                              width={216}
-                              onClose={() => setActionMenuRowId(null)}
-                              className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
-                            >
-                              <Link
-                                href={linkEdit(u.id)}
-                                onClick={() => setActionMenuRowId(null)}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-(--brand-700)" />
-                                <span>Edit Barista</span>
-                              </Link>
-
+                        {bolehKelola && (
+                          <div className="flex items-center justify-center">
+                            {/* `data-action-menu` WAJIB ada — sama seperti pola di Produk/Booth. */}
+                            <div className="relative" data-action-menu>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setActionMenuRowId(null);
-                                  setResetTarget(u);
-                                  setNewPassword("");
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const buka = actionMenuRowId !== u.id;
+                                  setActionMenuAnchor(buka ? e.currentTarget : null);
+                                  setActionMenuRowId(buka ? u.id : null);
                                 }}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left cursor-pointer"
-                              >
-                                <KeyRound className="w-3.5 h-3.5 text-(--brand-700)" />
-                                <span>Reset Password</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={togglingId === u.id}
-                                onClick={() => {
-                                  setActionMenuRowId(null);
-                                  toggleAktif(u);
-                                }}
-                                className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
-                                  u.active
-                                    ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                                    : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
+                                className={`w-8 h-8 rounded-lg border border-slate-200/90 dark:border-line flex items-center justify-center text-slate-600 dark:text-fg-muted hover:text-(--brand-700) dark:hover:text-brand-400 shadow-2xs cursor-pointer transition-colors ${
+                                  actionMenuRowId === u.id
+                                    ? "bg-brand-50 text-(--brand-700) border-brand-300"
+                                    : "bg-white/80 dark:bg-surface hover:bg-slate-50"
                                 }`}
+                                title="Aksi Lainnya"
                               >
-                                <Power className="w-3.5 h-3.5" />
-                                <span>{u.active ? "Nonaktifkan" : "Aktifkan"}</span>
+                                <MoreVertical className="w-4 h-4" />
                               </button>
-                            </PortalMenu>
+
+                              <PortalMenu
+                                open={actionMenuRowId === u.id}
+                                anchor={actionMenuAnchor}
+                                width={216}
+                                onClose={() => setActionMenuRowId(null)}
+                                className="rounded-xl bg-white dark:bg-surface border border-slate-200/90 dark:border-line shadow-xl py-1.5 text-left"
+                              >
+                                <Link
+                                  href={linkEdit(u.id)}
+                                  onClick={() => setActionMenuRowId(null)}
+                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-(--brand-700)" />
+                                  <span>Edit Barista</span>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuRowId(null);
+                                    setResetTarget(u);
+                                    setNewPassword("");
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-fg hover:bg-slate-50 dark:hover:bg-surface-hover transition-colors text-left cursor-pointer"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-(--brand-700)" />
+                                  <span>Reset Password</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={togglingId === u.id}
+                                  onClick={() => {
+                                    setActionMenuRowId(null);
+                                    toggleAktif(u);
+                                  }}
+                                  className={`w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer disabled:opacity-50 ${
+                                    u.active
+                                      ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                      : "text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/20"
+                                  }`}
+                                >
+                                  <Power className="w-3.5 h-3.5" />
+                                  <span>{u.active ? "Nonaktifkan" : "Aktifkan"}</span>
+                                </button>
+                              </PortalMenu>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </td>
                     )}
                   </tr>

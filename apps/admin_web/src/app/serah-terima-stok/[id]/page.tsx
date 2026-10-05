@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Ban, Check, History, Printer, Truck, Wrench, X } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -74,6 +75,8 @@ function tanggalJakarta(iso: string) {
 type Mode = "approve" | "reject" | "cancel" | "revise" | "correct" | null;
 
 function DetailSerahTerimaContent({ id }: { id: string }) {
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("SERAH_TERIMA_STOK");
   const toast = useToast();
   const [detail, setDetail] = useState<StockHandover | null>(null);
   const [tidakAda, setTidakAda] = useState(false);
@@ -505,7 +508,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                     <span>Cetak Nota</span>
                   </button>
 
-                  {detail.status === "DIAJUKAN" && (
+                  {bolehKelola && detail.status === "DIAJUKAN" && (
                     <>
                       <Button leftIcon={<Check className="w-3.5 h-3.5" />} onClick={() => bukaMode("approve")}>
                         Setujui & Kirim
@@ -516,7 +519,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                     </>
                   )}
 
-                  {detail.status === "DIPROSES" && (
+                  {bolehKelola && detail.status === "DIPROSES" && (
                     <>
                       <Button variant="danger" leftIcon={<Ban className="w-3.5 h-3.5" />} onClick={() => bukaMode("cancel")}>
                         Batalkan
@@ -532,7 +535,7 @@ function DetailSerahTerimaContent({ id }: { id: string }) {
                     </>
                   )}
 
-                  {detail.status === "DITERIMA" && (
+                  {bolehKelola && detail.status === "DITERIMA" && (
                     <button
                       type="button"
                       onClick={() => bukaMode("correct")}

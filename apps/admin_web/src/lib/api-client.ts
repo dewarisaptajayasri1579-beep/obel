@@ -159,6 +159,59 @@ async function uploadPhoto(path: string, file: File): Promise<{ photoUrl: string
   return data as { photoUrl: string }
 }
 
+/// Kunci menu yang bisa diatur hak aksesnya (BR-044). Sumber kebenarannya
+/// backend `src/common/access/menus.ts` (label & grup diambil dari
+/// `GET /access-roles/menus`); di sini hanya kuncinya untuk type-check nav-config.
+export type MenuKey =
+  | "BOOTH_AKTIF"
+  | "DASHBOARD"
+  | "TAMBAH_STOK_GUDANG"
+  | "PEMUSNAHAN_STOK"
+  | "SERAH_TERIMA_STOK"
+  | "CHECKIN_CHECKOUT"
+  | "TERIMA_STOK"
+  | "KASIR"
+  | "SETOR_PENGEMBALIAN"
+  | "REKAP_STOK_SELISIH"
+  | "REKAP_PENGEMBALIAN"
+  | "PRODUK"
+  | "BOOTH"
+  | "BARISTA"
+  | "PROFIL_PERUSAHAAN"
+  | "ABSENSI"
+  | "SHIFT"
+  | "USER"
+
+export type AccessLevel = "VIEW" | "MANAGE"
+
+/// Hak akses efektif user (Owner: Lihat semua; Admin: sesuai peran; tanpa peran: kosong).
+export interface UserAccess {
+  roleName: string | null
+  levels: Partial<Record<MenuKey, AccessLevel>>
+}
+
+export interface MenuCatalogItem {
+  key: MenuKey
+  label: string
+  group: string
+}
+
+export interface AccessRole {
+  id: string
+  name: string
+  description: string | null
+  /// Peran sistem "Admin Pusat" — Kelola semua menu, tidak bisa diubah/dihapus.
+  fullAccess: boolean
+  permissions: { menu: MenuKey; level: AccessLevel }[]
+  _count: { profiles: number }
+}
+
+export interface SaveAccessRoleInput {
+  name: string
+  description?: string
+  permissions: { menu: MenuKey; level: AccessLevel }[]
+}
+
 export interface LoginResponse {
   accessToken: string
   profile: {
@@ -168,6 +221,7 @@ export interface LoginResponse {
     role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
     defaultBoothId: string | null
   }
+  access: UserAccess
 }
 
 export interface Booth {
@@ -463,6 +517,8 @@ export interface UserAccount {
    *  Petugas) — ini acuan status "sudah/belum ditugaskan" yang benar. */
   assignedBoothId: string | null
   active: boolean
+  /// Peran hak akses (hanya Admin, BR-044).
+  accessRole: { id: string; name: string } | null
 }
 
 export interface WarehouseStockItem {
@@ -1961,6 +2017,15 @@ export const api = {
     return res.blob()
   },
 
-  getMyProfile: () => request<UserAccount>("/users/me"),
+  getMyProfile: () => request<UserAccount & { access: UserAccess }>("/users/me"),
+
+  getAccessRoles: () => request<AccessRole[]>("/access-roles"),
+  getAccessMenus: () => request<MenuCatalogItem[]>("/access-roles/menus"),
+  createAccessRole: (input: SaveAccessRoleInput) => request<AccessRole>("/access-roles", { method: "POST", body: input }),
+  updateAccessRole: (id: string, input: SaveAccessRoleInput) =>
+    request<AccessRole>(`/access-roles/${id}`, { method: "PATCH", body: input }),
+  deleteAccessRole: (id: string) => request<{ id: string }>(`/access-roles/${id}`, { method: "DELETE" }),
+  assignAccessRole: (userId: string, accessRoleId: string | null) =>
+    request<UserAccount>(`/users/${userId}/access-role`, { method: "PATCH", body: { accessRoleId } }),
   updateMyProfile: (input: { fullName?: string }) => request<UserAccount>("/users/me", { method: "PATCH", body: input }),
 }

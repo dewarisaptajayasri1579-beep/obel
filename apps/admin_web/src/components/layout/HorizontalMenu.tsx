@@ -5,7 +5,8 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { NAV_GROUPS, type NavItem } from "@/lib/nav-config";
+import { type NavItem } from "@/lib/nav-config";
+import { useNav } from "@/lib/use-nav";
 
 function isItemActive(pathname: string, href?: string): boolean {
   if (!href) return false;
@@ -117,11 +118,12 @@ const HorizontalMenuItem: React.FC<{ item: NavItem; pathname: string }> = ({ ite
 
 export const HorizontalMenu: React.FC = () => {
   const pathname = usePathname() || "/dashboard";
+  const { navGroups } = useNav();
 
   return (
     <nav className="hidden lg:block glass-header sticky top-20 z-20 px-4 sm:px-6 py-2.5 border-t border-white/40 dark:border-line">
       <div className="flex items-center gap-1.5 overflow-x-auto max-w-7xl mx-auto">
-        {NAV_GROUPS.flatMap((g) => g.items).map((item) => (
+        {navGroups.flatMap((g) => g.items).map((item) => (
           <HorizontalMenuItem key={item.label} item={item} pathname={pathname} />
         ))}
       </div>

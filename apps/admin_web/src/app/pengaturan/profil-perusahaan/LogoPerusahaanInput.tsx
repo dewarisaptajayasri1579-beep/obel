@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 
 /// Sisi terpanjang maksimum (piksel) sebelum diunggah — logo dipakai kecil
 /// (kop dokumen cetak, header layar), jadi berkas sumber dari HP/desain besar
@@ -33,6 +34,7 @@ async function perkecil(file: File): Promise<Blob> {
 }
 
 export function LogoPerusahaanInput({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const { canManage } = useAccess();
   const inputRef = useRef<HTMLInputElement>(null);
   const [mengunggah, setMengunggah] = useState(false);
   const [error, setError] = useState("");
@@ -73,30 +75,32 @@ export function LogoPerusahaanInput({ value, onChange }: { value: string; onChan
         </div>
 
         <div className="flex flex-col gap-1.5 pt-0.5">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={mengunggah}
-              className="h-8 px-3 rounded-lg border border-slate-200/80 dark:border-line bg-white dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-700 dark:text-fg text-xs font-semibold shadow-2xs cursor-pointer transition-colors disabled:opacity-50"
-            >
-              {value ? "Ganti Logo" : "Pilih Logo"}
-            </button>
-            {value && (
+          {canManage("PROFIL_PERUSAHAAN") && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  onChange("");
-                  setError("");
-                }}
+                onClick={() => inputRef.current?.click()}
                 disabled={mengunggah}
-                className="h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                className="h-8 px-3 rounded-lg border border-slate-200/80 dark:border-line bg-white dark:bg-surface hover:bg-slate-50 dark:hover:bg-surface-hover text-slate-700 dark:text-fg text-xs font-semibold shadow-2xs cursor-pointer transition-colors disabled:opacity-50"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Hapus
+                {value ? "Ganti Logo" : "Pilih Logo"}
               </button>
-            )}
-          </div>
+              {value && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("");
+                    setError("");
+                  }}
+                  disabled={mengunggah}
+                  className="h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-[10px] text-slate-400 dark:text-fg-muted max-w-xs">
             JPG atau PNG. Dipakai di kop semua dokumen cetak (PDF/Excel) dan header layar.
           </p>

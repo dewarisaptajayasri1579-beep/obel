@@ -3,15 +3,16 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BOTTOM_NAV_ITEMS } from "@/lib/nav-config";
+import { useNav } from "@/lib/use-nav";
 
 export const BottomBar: React.FC = () => {
   const pathname = usePathname() || "/dashboard";
+  const { bottomItems } = useNav();
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-1">
       <div className="glass-header flex items-center justify-around rounded-2xl border border-white/70 dark:border-line shadow-xl px-2 py-2">
-        {BOTTOM_NAV_ITEMS.map((item) => {
+        {bottomItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/") || (pathname === "/" && item.href === "/dashboard");
           const Icon = item.icon;
           return (

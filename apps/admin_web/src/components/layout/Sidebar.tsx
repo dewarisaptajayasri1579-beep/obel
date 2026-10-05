@@ -7,14 +7,13 @@ import { AppLogo } from "../ui/AppLogo";
 import { ChevronLeft, ChevronRight, ChevronDown, Settings, ArrowLeft } from "lucide-react";
 import { APP_CONFIG } from "@/lib/app-config";
 import {
-  MAIN_NAV,
-  SETTINGS_NAV,
   detectNavMode,
   getActiveHref,
   type NavItem,
   type NavGroup,
   type NavMode,
 } from "@/lib/nav-config";
+import { useNav } from "@/lib/use-nav";
 
 export interface SidebarProps {
   isCollapsed: boolean;
@@ -150,7 +149,8 @@ const NavPanel: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, className = "" }) => {
   const pathname = usePathname() || "/dashboard";
-  const activeHref = getActiveHref([...MAIN_NAV, ...SETTINGS_NAV], pathname);
+  const { mainNav, settingsNav, navGroups } = useNav();
+  const activeHref = getActiveHref(navGroups, pathname);
 
   const [mode, setMode] = useState<NavMode>(() => detectNavMode(pathname));
   const prevPathnameRef = useRef(pathname);
@@ -224,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
           </div>
         )}
 
-        <NavPanel groups={MAIN_NAV} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "utama"} />
+        <NavPanel groups={mainNav} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "utama"} />
 
         {/* Tombol masuk ke mode Pengaturan — di bawah menu alur, cuma di Menu Utama */}
         {mode === "utama" && (
@@ -248,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
           </div>
         )}
 
-        <NavPanel groups={SETTINGS_NAV} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "pengaturan"} />
+        <NavPanel groups={settingsNav} isCollapsed={isCollapsed} activeHref={activeHref} isVisible={mode === "pengaturan"} />
       </nav>
 
       <div className="p-4 border-t border-black/20 dark:border-line bg-black/15">

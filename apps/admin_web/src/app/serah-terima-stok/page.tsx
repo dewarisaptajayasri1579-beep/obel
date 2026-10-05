@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { PortalMenu } from "@/components/ui/PortalMenu";
@@ -107,6 +108,7 @@ function waktuJakarta(iso: string) {
 
 function SerahTerimaStokContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [rows, setRows] = useState<StockHandover[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -230,11 +232,13 @@ function SerahTerimaStokContent() {
           </div>
         </div>
 
-        <Link href="/serah-terima-stok/baru">
-          <Button variant="primary" size="sm" leftIcon={<Send className="w-3.5 h-3.5" />}>
-            Kirim Stok
-          </Button>
-        </Link>
+        {canManage("SERAH_TERIMA_STOK") && (
+          <Link href="/serah-terima-stok/baru">
+            <Button variant="primary" size="sm" leftIcon={<Send className="w-3.5 h-3.5" />}>
+              Kirim Stok
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

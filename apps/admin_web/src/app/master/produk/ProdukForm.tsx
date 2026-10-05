@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useHotkey } from "@/hooks/useHotkey";
 import { useFokusAwal } from "@/hooks/useFokusAwal";
 import { api, ApiError } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { nilaiAwalProduk, type ProdukFormValues } from "./form-values";
 import { FotoProdukInput } from "./FotoProdukInput";
 import { NonaktifDiblokirModal, rincianNonaktifDiblokir, type RincianNonaktifDiblokir } from "./NonaktifDiblokirModal";
@@ -45,6 +46,8 @@ export const ProdukForm: React.FC<{
 }> = ({ mode, initial, categories, back }) => {
   const router = useRouter();
   const toast = useToast();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("PRODUK");
 
   const [form, setForm] = useState<ProdukFormValues>(initial);
   const [error, setError] = useState("");
@@ -144,7 +147,7 @@ export const ProdukForm: React.FC<{
   };
 
   const simpan = async (lanjutIsiLagi = false) => {
-    if (!validate()) return;
+    if (!bolehKelola || !validate()) return;
 
     setSubmitting(true);
     try {
@@ -199,6 +202,8 @@ export const ProdukForm: React.FC<{
 
   return (
     <div ref={formRef} data-isian-form onKeyDownCapture={enterMajuKeFieldBerikutnya} className="space-y-5">
+      {!bolehKelola && <Alert variant="info">Anda hanya punya akses Lihat.</Alert>}
+
       {error && (
         <Alert variant="error" onClose={() => setError("")}>
           {error}
@@ -246,7 +251,7 @@ export const ProdukForm: React.FC<{
               lanjutSetelahPilih("kategori");
             }}
             placeholder="Pilih atau ketik kategori baru"
-            creatable
+            creatable={bolehKelola}
             createOptionLabel={(q) => `Tambah kategori "${q}"`}
             onCreateOption={async (query) => {
               try {
@@ -313,7 +318,7 @@ export const ProdukForm: React.FC<{
             <span className="text-[9px] font-mono opacity-80 font-normal">(Esc)</span>
           </Link>
 
-          {mode === "create" && (
+          {bolehKelola && mode === "create" && (
             <button
               type="button"
               onClick={() => simpan(true)}
@@ -326,16 +331,18 @@ export const ProdukForm: React.FC<{
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => simpan(false)}
-            disabled={submitting}
-            className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{submitting ? "Menyimpan..." : "Simpan"}</span>
-            <span className="text-[9px] font-mono opacity-80 font-normal">(Ctrl+S)</span>
-          </button>
+          {bolehKelola && (
+            <button
+              type="button"
+              onClick={() => simpan(false)}
+              disabled={submitting}
+              className="px-4 py-1.5 rounded-lg bg-(--brand-700) hover:bg-(--brand-800) text-white font-semibold text-xs shadow-sm flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{submitting ? "Menyimpan..." : "Simpan"}</span>
+              <span className="text-[9px] font-mono opacity-80 font-normal">(Ctrl+S)</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

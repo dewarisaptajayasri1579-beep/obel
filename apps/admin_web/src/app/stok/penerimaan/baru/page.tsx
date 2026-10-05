@@ -9,10 +9,12 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type Product } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { PenerimaanForm } from "../PenerimaanForm";
 
 function TambahPenerimaanContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [products, setProducts] = useState<Product[] | null>(null);
 
   useEffect(() => {
@@ -56,10 +58,12 @@ function TambahPenerimaanContent() {
             </p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-fg-muted">
-          <Keyboard className="w-3.5 h-3.5" />
-          Ctrl+S Simpan Draft · Ctrl+Enter Posting
-        </span>
+        {canManage("TAMBAH_STOK_GUDANG") && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-fg-muted">
+            <Keyboard className="w-3.5 h-3.5" />
+            Ctrl+S Simpan Draft · Ctrl+Enter Posting
+          </span>
+        )}
       </div>
 
       <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs!">

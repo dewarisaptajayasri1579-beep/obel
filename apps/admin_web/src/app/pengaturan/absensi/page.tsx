@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Crosshair, MapPinned, Save } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +16,8 @@ import { api, ApiError, type AppSettings } from "@/lib/api-client";
 /// Titik Booth diatur di Data Booth masing-masing.
 function AbsensiContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
+  const bolehKelola = canManage("ABSENSI");
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -109,9 +112,11 @@ function AbsensiContent() {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-bold text-slate-700 dark:text-fg-secondary">Titik Gudang</p>
-              <Button variant="secondary" size="sm" leftIcon={<Crosshair className="w-3.5 h-3.5" />} onClick={pakaiLokasiSaya} isLoading={mencariLokasi}>
-                Pakai lokasi saya
-              </Button>
+              {bolehKelola && (
+                <Button variant="secondary" size="sm" leftIcon={<Crosshair className="w-3.5 h-3.5" />} onClick={pakaiLokasiSaya} isLoading={mencariLokasi}>
+                  Pakai lokasi saya
+                </Button>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Latitude" type="number" step="any" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="-7.540767" />
@@ -145,11 +150,13 @@ function AbsensiContent() {
             />
           </div>
 
-          <div className="flex justify-end pt-1">
-            <Button variant="primary" size="sm" leftIcon={<Save className="w-3.5 h-3.5" />} onClick={simpan} isLoading={menyimpan}>
-              Simpan
-            </Button>
-          </div>
+          {bolehKelola && (
+            <div className="flex justify-end pt-1">
+              <Button variant="primary" size="sm" leftIcon={<Save className="w-3.5 h-3.5" />} onClick={simpan} isLoading={menyimpan}>
+                Simpan
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

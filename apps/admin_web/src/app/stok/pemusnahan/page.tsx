@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 import { api, ApiError, type Product, type StockAdjustmentRecord, type WarehouseStockItem } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { randomUUID } from "@/lib/uuid";
 
 const waktuJakarta = (iso: string) =>
@@ -25,6 +26,7 @@ const waktuJakarta = (iso: string) =>
 /// reverse, bukan dihapus.
 function PemusnahanContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const [records, setRecords] = useState<StockAdjustmentRecord[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [gudang, setGudang] = useState<WarehouseStockItem[]>([]);
@@ -139,9 +141,11 @@ function PemusnahanContent() {
             </p>
           </div>
         </div>
-        <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />} onClick={bukaForm}>
-          Musnahkan Stok
-        </Button>
+        {canManage("PEMUSNAHAN_STOK") && (
+          <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />} onClick={bukaForm}>
+            Musnahkan Stok
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -213,6 +217,8 @@ function PemusnahanContent() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-slate-100 dark:bg-surface-hover text-slate-600 dark:text-fg-muted border-slate-200 dark:border-line">
                               Dibatalkan
                             </span>
+                          ) : !canManage("PEMUSNAHAN_STOK") ? (
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-fg-muted">Berlaku</span>
                           ) : (
                             <button
                               type="button"

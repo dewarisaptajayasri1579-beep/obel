@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Keyboard, Truck } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { useAccess } from "@/lib/auth-context";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,6 +15,7 @@ import { SerahTerimaForm } from "../SerahTerimaForm";
 
 function KirimStokContent() {
   const toast = useToast();
+  const { canManage } = useAccess();
   const searchParams = useSearchParams();
   const prefillBoothId = searchParams.get("boothId") || undefined;
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -66,7 +68,9 @@ function KirimStokContent() {
       </div>
 
       <Card variant="solid" padding="md" className="rounded-xl! shadow-2xs!">
-        {!products ? (
+        {!canManage("SERAH_TERIMA_STOK") ? (
+          <p className="text-sm text-slate-500 dark:text-fg-muted py-6 text-center">Anda hanya punya akses Lihat.</p>
+        ) : !products ? (
           <div className="flex justify-center py-10">
             <Spinner />
           </div>

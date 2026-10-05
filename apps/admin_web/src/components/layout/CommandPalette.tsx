@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, ArrowRight } from "lucide-react";
-import { FLAT_NAV_ITEMS } from "@/lib/nav-config";
-
-const SECTIONS = FLAT_NAV_ITEMS;
+import { useNav } from "@/lib/use-nav";
 
 // CONTOH: hasil dari /api/search cuma User. Tambah "type" baru di sini kalau project ini
 // nambah query model lain ke route itu (lihat komentar di src/app/api/search/route.ts).
@@ -22,6 +20,7 @@ const TYPE_LABEL: Record<SearchResult["type"], string> = {
 };
 
 export const CommandPalette: React.FC = () => {
+  const { flatItems: SECTIONS } = useNav();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);

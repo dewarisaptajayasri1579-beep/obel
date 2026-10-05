@@ -18,7 +18,8 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
-import { api, ApiError, type UserAccount } from "@/lib/api-client";
+import { api, ApiError, type AccessRole, type UserAccount } from "@/lib/api-client";
+import { useAccess } from "@/lib/auth-context";
 import { KeyRound, Plus } from "lucide-react";
 
 const ROLE_LABEL: Record<UserAccount["role"], string> = {
@@ -30,15 +31,18 @@ const ROLE_LABEL: Record<UserAccount["role"], string> = {
 /// Petugas Booth SENGAJA tidak bisa dibuat dari sini — punya halaman
 /// tersendiri (Data Operasional → Petugas) yang juga bisa aktif/nonaktifkan,
 /// tidak cuma reset password seperti di sini. Dua jalur bikin satu akun sama
-/// mungkin dikelola dari dua tempat berbeda.
-const ROLE_OPTIONS = [
-  { value: "ADMIN", label: "Admin Pusat" },
-  { value: "OWNER", label: "Owner" },
-];
+/// mungkin dikelola dari dua tempat berbeda. Akun Owner hanya dibuat Owner (BR-044).
+const ROLE_OPTIONS_ADMIN = [{ value: "ADMIN", label: "Admin Pusat" }];
+const ROLE_OPTIONS_OWNER = [...ROLE_OPTIONS_ADMIN, { value: "OWNER", label: "Owner" }];
+const TANPA_PERAN = "";
 
 function UserContent() {
   const toast = useToast();
+  const { isOwner, canManage } = useAccess();
+  const bolehKelolaAdmin = isOwner || canManage("USER");
   const [users, setUsers] = useState<UserAccount[] | null>(null);
+  const [roles, setRoles] = useState<AccessRole[]>([]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -53,8 +57,9 @@ function UserContent() {
   // Petugas) — di sini sengaja hanya menampilkan Admin/Owner.
   async function load() {
     try {
-      const userList = await api.getUsers();
+      const [userList, roleList] = await Promise.all([api.getUsers(), api.getAccessRoles()]);
       setUsers(userList.filter((u) => u.role !== "BOOTH_STAFF"));
+      setRoles(roleList);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat data User.");
     }
@@ -84,6 +89,20 @@ function UserContent() {
     }
   }
 
+  /// Hanya Owner (BR-044) — berlaku di request berikutnya Admin itu.
+  async function handleAssignRole(u: UserAccount, accessRoleId: string) {
+    setAssigningId(u.id);
+    try {
+      await api.assignAccessRole(u.id, accessRoleId === TANPA_PERAN ? null : accessRoleId);
+      toast.success(`Peran "${u.username}" diperbarui.`);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengubah peran.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     if (!resetTarget) return;
@@ -109,9 +128,11 @@ function UserContent() {
             Kelola akun login Admin &amp; Owner. Barista ada di Data Operasional → Barista.
           </p>
         </div>
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
-          Tambah User
-        </Button>
+        {bolehKelolaAdmin && (
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
+            Tambah User
+          </Button>
+        )}
       </div>
 
       {!users ? (
@@ -126,6 +147,7 @@ function UserContent() {
                 <TableHead>Username</TableHead>
                 <TableHead>Nama Lengkap</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Peran</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -137,25 +159,49 @@ function UserContent() {
                   <TableCell className="font-semibold">{u.fullName}</TableCell>
                   <TableCell>{ROLE_LABEL[u.role]}</TableCell>
                   <TableCell>
+                    {u.role !== "ADMIN" ? (
+                      <span className="text-slate-400 dark:text-fg-muted">-</span>
+                    ) : isOwner ? (
+                      <div className="w-48">
+                        <Select
+                          options={[
+                            { value: TANPA_PERAN, label: "Tanpa peran" },
+                            ...roles.map((r) => ({ value: r.id, label: r.name })),
+                          ]}
+                          value={u.accessRole?.id ?? TANPA_PERAN}
+                          onChange={(v) => handleAssignRole(u, v)}
+                          disabled={assigningId === u.id}
+                          sizeVariant="sm"
+                        />
+                      </div>
+                    ) : u.accessRole ? (
+                      u.accessRole.name
+                    ) : (
+                      <StatusBadge type="unpaid" label="Belum diberi peran" />
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <StatusBadge type={u.active ? "safe" : "inactive"} label={u.active ? "Aktif" : "Nonaktif"} />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      leftIcon={<KeyRound className="w-3.5 h-3.5" />}
-                      onClick={() => {
-                        setResetTarget(u);
-                        setNewPassword("");
-                      }}
-                    >
-                      Reset Password
-                    </Button>
+                    {(u.role === "OWNER" ? isOwner : bolehKelolaAdmin) && (
+                      <Button
+                        variant="ghost"
+                        leftIcon={<KeyRound className="w-3.5 h-3.5" />}
+                        onClick={() => {
+                          setResetTarget(u);
+                          setNewPassword("");
+                        }}
+                      >
+                        Reset Password
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
               {users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                  <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     Belum ada User.
                   </TableCell>
                 </TableRow>
@@ -177,9 +223,14 @@ function UserContent() {
             required
           />
           <Input label="Nama Lengkap" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          {role === "ADMIN" && (
+            <p className="text-xs text-slate-500 dark:text-fg-muted">
+              Akun Admin baru belum bisa membuka menu apa pun sampai Owner memasang peran.
+            </p>
+          )}
           <Select
             label="Role"
-            options={ROLE_OPTIONS}
+            options={isOwner ? ROLE_OPTIONS_OWNER : ROLE_OPTIONS_ADMIN}
             value={role}
             onChange={(v) => setRole(v as UserAccount["role"])}
           />

@@ -1,5 +1,6 @@
 // src/lib/nav-config.ts
 import type { LucideIcon } from "lucide-react";
+import type { MenuKey } from "./api-client";
 import {
   LayoutGrid,
   ShoppingCart,
@@ -24,6 +25,7 @@ import {
   AlertTriangle,
   ClipboardList,
   Undo2,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,6 +34,11 @@ export interface NavItem {
   icon?: LucideIcon;
   bottomBar?: boolean;
   children?: NavItem[];
+  /// Menu hak akses (BR-044) — item tampil kalau user punya minimal Lihat.
+  /// Tanpa `menu` & tanpa `ownerOnly` = selalu tampil (Tampilan, Dokumentasi).
+  menu?: MenuKey;
+  /// Hanya untuk Owner (mis. Peran & Hak Akses).
+  ownerOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -53,6 +60,7 @@ export const MAIN_NAV: NavGroup[] = [
       {
         label: "Booth Aktif",
         href: "/monitoring/booth-aktif",
+        menu: "BOOTH_AKTIF",
         icon: Radar,
         bottomBar: true,
       },
@@ -62,6 +70,7 @@ export const MAIN_NAV: NavGroup[] = [
         // tumpang tindih (sama-sama "ringkasan operasional").
         label: "Dashboard",
         href: "/dashboard",
+        menu: "DASHBOARD",
         icon: LayoutGrid,
         bottomBar: true,
       },
@@ -77,17 +86,20 @@ export const MAIN_NAV: NavGroup[] = [
           {
             label: "Tambah Stok Gudang",
             href: "/stok/penerimaan",
+            menu: "TAMBAH_STOK_GUDANG",
             icon: PackagePlus,
             bottomBar: true,
           },
           {
             label: "Pemusnahan Stok",
             href: "/stok/pemusnahan",
+            menu: "PEMUSNAHAN_STOK",
             icon: PackageX,
           },
           {
             label: "Serah Terima Stok",
             href: "/serah-terima-stok",
+            menu: "SERAH_TERIMA_STOK",
             icon: Truck,
             bottomBar: true,
           },
@@ -100,36 +112,42 @@ export const MAIN_NAV: NavGroup[] = [
           {
             label: "Check In-Check Out",
             href: "/transaksi-checkin-checkout",
+            menu: "CHECKIN_CHECKOUT",
             icon: Fingerprint,
             bottomBar: false,
           },
           {
             label: "Terima Stok",
             href: "/transaksi-terima-stok",
+            menu: "TERIMA_STOK",
             icon: PackageCheck,
             bottomBar: false,
           },
           {
             label: "Kasir",
             href: "/transaksi-kasir",
+            menu: "KASIR",
             icon: Receipt,
             bottomBar: true,
           },
           {
             label: "Setor & Pengembalian Stok",
             href: "/transaksi-laporan-kembali",
+            menu: "SETOR_PENGEMBALIAN",
             icon: ClipboardList,
             bottomBar: false,
           },
           {
             label: "Rekap Stok Selisih",
             href: "/laporan/stok-selisih",
+            menu: "REKAP_STOK_SELISIH",
             icon: AlertTriangle,
             bottomBar: false,
           },
           {
             label: "Rekap Pengembalian Stok",
             href: "/laporan/pengembalian-stok",
+            menu: "REKAP_PENGEMBALIAN",
             icon: Undo2,
             bottomBar: false,
           },
@@ -151,18 +169,21 @@ export const MAIN_NAV: NavGroup[] = [
           {
             label: "Produk",
             href: "/master/produk",
+            menu: "PRODUK",
             icon: Package,
             bottomBar: false,
           },
           {
             label: "Booth",
             href: "/master/booth",
+            menu: "BOOTH",
             icon: Store,
             bottomBar: false,
           },
           {
             label: "Barista",
             href: "/master/petugas",
+            menu: "BARISTA",
             icon: UserRound,
             bottomBar: false,
           },
@@ -187,12 +208,14 @@ export const SETTINGS_NAV: NavGroup[] = [
       {
         label: "Profil Perusahaan",
         href: "/pengaturan/profil-perusahaan",
+        menu: "PROFIL_PERUSAHAAN",
         icon: Building2,
         bottomBar: false,
       },
       {
         label: "Absensi",
         href: "/pengaturan/absensi",
+        menu: "ABSENSI",
         icon: MapPinned,
         bottomBar: false,
       },
@@ -210,8 +233,9 @@ export const SETTINGS_NAV: NavGroup[] = [
           // Threshold Stok Booth: tautannya dilepas dari menu (bukan halamannya
           // — masih bisa dibuka lewat /master/threshold langsung), sama pola
           // dengan submenu lama lain di atas.
-          { label: "Shift", href: "/master/shift", icon: Clock },
-          { label: "User", href: "/master/user", icon: Users },
+          { label: "Shift", href: "/master/shift", icon: Clock, menu: "SHIFT" },
+          { label: "User", href: "/master/user", icon: Users, menu: "USER" },
+          { label: "Peran & Hak Akses", href: "/master/peran", icon: ShieldCheck, ownerOnly: true },
         ],
       },
       {
@@ -283,9 +307,9 @@ function flattenNavItems(
   });
 }
 
-export const FLAT_NAV_ITEMS = flattenNavItems(
-  NAV_GROUPS.flatMap((g) => g.items)
-);
+export function flatNavItems(groups: NavGroup[]) {
+  return flattenNavItems(groups.flatMap((g) => g.items));
+}
 
 // Helper untuk menu Bottom Bar Mobile
 function extractBottomNavItems(
@@ -301,6 +325,50 @@ function extractBottomNavItems(
   });
 }
 
-export const BOTTOM_NAV_ITEMS = extractBottomNavItems(
-  NAV_GROUPS.flatMap((g) => g.items)
-);
+export function bottomNavItems(groups: NavGroup[]) {
+  return extractBottomNavItems(groups.flatMap((g) => g.items));
+}
+
+/** Buang item yang tidak boleh dilihat (BR-044); induk tanpa anak & grup kosong ikut hilang. */
+export function filterNav(groups: NavGroup[], boleh: (item: NavItem) => boolean): NavGroup[] {
+  const saring = (items: NavItem[]): NavItem[] =>
+    items.flatMap((item) => {
+      if (item.children) {
+        const children = saring(item.children);
+        return children.length > 0 ? [{ ...item, children }] : [];
+      }
+      return boleh(item) ? [item] : [];
+    });
+  return groups.map((g) => ({ ...g, items: saring(g.items) })).filter((g) => g.items.length > 0);
+}
+
+/** Halaman yang tidak ada di menu (yatim / deep link) ikut menu terdekatnya. */
+const MENU_HALAMAN_LAIN: Record<string, MenuKey> = {
+  "/stok/adjustment": "TAMBAH_STOK_GUDANG",
+  "/stok/gudang": "TAMBAH_STOK_GUDANG",
+  "/stok/opname": "TAMBAH_STOK_GUDANG",
+  "/stok/booth": "BOOTH",
+  "/master/threshold": "BOOTH",
+  "/koreksi": "DASHBOARD",
+  "/return": "SETOR_PENGEMBALIAN",
+  "/penjualan": "KASIR",
+};
+
+/** Syarat akses sebuah halaman admin: menu tertentu, khusus Owner, atau bebas. */
+export function accessForPath(
+  pathname: string
+): { kind: "menu"; menu: MenuKey } | { kind: "owner" } | { kind: "free" } {
+  const cocok = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  let terbaik: NavItem | undefined;
+  const telusuri = (items: NavItem[]) => {
+    for (const item of items) {
+      if (item.href && cocok(item.href) && (!terbaik || item.href.length > (terbaik.href ?? "").length)) terbaik = item;
+      if (item.children) telusuri(item.children);
+    }
+  };
+  telusuri(NAV_GROUPS.flatMap((g) => g.items));
+  if (terbaik?.ownerOnly) return { kind: "owner" };
+  if (terbaik?.menu) return { kind: "menu", menu: terbaik.menu };
+  const lain = Object.entries(MENU_HALAMAN_LAIN).find(([href]) => cocok(href));
+  return lain ? { kind: "menu", menu: lain[1] } : { kind: "free" };
+}
