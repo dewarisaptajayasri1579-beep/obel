@@ -1,0 +1,11 @@
+{
+  "name": "obel",
+  "private": true,
+  "description": "Root helper scripts for local development; each app keeps its own package.json.",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm --prefix backend run start:dev\" \"npm --prefix apps/admin_web run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
