@@ -31,7 +31,9 @@ import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
-import { printReceipt, isNativeBridgeAvailable } from "../_lib/native-bridge";
+import { printStruk, isNativeBridgeAvailable } from "../_lib/native-bridge";
+import { buatStrukPenjualan, teksStruk, type Perusahaan } from "../_lib/receipt";
+import { APP_CONFIG } from "@/lib/app-config";
 import { PhotoCapture } from "../_components/PhotoCapture";
 import {
   KodeQrisBooth,
@@ -108,6 +110,16 @@ function KasirContent() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SaleResult | null>(null);
   const [printing, setPrinting] = useState(false);
+  /// Identitas di header struk — dari Profil Perusahaan, bukan teks tertanam. Gagal dimuat = pakai
+  /// nama aplikasi, struk tetap bisa dicetak.
+  const [perusahaan, setPerusahaan] = useState<Perusahaan | null>(null);
+
+  useEffect(() => {
+    api
+      .getCompanyProfile()
+      .then((p) => setPerusahaan({ nama: p.name, alamat: p.address, telepon: p.phone }))
+      .catch(() => {});
+  }, []);
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
 
@@ -344,25 +356,25 @@ function KasirContent() {
     return metode === "SPLIT" ? "Split" : metode === "CASH" ? "Tunai" : "QRIS";
   }
 
+  /// Satu susunan struk untuk semua keluaran (Bluetooth, WhatsApp, cetak browser) — lihat receipt.ts.
+  function susunStruk(sale: SaleResult) {
+    return buatStrukPenjualan({
+      perusahaan: perusahaan ?? { nama: `${APP_CONFIG.name} ${APP_CONFIG.tagline}` },
+      boothName: shift.booth.name,
+      saleNo: sale.saleNo,
+      waktuIso: sale.paidAt ?? new Date().toISOString(),
+      barista: session?.profile.fullName,
+      items: sale.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      total: sale.total,
+      metode: labelMetode(sale.paymentMethod),
+    });
+  }
+
+  /// Teks WhatsApp: struk yang sama dengan yang tercetak, dalam blok monospace supaya kolomnya rata.
   function receiptText(sale: SaleResult): string {
-    const lines = [
-      `*Obbel Coffee & Milk*`,
-      `No. Invoice: ${sale.saleNo}`,
-      `Booth: ${shift.booth.name}`,
-      `Waktu: ${sale.paidAt ? formatJamJakarta(sale.paidAt) : "-"}`,
-      `--------------------------`,
-      ...sale.items.map((i) => `${i.productName}
-  ${i.qty} x ${formatRupiah(i.unitPrice)} = ${formatRupiah(i.lineTotal)}`),
-      `--------------------------`,
-      ...(sale.discount > 0
-        ? [`Subtotal: ${formatRupiah(sale.subtotal)}`, `Diskon: -${formatRupiah(sale.discount)}`]
-        : []),
-      `*Total: ${formatRupiah(sale.total)}*`,
-      `Metode: ${labelMetode(sale.paymentMethod)}`,
-      `--------------------------`,
-      `Terima kasih telah berbelanja di Obbel Coffee & Milk!`,
-    ];
-    return lines.join("\n");
+    return "```\n" + teksStruk(susunStruk(sale)) + "\n```";
   }
 
   /// Cetak Bluetooth kalau lagi dibuka di dalam shell booth_pwa_flutter
@@ -377,7 +389,7 @@ function KasirContent() {
     }
     setPrinting(true);
     try {
-      await printReceipt({
+      await printStruk(susunStruk(result), {
         boothName: shift.booth.name,
         saleNo: result.saleNo,
         time: result.paidAt ?? new Date().toISOString(),
@@ -417,30 +429,12 @@ function KasirContent() {
           <p className="text-base text-slate-500">Terima kasih telah melayani dengan sepenuh hati!</p>
         </div>
 
-        {/* Nota cetak — HANYA terlihat di dialog print (window.print()),
-            disembunyikan di layar normal supaya tidak dobel dgn kartu di
-            bawah. Print browser tidak butuh backend/PDF generator. */}
-        <div className="hidden print:block text-left w-full text-base">
-          <p className="font-extrabold text-base">Obbel Coffee & Milk</p>
-          <p>No. Invoice: {result.saleNo}</p>
-          <p>Booth: {shift.booth.name}</p>
-          <p>Waktu: {result.paidAt ? formatJamJakarta(result.paidAt) : "-"}</p>
-          <hr className="my-2" />
-          {result.items.map((i) => (
-            <p key={i.productId}>
-              {i.productName}: {i.qty} x {formatRupiah(i.unitPrice)} = {formatRupiah(i.lineTotal)}
-            </p>
-          ))}
-          <hr className="my-2" />
-          {result.discount > 0 && (
-            <>
-              <p>Subtotal: {formatRupiah(result.subtotal)}</p>
-              <p>Diskon: -{formatRupiah(result.discount)}</p>
-            </>
-          )}
-          <p className="font-bold">Total: {formatRupiah(result.total)}</p>
-          <p>Metode: {labelMetode(result.paymentMethod)}</p>
-        </div>
+        {/* Nota cetak — HANYA terlihat di dialog print (window.print()), disembunyikan di layar normal
+            supaya tidak dobel dgn kartu di bawah. Isinya struk yang sama dengan cetak Bluetooth dan
+            WhatsApp; print browser tidak butuh backend/PDF generator. */}
+        <pre className="hidden print:block text-left w-full font-mono text-[11px] leading-tight whitespace-pre-wrap">
+          {teksStruk(susunStruk(result))}
+        </pre>
 
         <div className="print:hidden w-full rounded-2xl bg-white border border-slate-200 p-4 mt-2 text-base text-left flex flex-col gap-1.5">
           <div className="flex justify-between">

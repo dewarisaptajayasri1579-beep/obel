@@ -28,23 +28,26 @@ Buat abstraction:
 ReceiptPrinter
 - connect()
 - disconnect()
-- printReceipt(receipt)
+- printLines(lines)  // baris struk yang sudah disusun web
 - getStatus()
 ```
 
 Implementasi Bluetooth vendor/package dipisah dari business logic.
 
 ### Receipt minimum
-- Logo/nama Obbel;
-- Booth;
+- Nama perusahaan (dari Profil Perusahaan: alamat dan telepon bila diisi) dan Booth;
 - nomor transaksi;
-- waktu;
-- item, qty, harga;
-- total;
+- waktu (Asia/Jakarta, `23 Agu 2026, 15.40`);
+- item, qty, harga, jumlah item;
+- Subtotal dan Diskon bila ada diskon, lalu total;
 - metode pembayaran;
-- petugas optional;
+- Barista;
+- penanda **CETAK ULANG** pada salinan;
 - footer terima kasih;
 - IG/WA optional dari setting.
+
+### Susunan struk (aplikasi PWA Barista)
+Struk disusun di **web** (`admin_web/src/app/petugas/_lib/receipt.ts`) sebagai daftar baris yang sudah dibungkus dan dirata ke lebar kertas 58 mm (32 karakter, judul lebar ganda 16). Satu susunan itu dipakai untuk cetak Bluetooth, teks WhatsApp (blok monospace) dan cetak browser. Aplikasi Android (`booth_pwa_flutter`) hanya menerjemahkan baris ke ESC/POS lewat aksi jembatan `printer.printLines`, sehingga format struk bisa diubah dengan deploy web tanpa membangun ulang APK. Judul perusahaan dipecah: kata pertama di baris atas, sisanya di bawah (`OBBEL` / `COFFEE & MILK`). APK lama yang belum mengenal `printer.printLines` dilayani lewat aksi lama `printer.print` (format lama) sampai semua HP diperbarui.
 
 ## 5. Print rule
 - Server sale harus sukses terlebih dahulu.

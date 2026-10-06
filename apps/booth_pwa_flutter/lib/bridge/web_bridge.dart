@@ -90,8 +90,8 @@ class WebBridge {
           final status = await _printer.status();
           return BridgeResponse.ok(req.id, {'status': status});
 
-        case 'printer.print':
-          final success = await _printer.print(req.payload);
+        case 'printer.printLines':
+          final success = await _printer.printLines(req.payload['lines']);
           return success
               ? BridgeResponse.ok(req.id, {'printed': true})
               : BridgeResponse.fail(req.id, 'Gagal cetak — cek printer sudah paired & menyala.');

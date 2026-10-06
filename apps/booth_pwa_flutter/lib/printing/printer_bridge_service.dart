@@ -2,7 +2,7 @@ import 'package:permission_handler/permission_handler.dart' hide openAppSettings
 import 'package:permission_handler/permission_handler.dart' as permission_handler show openAppSettings;
 
 import 'bluetooth_receipt_printer.dart';
-import 'receipt.dart';
+import 'print_line.dart';
 import 'receipt_printer.dart';
 
 /// Izin yang dibutuhkan buat baca daftar paired device & connect di
@@ -14,7 +14,7 @@ const _izinBluetooth = [Permission.bluetoothConnect, Permission.bluetoothScan];
 
 /// Lapisan tipis yang menerjemahkan payload JSON dari PWA ke pemanggilan
 /// [BluetoothReceiptPrinter] — satu-satunya alasan lapisan ini ada adalah
-/// supaya WebBridge tidak perlu tahu detail model Receipt/PairedPrinter.
+/// supaya WebBridge tidak perlu tahu detail model PrintLine/PairedPrinter.
 class PrinterBridgeService {
   final _printer = BluetoothReceiptPrinter();
 
@@ -61,9 +61,8 @@ class PrinterBridgeService {
     return status.name;
   }
 
-  Future<bool> print(Map<String, dynamic> receiptJson) async {
+  Future<bool> printLines(Object? rawLines) async {
     if (!await _ensureBluetoothPermission()) return false;
-    final receipt = Receipt.fromJson(receiptJson);
-    return _printer.printReceipt(receipt);
+    return _printer.printLines(PrintLine.listFromJson(rawLines));
   }
 }

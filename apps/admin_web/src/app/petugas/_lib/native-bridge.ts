@@ -1,6 +1,7 @@
 "use client";
 
 import { api, BASE_URL, getToken } from "@/lib/api-client";
+import type { PrintLine } from "./receipt";
 
 /// Jembatan ke shell native booth_pwa_flutter (lihat
 /// booth_pwa_flutter/lib/bridge/bridge_protocol.dart untuk kontrak
@@ -163,4 +164,19 @@ export async function printReceipt(receipt: ReceiptPayload): Promise<boolean> {
   if (!isNativeBridgeAvailable()) return false;
   await callBridge("printer.print", receipt as unknown as Record<string, unknown>);
   return true;
+}
+
+/// Cetak struk dari daftar baris yang sudah disusun web (lihat receipt.ts): aplikasi Android hanya
+/// menerjemahkannya ke ESC/POS. APK yang masih beredar dari versi lama belum mengenal aksi ini
+/// ("Action tidak dikenal"); untuk itu jatuh ke payload lama (`lama`) supaya cetak tidak putus selama
+/// APK belum diperbarui. Hapus jalur lama ini setelah semua HP Barista memakai APK baru.
+export async function printStruk(baris: PrintLine[], lama: ReceiptPayload): Promise<boolean> {
+  if (!isNativeBridgeAvailable()) return false;
+  try {
+    await callBridge("printer.printLines", { lines: baris });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Action tidak dikenal")) return printReceipt(lama);
+    throw err;
+  }
 }

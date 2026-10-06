@@ -1,4 +1,4 @@
-import 'receipt.dart';
+import 'print_line.dart';
 
 enum PrinterStatus { disconnected, connecting, connected, error }
 
@@ -8,7 +8,7 @@ enum PrinterStatus { disconnected, connecting, connected, error }
 abstract class ReceiptPrinter {
   Future<bool> connect();
   Future<void> disconnect();
-  Future<bool> printReceipt(Receipt receipt);
+  Future<bool> printLines(List<PrintLine> lines);
   Future<PrinterStatus> getStatus();
 }
 
