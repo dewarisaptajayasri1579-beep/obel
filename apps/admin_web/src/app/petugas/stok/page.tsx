@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Minus,
   Plus,
@@ -140,10 +140,11 @@ const VALID_TABS: Tab[] = ["STOK", "RESTOCK", "RIWAYAT"];
 
 function StokContent() {
   const toast = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  // Tab mengikuti ?tab= di URL, jadi menu Riwayat di bottom nav bisa berpindah tab walau halaman Stok sudah terbuka.
   const tabFromQuery = searchParams.get("tab")?.toUpperCase();
-  const initialTab = VALID_TABS.includes(tabFromQuery as Tab) ? (tabFromQuery as Tab) : "STOK";
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const tab: Tab = VALID_TABS.includes(tabFromQuery as Tab) ? (tabFromQuery as Tab) : "STOK";
   const [loading, setLoading] = useState(true);
   const [stock, setStock] = useState<BoothStockRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -373,7 +374,7 @@ function StokContent() {
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => router.replace(`/petugas/stok?tab=${key}`, { scroll: false })}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold"
             style={
               tab === key
