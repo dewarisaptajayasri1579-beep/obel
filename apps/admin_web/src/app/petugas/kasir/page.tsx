@@ -32,8 +32,8 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printStruk, isNativeBridgeAvailable } from "../_lib/native-bridge";
-import { buatStrukPenjualan, teksStruk, type Perusahaan } from "../_lib/receipt";
-import { APP_CONFIG } from "@/lib/app-config";
+import { buatStrukPenjualan, teksStruk } from "../_lib/receipt";
+import { usePerusahaan } from "../_lib/use-perusahaan";
 import { PhotoCapture } from "../_components/PhotoCapture";
 import {
   KodeQrisBooth,
@@ -110,16 +110,7 @@ function KasirContent() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SaleResult | null>(null);
   const [printing, setPrinting] = useState(false);
-  /// Identitas di header struk — dari Profil Perusahaan, bukan teks tertanam. Gagal dimuat = pakai
-  /// nama aplikasi, struk tetap bisa dicetak.
-  const [perusahaan, setPerusahaan] = useState<Perusahaan | null>(null);
-
-  useEffect(() => {
-    api
-      .getCompanyProfile()
-      .then((p) => setPerusahaan({ nama: p.name, alamat: p.address, telepon: p.phone }))
-      .catch(() => {});
-  }, []);
+  const perusahaan = usePerusahaan();
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
 
@@ -359,7 +350,7 @@ function KasirContent() {
   /// Satu susunan struk untuk semua keluaran (Bluetooth, WhatsApp, cetak browser) — lihat receipt.ts.
   function susunStruk(sale: SaleResult) {
     return buatStrukPenjualan({
-      perusahaan: perusahaan ?? { nama: `${APP_CONFIG.name} ${APP_CONFIG.tagline}` },
+      perusahaan,
       boothName: shift.booth.name,
       saleNo: sale.saleNo,
       waktuIso: sale.paidAt ?? new Date().toISOString(),

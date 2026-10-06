@@ -105,6 +105,28 @@ describe('Draft payment (e2e)', () => {
     expect(dibayar.body.items).toEqual(itemDiharapkan(1));
   });
 
+  it("lists each sale with the prices and discount a Barista needs to reprint its receipt", async () => {
+    const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
+    const harga = catalog.body.find((p: { id: string }) => p.id === productId).sellPrice as number;
+    const dibuat = await request(server())
+      .post('/sales')
+      .set('Authorization', `Bearer ${boothToken}`)
+      .send({ idempotencyKey: randomUUID(), shiftSessionId, paymentMethod: 'CASH', items: [{ productId, qty: 2 }], discount: 1000 })
+      .expect(201);
+    paidSaleIds.push(dibuat.body.saleId);
+
+    const daftar = await request(server()).get('/sales?status=PAID&limit=100').set('Authorization', `Bearer ${boothToken}`).expect(200);
+    const baris = daftar.body.rows.find((r: { id: string }) => r.id === dibuat.body.saleId);
+    expect(baris).toBeDefined();
+    expect(baris.subtotal).toBe(harga * 2);
+    expect(baris.discount).toBe(1000);
+    expect(baris.total).toBe(harga * 2 - 1000);
+    expect(baris.staffName).toEqual(expect.any(String));
+    expect(baris.items).toEqual([
+      { productId, productName: expect.any(String), qty: 2, unitPrice: harga, lineTotal: harga * 2 },
+    ]);
+  });
+
   it('paying an already-paid draft again is a no-op returning the same sale', async () => {
     const before = await stockOnHand();
     const draft = (

@@ -647,15 +647,21 @@ export class SalesService {
         shiftLabel: s.shiftSession.shiftTemplate.name,
         shiftSessionId: s.shiftSessionId,
         status: s.status,
+        subtotal: Number(s.subtotal),
+        discount: Number(s.discount),
         total: Number(s.total),
         cupCount: s.items.reduce((sum, i) => sum + i.qty, 0),
         paymentMethod: s.paymentMethod,
         // Baris Payment aktif (Split = dua baris) — Barista butuh pecahannya saat ganti metode.
         payments: s.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
+        // Harga & total per baris ikut dikirim: cetak ulang struk di Riwayat Penjualan (Barista tidak
+        // boleh membaca GET /sales/:id) memerlukannya.
         items: s.items.map((item) => ({
           productId: item.productId,
           productName: item.productNameSnapshot,
           qty: item.qty,
+          unitPrice: Number(item.unitPrice),
+          lineTotal: Number(item.lineTotal),
         })),
         paidAt: s.paidAt,
         createdAt: s.createdAt,

@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { Printer } from "lucide-react";
 import { api, ApiError, type SaleListItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatRupiah, formatJamJakarta, formatTanggalJakarta } from "../_lib/format";
 import { labelMetodeBayar } from "../_components/PembayaranInput";
+import { isNativeBridgeAvailable, printBaris } from "../_lib/native-bridge";
+import { buatStrukPenjualan } from "../_lib/receipt";
+import { usePerusahaan } from "../_lib/use-perusahaan";
 import { GantiMetodeSheet } from "./GantiMetodeSheet";
 
 import { OBBEL } from "../_lib/theme";
@@ -30,6 +34,40 @@ function RiwayatPenjualanContent() {
   const [shiftAktifId, setShiftAktifId] = useState<string | null>(null);
   const [qrisImageUrl, setQrisImageUrl] = useState<string | null>(null);
   const [gantiMetode, setGantiMetode] = useState<SaleListItem | null>(null);
+  const [mencetakId, setMencetakId] = useState<string | null>(null);
+  const perusahaan = usePerusahaan();
+
+  /// Cetak ulang struk dari data yang tersimpan di server (bukan dari keranjang), diberi penanda
+  /// CETAK ULANG supaya salinan tidak dipakai sebagai nota asli. Barista di struk = yang menjual.
+  async function cetakUlang(s: SaleListItem) {
+    if (!isNativeBridgeAvailable()) {
+      toast.warning("Cetak ulang hanya bisa dari aplikasi Barista (printer Bluetooth).");
+      return;
+    }
+    setMencetakId(s.id);
+    try {
+      await printBaris(
+        buatStrukPenjualan({
+          perusahaan,
+          boothName: s.boothName,
+          saleNo: s.saleNo,
+          waktuIso: s.paidAt ?? s.createdAt,
+          barista: s.staffName,
+          items: s.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+          subtotal: s.subtotal,
+          discount: s.discount,
+          total: s.total,
+          metode: labelMetodeBayar(s.paymentMethod),
+          cetakUlang: true,
+        }),
+      );
+      toast.success("Struk dicetak ulang.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal cetak ulang. Cek printer sudah dipilih & menyala.");
+    } finally {
+      setMencetakId(null);
+    }
+  }
 
   function muatPenjualan() {
     return api
@@ -125,16 +163,26 @@ function RiwayatPenjualanContent() {
                   </div>
                   <p className="font-extrabold text-base">{formatRupiah(s.total)}</p>
                 </div>
-                {s.shiftSessionId === shiftAktifId && (
+                <div className="mt-2.5 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setGantiMetode(s)}
-                    className="mt-2.5 w-full rounded-lg border py-2 text-sm font-bold"
-                    style={{ borderColor: GREEN, color: GREEN }}
+                    onClick={() => cetakUlang(s)}
+                    disabled={mencetakId === s.id}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 py-2 text-sm font-bold text-slate-600 disabled:opacity-60"
                   >
-                    Ganti Metode Bayar
+                    {mencetakId === s.id ? <Spinner size="sm" /> : <Printer size={14} />} Cetak Ulang
                   </button>
-                )}
+                  {s.shiftSessionId === shiftAktifId && (
+                    <button
+                      type="button"
+                      onClick={() => setGantiMetode(s)}
+                      className="flex-1 rounded-lg border py-2 text-sm font-bold"
+                      style={{ borderColor: GREEN, color: GREEN }}
+                    >
+                      Ganti Metode Bayar
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

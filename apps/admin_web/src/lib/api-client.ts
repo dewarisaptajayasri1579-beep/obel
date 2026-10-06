@@ -884,12 +884,15 @@ export interface SaleListItem {
   shiftLabel: string
   shiftSessionId: string
   status: "PENDING" | "PAID" | "VOIDED"
+  subtotal: number
+  discount: number
   total: number
   cupCount: number
   paymentMethod: SalePaymentMethod
   /// Baris Payment aktif (Split = dua baris).
   payments: { method: "CASH" | "QRIS"; amount: number }[]
-  items: { productName: string; qty: number }[]
+  /// Harga & total per baris ikut dikirim supaya struk bisa dicetak ulang dari daftar.
+  items: { productName: string; qty: number; unitPrice: number; lineTotal: number }[]
   paidAt: string | null
   createdAt: string
   versionNo?: number

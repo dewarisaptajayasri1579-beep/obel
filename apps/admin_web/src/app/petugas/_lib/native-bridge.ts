@@ -166,17 +166,34 @@ export async function printReceipt(receipt: ReceiptPayload): Promise<boolean> {
   return true;
 }
 
+/// APK lama belum mengenal aksi printer.printLines (jawabannya "Action tidak dikenal").
+export class AplikasiPerluDiperbarui extends Error {
+  constructor() {
+    super("Aplikasi Barista perlu diperbarui untuk mencetak struk ini. Hubungi Admin.");
+    this.name = "AplikasiPerluDiperbarui";
+  }
+}
+
 /// Cetak struk dari daftar baris yang sudah disusun web (lihat receipt.ts): aplikasi Android hanya
-/// menerjemahkannya ke ESC/POS. APK yang masih beredar dari versi lama belum mengenal aksi ini
-/// ("Action tidak dikenal"); untuk itu jatuh ke payload lama (`lama`) supaya cetak tidak putus selama
-/// APK belum diperbarui. Hapus jalur lama ini setelah semua HP Barista memakai APK baru.
-export async function printStruk(baris: PrintLine[], lama: ReceiptPayload): Promise<boolean> {
+/// menerjemahkannya ke ESC/POS. Dilempar AplikasiPerluDiperbarui kalau APK-nya terlalu lama.
+export async function printBaris(baris: PrintLine[]): Promise<boolean> {
   if (!isNativeBridgeAvailable()) return false;
   try {
     await callBridge("printer.printLines", { lines: baris });
     return true;
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith("Action tidak dikenal")) return printReceipt(lama);
+    if (err instanceof Error && err.message.startsWith("Action tidak dikenal")) throw new AplikasiPerluDiperbarui();
+    throw err;
+  }
+}
+
+/// Struk transaksi baru: aksi baru, dan untuk APK lama jatuh ke payload lama (`lama`) supaya cetak tidak
+/// putus selama APK belum diperbarui. Hapus jalur lama ini setelah semua HP Barista memakai APK baru.
+export async function printStruk(baris: PrintLine[], lama: ReceiptPayload): Promise<boolean> {
+  try {
+    return await printBaris(baris);
+  } catch (err) {
+    if (err instanceof AplikasiPerluDiperbarui) return printReceipt(lama);
     throw err;
   }
 }
