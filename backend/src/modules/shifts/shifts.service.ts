@@ -377,7 +377,7 @@ export class ShiftsService {
     throw new DomainError(
       'OUTSIDE_ATTENDANCE_RADIUS',
       `Lokasi Anda sekitar ${jarak} m dari ${acuan.nama} (maks ${radius} m). Absen ${NAMA_TITIK[point]} ditolak — kalau GPS meleset, minta izin Admin lalu ulangi.`,
-      { distance: jarak, radius, point },
+      { distance: jarak, radius, point, place: acuan.nama },
     );
   }
 

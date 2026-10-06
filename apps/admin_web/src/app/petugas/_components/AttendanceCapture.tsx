@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { MapPin, CheckCircle2 } from "lucide-react";
 import { PhotoCapture } from "./PhotoCapture";
+import { pesanGpsError } from "@/lib/gps-error";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -51,7 +52,7 @@ export function AttendanceCapture({
         setLocating(false);
       },
       (err) => {
-        setLocationError(err.message || "Gagal mengambil lokasi. Pastikan izin GPS diaktifkan.");
+        setLocationError(pesanGpsError(err));
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000 },
@@ -70,14 +71,25 @@ export function AttendanceCapture({
         </p>
 
         {location ? (
-          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
-            <div className="text-sm text-slate-700">
-              <div className="font-semibold">
-                {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
+              <div className="text-sm text-slate-700">
+                <div className="font-semibold">
+                  {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                </div>
+                <div className="text-slate-500">Akurat • {Math.round(location.accuracy)}m</div>
               </div>
-              <div className="text-slate-500">Akurat • {Math.round(location.accuracy)}m</div>
+              <CheckCircle2 size={20} className="text-emerald-600" />
             </div>
-            <CheckCircle2 size={20} className="text-emerald-600" />
+            <button
+              type="button"
+              onClick={requestLocation}
+              disabled={locating}
+              className="self-start text-sm font-semibold underline underline-offset-2 disabled:opacity-60"
+              style={{ color: GREEN }}
+            >
+              {locating ? "Mengambil lokasi..." : "Perbarui lokasi"}
+            </button>
           </div>
         ) : (
           <button

@@ -146,6 +146,8 @@ describe('Attendance four points (e2e)', () => {
     const ditolak = await berangkat(JAUH).expect(400);
     expect(ditolak.body.code).toBe('OUTSIDE_ATTENDANCE_RADIUS');
     expect(ditolak.body.details.radius).toBe(100);
+    expect(ditolak.body.details.place).toBe('Gudang');
+    expect(ditolak.body.details.distance).toBeGreaterThan(100);
     expect(await prisma.shiftSession.count({ where: { staffId, status: 'OPEN' } })).toBe(0);
 
     await izin('LOCATION', 'DEPART');

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type AppSettings } from "@/lib/api-client";
+import { pesanGpsError } from "@/lib/gps-error";
 
 /// Pengaturan absen Barista (BR-042): titik Gudang (acuan absen Berangkat &
 /// Kembali), radius absen, dan toleransi Check-Out sebelum jam selesai shift.
@@ -57,7 +58,7 @@ function AbsensiContent() {
       },
       (err) => {
         setMencariLokasi(false);
-        toast.error(err.message || "Gagal mengambil lokasi.");
+        toast.error(pesanGpsError(err));
       },
       { enableHighAccuracy: true, timeout: 15000 },
     );

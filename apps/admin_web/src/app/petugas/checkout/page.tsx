@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, MapPinOff, ReceiptText, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock, ReceiptText, type LucideIcon } from "lucide-react";
 import { api, ApiError, type ActiveShift, type ShiftReport, type ClosingItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -12,6 +12,7 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { QtyStepper } from "../_components/QtyStepper";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
+import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "../_components/LokasiDitolak";
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
 import { stopGpsTracking } from "../_lib/native-bridge";
 
@@ -99,8 +100,8 @@ function CheckoutContent() {
   const [draftTertunda, setDraftTertunda] = useState<string[] | null>(null);
   /// Pesan backend kalau Check-Out sebelum jam selesai shift (EARLY_CHECKOUT, BR-042).
   const [belumWaktunya, setBelumWaktunya] = useState<string | null>(null);
-  /// Pesan backend kalau lokasi Check-Out di luar radius Booth (OUTSIDE_ATTENDANCE_RADIUS).
-  const [lokasiDitolak, setLokasiDitolak] = useState<string | null>(null);
+  /// Penolakan kalau lokasi Check-Out di luar radius Booth (OUTSIDE_ATTENDANCE_RADIUS).
+  const [lokasiDitolak, setLokasiDitolak] = useState<PenolakanLokasi | null>(null);
 
   /// true kalau error-nya menghalangi Check-Out (layar beralih ke pemberitahuannya).
   function tanganiPenghalang(err: unknown): boolean {
@@ -208,7 +209,7 @@ function CheckoutContent() {
     } catch (err) {
       if (tanganiPenghalang(err)) return;
       if (err instanceof ApiError && err.code === "OUTSIDE_ATTENDANCE_RADIUS") {
-        setLokasiDitolak(err.message);
+        setLokasiDitolak(penolakanDariError(err));
         return;
       }
       if (err instanceof ApiError && err.code === "STOCK_CHANGED_DURING_CLOSING") {
@@ -454,15 +455,19 @@ function CheckoutContent() {
         <div>
           <p className="text-base font-bold text-slate-800 mb-2">Konfirmasi Kehadiran</p>
           {lokasiDitolak && (
-            <div className="rounded-2xl bg-red-50 border border-red-200 p-4 mb-3 flex gap-3">
-              <MapPinOff size={20} className="shrink-0 mt-0.5" style={{ color: OBBEL.accentRed }} />
-              <div className="text-sm text-red-800">
-                <p className="font-bold">Check-Out ditolak</p>
-                <p className="mt-0.5">{lokasiDitolak}</p>
-              </div>
+            <div className="mb-3">
+              <PanelLokasiDitolak penolakan={lokasiDitolak} tempat="booth" />
             </div>
           )}
-          <AttendanceCapture location={location} onLocation={setLocation} photoFile={photoFile} onPhoto={(f) => setPhotoFile(f)} />
+          <AttendanceCapture
+            location={location}
+            onLocation={(loc) => {
+              setLocation(loc);
+              setLokasiDitolak(null);
+            }}
+            photoFile={photoFile}
+            onPhoto={(f) => setPhotoFile(f)}
+          />
         </div>
       </div>
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-200 p-4 space-y-2.5">

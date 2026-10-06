@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { MapPinOff } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
+import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { AttendanceCapture, type LocationValue } from "./AttendanceCapture";
+import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "./LokasiDitolak";
 import { OBBEL } from "../_lib/theme";
 
 const GREEN = OBBEL.primaryDark;
@@ -31,11 +32,13 @@ export function AbsenScreen({
   children?: React.ReactNode;
 }) {
   const toast = useToast();
+  // Tombol konfirmasi menempel di bawah layar; tanpa ini bottom nav mengambang menutupinya.
+  useHidePetugasNav();
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [ditolak, setDitolak] = useState<string | null>(null);
+  const [ditolak, setDitolak] = useState<PenolakanLokasi | null>(null);
 
   async function kirim() {
     if (!location || !photoFile) return;
@@ -49,7 +52,7 @@ export function AbsenScreen({
       await onSubmit({ latitude: location.latitude, longitude: location.longitude, photoUrl: url });
     } catch (err) {
       if (err instanceof ApiError && err.code === "OUTSIDE_ATTENDANCE_RADIUS") {
-        setDitolak(err.message);
+        setDitolak(penolakanDariError(err));
       } else {
         toast.error(err instanceof ApiError ? err.message : "Gagal absen. Coba lagi.");
       }
@@ -66,16 +69,7 @@ export function AbsenScreen({
       </div>
 
       <div className="px-4 -mt-2 flex flex-col gap-4">
-        {ditolak && (
-          <div className="rounded-2xl bg-red-50 border border-red-200 p-4 flex gap-3">
-            <MapPinOff size={20} className="shrink-0 mt-0.5" style={{ color: OBBEL.accentRed }} />
-            <div className="text-sm text-red-800">
-              <p className="font-bold">Absen ditolak</p>
-              <p className="mt-0.5">{ditolak}</p>
-              <p className="mt-2">Ambil ulang lokasi di tempat yang lebih terbuka, atau hubungi Admin untuk izin lalu tekan tombol lagi.</p>
-            </div>
-          </div>
-        )}
+        {ditolak && <PanelLokasiDitolak penolakan={ditolak} tempat={tempat} />}
 
         <AttendanceCapture
           tempat={tempat}
