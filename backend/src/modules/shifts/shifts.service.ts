@@ -514,6 +514,27 @@ export class ShiftsService {
       include: { product: true },
     });
 
+    // Layar Check-Out bisa memanggil ini dua kali hampir bersamaan (tap ganda, efek ganda React di dev):
+    // dua pengisian ulang yang bertabrakan melanggar unique snapshot/item. Yang kalah cukup membaca
+    // snapshot yang baru ditulis pemenangnya — isinya sama, diambil dari stok Booth saat itu juga.
+    try {
+      return await this.tulisSnapshotClosing(shiftSessionId, user, existing, boothStocks);
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err;
+      const terbaru = await this.prisma.shiftStockCount.findUniqueOrThrow({
+        where: { shiftSessionId },
+        include: { items: { include: { product: true } } },
+      });
+      return this.toClosingResponse(terbaru);
+    }
+  }
+
+  private async tulisSnapshotClosing(
+    shiftSessionId: string,
+    user: JwtPayload,
+    existing: { id: string } | null,
+    boothStocks: { productId: string; qtyOnHand: number }[],
+  ) {
     // Snapshot DRAFT dari buka-layar-Check-Out sebelumnya bisa sudah basi:
     // shift tetap OPEN sampai konfirmasi, jadi Petugas bisa balik, lanjut
     // jualan/terima stok, lalu buka layar lagi. Diisi ulang dari stok Booth

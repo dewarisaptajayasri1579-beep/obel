@@ -159,6 +159,18 @@ describe('Closing snapshot freshness (e2e)', () => {
     expect(kedua.items.find((i) => i.productId === productId)!.actualQty).toBe(live);
   });
 
+  /// Layar Check-Out bisa memanggil startClosing dua kali hampir bersamaan (tap ganda, atau efek
+  /// ganda React di dev). Keduanya harus sukses dengan snapshot yang sama, bukan 500 karena
+  /// pelanggaran unique (stock_count_id, product_id) saat dua pengisian ulang bertabrakan.
+  it('simultaneous starts of the checkout screen all succeed with the same fresh snapshot', async () => {
+    await mulaiClosing();
+    await jual(1);
+    const live = await stokBooth();
+    const hasil = await Promise.all([0, 1, 2].map(() => request(server()).post(`/shifts/${shiftSessionId}/closing/start`).set(staff())));
+    expect(hasil.map((r) => r.status)).toEqual([201, 201, 201]);
+    for (const r of hasil) expect(expectedProduk(r.body)).toBe(live);
+  });
+
   /// Layar Check-Out memanggil laporan shift dan startClosing BERSAMAAN, jadi laporan
   /// selalu terbaca sebelum snapshot diperbarui. "Awal" tidak boleh ikut bergeser
   /// oleh penjualan yang terjadi setelah snapshot terakhir: stok awal shift itu tetap.
