@@ -16,7 +16,6 @@ import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "..
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
 import { isNativeBridgeAvailable, printBaris, stopGpsTracking } from "../_lib/native-bridge";
 import { buatStrukRingkasanShift } from "../_lib/receipt";
-import { usePerusahaan } from "../_lib/use-perusahaan";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -93,7 +92,6 @@ function CheckoutContent() {
   const router = useRouter();
   const toast = useToast();
   useHidePetugasNav();
-  const perusahaan = usePerusahaan();
 
   const [loading, setLoading] = useState(true);
   const [shift, setShift] = useState<ActiveShift | null>(null);
@@ -199,11 +197,9 @@ function CheckoutContent() {
       const r = await api.getShiftSalesSummary(shift.shiftSessionId);
       await printBaris(
         buatStrukRingkasanShift({
-          perusahaan,
           shiftName: r.shiftTemplateName,
           barista: r.staffName,
           tanggalIso: r.businessDate,
-          dicetakIso: new Date().toISOString(),
           ...r,
         }),
       );

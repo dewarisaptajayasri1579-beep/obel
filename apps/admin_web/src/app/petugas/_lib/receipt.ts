@@ -115,17 +115,23 @@ function judulMerek(nama: string): PrintLine[] {
   return bagian.flatMap((b) => bungkus(b.toUpperCase(), LEBAR_JUDUL).map(judul));
 }
 
-export function buatStrukPenjualan(input: StrukPenjualanInput): PrintLine[] {
-  const { perusahaan, items } = input;
+/// Kop semua struk: judul merek, alamat dan telepon dari Profil Perusahaan (yang kosong tidak dicetak),
+/// ditutup garis. Booth ada di blok info (`No booth`), bukan di kop.
+function kopStruk(perusahaan: Perusahaan): PrintLine[] {
   const baris: PrintLine[] = [...judulMerek(perusahaan.nama)];
-
   if (perusahaan.alamat) baris.push(...bungkus(perusahaan.alamat, LEBAR_STRUK).map((b) => tengah(b)));
   if (perusahaan.telepon) baris.push(tengah(`Phone: ${perusahaan.telepon}`));
-  baris.push(tengah(input.boothName, true), garis("="));
+  baris.push(garis("="));
+  return baris;
+}
+
+export function buatStrukPenjualan(input: StrukPenjualanInput): PrintLine[] {
+  const { perusahaan, items } = input;
+  const baris = kopStruk(perusahaan);
 
   baris.push(...info("Date", formatWaktuStruk(input.waktuIso)), ...info("Order Number", input.saleNo));
-  if (input.barista) baris.push(...info("Barista", input.barista));
-  baris.push(garis("="));
+  if (input.barista) baris.push(...info("User", input.barista));
+  baris.push(...info("No booth", input.boothName), garis("="));
   if (input.cetakUlang) baris.push(tengah("** REPRINT BILL **", true), garis("="));
 
   for (const item of items) {
@@ -150,13 +156,11 @@ export function formatTanggalStruk(iso: string): string {
 }
 
 export interface RingkasanShiftInput {
-  perusahaan: Perusahaan;
   boothName: string;
   shiftName: string;
   barista: string;
-  /// Tanggal bisnis shift (ISO) dan waktu struk dicetak (ISO).
+  /// Tanggal bisnis shift (ISO).
   tanggalIso: string;
-  dicetakIso: string;
   transaksi: number;
   subtotal: number;
   diskon: number;
@@ -164,23 +168,22 @@ export interface RingkasanShiftInput {
   pembatalan: { count: number; cup: number; amount: number };
   tunai: { amount: number };
   qris: { amount: number };
-  uangJalan: number;
-  setoranDiharapkan: number;
   kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number }[] }[];
 }
 
 /// Struk ringkasan penjualan satu shift (dicetak Barista saat Check-Out), bentuknya mengikuti struk
 /// "Ringkasan Penjualan" client: label bahasa Indonesia, blok per pembayaran, per produk dengan TOTAL tiap
 /// kategori. Gaya garis, info dan nominal sama dengan struk penjualan; Biaya Layanan, Pajak, Pembulatan,
-/// Tipe Penjualan dan Tamu tidak ada di sistem ini. Uang Jalan dan Setoran adalah tambahan khas Obbel.
+/// Tipe Penjualan dan Tamu tidak ada di sistem ini.
+/// Tanpa kop perusahaan, seperti struk client: ini laporan internal, dan booth, User dan shift sudah di
+/// blok info.
 export function buatStrukRingkasanShift(input: RingkasanShiftInput): PrintLine[] {
-  const tanggal = formatTanggalStruk(input.tanggalIso);
-  const baris: PrintLine[] = [...judulMerek(input.perusahaan.nama), tengah(input.boothName, true), garis("=")];
-  baris.push(tengah("RINGKASAN PENJUALAN", true), tengah(`${tanggal} - ${tanggal}`), garis("="));
+  const baris: PrintLine[] = [tengah("RINGKASAN PENJUALAN", true), garis("=")];
   baris.push(
+    ...info("Tanggal", formatTanggalStruk(input.tanggalIso)),
     ...info("Shift", input.shiftName),
-    ...info("Barista", input.barista),
-    ...info("Dicetak", formatWaktuStruk(input.dicetakIso)),
+    ...info("User", input.barista),
+    ...info("No booth", input.boothName),
     garis("="),
   );
 
@@ -211,9 +214,7 @@ export function buatStrukRingkasanShift(input: RingkasanShiftInput): PrintLine[]
     baris.push(...kiriKanan("TOTAL", `(${k.qty}) ${angka(k.amount)}`, true));
   }
 
-  baris.push(garis("-"));
-  if (input.uangJalan > 0) baris.push(...kiriKanan("Uang Jalan", angka(input.uangJalan)));
-  baris.push(...kiriKanan("Setoran", angka(input.setoranDiharapkan), true), garis("="));
+  baris.push(garis("="));
   return baris;
 }
 

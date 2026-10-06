@@ -35,13 +35,13 @@ ReceiptPrinter
 Implementasi Bluetooth vendor/package dipisah dari business logic.
 
 ### Receipt minimum
-- Nama perusahaan (dari Profil Perusahaan: alamat dan telepon bila diisi) dan Booth;
+- Nama perusahaan (dari Profil Perusahaan: alamat dan telepon bila diisi);
 - nomor transaksi;
 - waktu (Asia/Jakarta, format struk client `29/09/2026 12:00`);
 - item, qty, harga, jumlah item;
 - Subtotal dan Diskon bila ada diskon, lalu total;
 - metode pembayaran;
-- Barista;
+- User (Barista yang menjual) dan No booth (nama Booth), keduanya di blok info di bawah Order Number;
 - penanda `** REPRINT BILL **` pada salinan;
 - footer `Terima kasih`;
 - IG/WA optional dari setting.
@@ -50,7 +50,7 @@ Implementasi Bluetooth vendor/package dipisah dari business logic.
 Struk disusun di **web** (`admin_web/src/app/petugas/_lib/receipt.ts`) sebagai daftar baris yang sudah dibungkus dan dirata ke lebar kertas 58 mm (32 karakter, judul lebar ganda 16). Satu susunan itu dipakai untuk cetak Bluetooth, teks WhatsApp (blok monospace) dan cetak browser. Aplikasi Android (`booth_pwa_flutter`) hanya menerjemahkan baris ke ESC/POS lewat aksi jembatan `printer.printLines`, sehingga format struk bisa diubah dengan deploy web tanpa membangun ulang APK. Label mengikuti struk client (Date, Order Number, Total Item, Discount, Total, Payment), isi data tetap bahasa Indonesia, dan nominal tanpa `Rp`. Judul perusahaan dipecah: kata pertama di baris atas, sisanya di bawah (`OBBEL` / `COFFEE & MILK`). APK lama yang belum mengenal `printer.printLines` dilayani lewat aksi lama `printer.print` (format lama) sampai semua HP diperbarui.
 
 ### Struk Ringkasan Shift
-Barista mencetaknya dari langkah Laporan layar Check-Out (tombol **Cetak Ringkasan Penjualan**, hanya lewat printer Bluetooth di aplikasi Barista). Sumbernya `GET /shifts/:id/sales-summary`, dibaca ulang saat dicetak. Bentuknya mengikuti struk "Ringkasan Penjualan" client (label bahasa Indonesia) dengan garis, info dan nominal yang sama dengan struk penjualan. Isi: rentang tanggal, shift, Barista, Penjualan, Diskon, TOTAL, Invoices (jumlah dan rata-rata per invoice), Ringkasan Pembatalan (jumlah invoice, jumlah item, total; hanya bila ada), Ringkasan Pembayaran (Tunai, QRIS, TOTAL; sale Split masuk ke dua sisi), Ringkasan Berdasarkan Produk per kategori (`x2 Nama  nominal` dan `TOTAL (qty) nominal`), lalu Uang Jalan dan Setoran (Tunai + Uang Jalan) sebagai tambahan khas Obbel. Biaya Layanan, Pajak, Pembulatan, Tipe Penjualan dan Tamu pada struk client tidak ada di sistem ini sehingga tidak dicetak. APK lama menampilkan pesan untuk memperbarui aplikasi.
+Barista mencetaknya dari langkah Laporan layar Check-Out (tombol **Cetak Ringkasan Penjualan**, hanya lewat printer Bluetooth di aplikasi Barista). Sumbernya `GET /shifts/:id/sales-summary`, dibaca ulang saat dicetak. Bentuknya mengikuti struk "Ringkasan Penjualan" client (label bahasa Indonesia) dengan garis, info dan nominal yang sama dengan struk penjualan. Tanpa kop perusahaan (laporan internal, seperti struk client). Isi: Tanggal (tanggal bisnis shift), Shift, User, No booth, Penjualan, Diskon, TOTAL, Invoices (jumlah dan rata-rata per invoice), Ringkasan Pembatalan (jumlah invoice, jumlah item, total; hanya bila ada), Ringkasan Pembayaran (Tunai, QRIS, TOTAL; sale Split masuk ke dua sisi), Ringkasan Berdasarkan Produk per kategori (`x2 Nama  nominal` dan `TOTAL (qty) nominal`). Biaya Layanan, Pajak, Pembulatan, Tipe Penjualan dan Tamu pada struk client tidak ada di sistem ini sehingga tidak dicetak. APK lama menampilkan pesan untuk memperbarui aplikasi.
 
 ## 5. Print rule
 - Server sale harus sukses terlebih dahulu.
