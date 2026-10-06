@@ -63,17 +63,6 @@ function ukuranNamaKartu(nama: string): string {
   return "text-lg";
 }
 
-/// Nominal cepat: kelipatan Rp5.000 di atas total (mirip mockup Rp20rb/50rb/
-/// 100rb) — dibulatkan sesuai besar transaksinya sendiri, bukan angka tetap,
-/// supaya tetap masuk akal untuk transaksi besar.
-function nominalCepat(total: number): number[] {
-  const bulat = (n: number) => Math.ceil(n / 5000) * 5000;
-  const a = bulat(total);
-  const b = bulat(total * 1.5);
-  const c = bulat(total * 2);
-  return Array.from(new Set([a, b, c].filter((n) => n > 0)));
-}
-
 function KasirContent() {
   const toast = useToast();
   const router = useRouter();
@@ -89,7 +78,6 @@ function KasirContent() {
 
   const [discountInput, setDiscountInput] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<MetodeBayar>("CASH");
-  const [nominalTunai, setNominalTunai] = useState<number>(0);
   // Split: cukup simpan bagian Tunai — bagian QRIS selalu sisanya (lihat SplitBayarInput).
   const [splitTunai, setSplitTunai] = useState<number>(0);
   // Foto bukti bayar QRIS (wajib untuk QRIS & Split). URL hasil upload
@@ -207,7 +195,6 @@ function KasirContent() {
 
   useEffect(() => {
     if (sheet !== "payment") return;
-    setNominalTunai(total);
     setSplitTunai(Math.ceil(total / 2));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet]);
@@ -266,14 +253,8 @@ function KasirContent() {
   }
 
 
-  const kembalianAtauKurang = nominalTunai - total;
   const butuhBuktiQris = paymentMethod !== "CASH";
-  const nominalValid =
-    paymentMethod === "QRIS"
-      ? true
-      : paymentMethod === "CASH"
-        ? nominalTunai >= total
-        : splitValid(total, splitTunai);
+  const nominalValid = paymentMethod === "SPLIT" ? splitValid(total, splitTunai) : true;
   const bisaBayar = nominalValid && (!butuhBuktiQris || !!qrisPhoto);
 
   async function handleSimpanDraft() {
@@ -845,56 +826,7 @@ function KasirContent() {
                 />
               )}
 
-              {paymentMethod === "CASH" && (
-                <div>
-                  <p className="text-base font-bold text-slate-700 mb-2">Nominal Diterima (Tunai)</p>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {nominalCepat(total).map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setNominalTunai(n)}
-                        className="rounded-xl py-3 text-sm font-bold border-2"
-                        style={
-                          nominalTunai === n
-                            ? { borderColor: GREEN, color: GREEN, backgroundColor: OBBEL_SCALE[50] }
-                            : { borderColor: "#E2E8F0", color: "#475569" }
-                        }
-                      >
-                        {formatRupiah(n)}
-                      </button>
-                    ))}
-                  </div>
-                  <RibuanInput value={nominalTunai} onChange={setNominalTunai} placeholder="Masukkan nominal lain" />
-                </div>
-              )}
-
               {paymentMethod === "SPLIT" && <SplitBayarInput total={total} tunai={splitTunai} onTunai={setSplitTunai} />}
-
-              {paymentMethod === "CASH" && (
-                <div className="rounded-2xl bg-slate-50 p-4 flex flex-col gap-1.5 text-base">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Total Pembayaran</span>
-                    <span className="font-semibold">{formatRupiah(total)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Dibayar</span>
-                    <span className="font-semibold">{formatRupiah(nominalTunai)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{kembalianAtauKurang < 0 ? "Kekurangan" : "Kembalian"}</span>
-                    <span className="font-bold" style={{ color: kembalianAtauKurang < 0 ? OBBEL.accentRed : GREEN }}>
-                      {formatRupiah(Math.abs(kembalianAtauKurang))}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {paymentMethod === "CASH" && kembalianAtauKurang < 0 && (
-                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
-                  Nominal masih kurang. Mohon masukkan nominal yang sesuai.
-                </div>
-              )}
             </div>
 
             <div className="p-4 border-t border-slate-100">
