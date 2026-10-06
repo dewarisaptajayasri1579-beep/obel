@@ -84,16 +84,19 @@ const garis = (karakter: "-" | "="): PrintLine => kiri(karakter.repeat(LEBAR_STR
 
 /// Satu baris label di kiri dan nilai di kanan. Kalau label terlalu panjang, label dibungkus dan nilai
 /// ikut di baris terakhir bila muat, kalau tidak di baris sendiri rata kanan (angka tidak pernah terpecah).
-function kiriKanan(label: string, nilai: string, tebal = false): PrintLine[] {
-  const batasKiri = LEBAR_STRUK - nilai.length - 1;
-  if (label.length <= batasKiri) return [kiri(label.padEnd(LEBAR_STRUK - nilai.length) + nilai, tebal)];
-  const potongan = bungkus(label, LEBAR_STRUK);
+/// `menjorok` = spasi di depan tiap baris label (rincian di bawah judul), nilai tetap rata kanan.
+function kiriKanan(label: string, nilai: string, tebal = false, menjorok = 0): PrintLine[] {
+  const awal = " ".repeat(menjorok);
+  const lebar = LEBAR_STRUK - menjorok;
+  const batasKiri = lebar - nilai.length - 1;
+  if (label.length <= batasKiri) return [kiri(awal + label.padEnd(lebar - nilai.length) + nilai, tebal)];
+  const potongan = bungkus(label, lebar);
   const terakhir = potongan[potongan.length - 1];
   if (terakhir.length <= batasKiri) {
-    potongan[potongan.length - 1] = terakhir.padEnd(LEBAR_STRUK - nilai.length) + nilai;
-    return potongan.map((p) => kiri(p, tebal));
+    potongan[potongan.length - 1] = terakhir.padEnd(lebar - nilai.length) + nilai;
+    return potongan.map((p) => kiri(awal + p, tebal));
   }
-  return [...potongan.map((p) => kiri(p, tebal)), kiri(nilai.padStart(LEBAR_STRUK), tebal)];
+  return [...potongan.map((p) => kiri(awal + p, tebal)), kiri(nilai.padStart(LEBAR_STRUK), tebal)];
 }
 
 /// `Label        : nilai` dengan titik dua sejajar; nilai panjang dilanjutkan di bawahnya dengan indentasi.
@@ -136,6 +139,81 @@ export function buatStrukPenjualan(input: StrukPenjualanInput): PrintLine[] {
   }
   baris.push(...kiriKanan("Total", angka(input.total), true), ...kiriKanan("Payment", input.metode), garis("="));
   baris.push(kiri(""), tengah("Terima kasih"));
+  return baris;
+}
+
+/// Tanggal tanpa jam (mis. tanggal bisnis shift) `dd/MM/yyyy`; dibaca dari bagian tanggal ISO-nya apa
+/// adanya, tanpa konversi zona waktu.
+export function formatTanggalStruk(iso: string): string {
+  const [tahun, bulan, hari] = iso.slice(0, 10).split("-");
+  return `${hari}/${bulan}/${tahun}`;
+}
+
+export interface RingkasanShiftInput {
+  perusahaan: Perusahaan;
+  boothName: string;
+  shiftName: string;
+  barista: string;
+  /// Tanggal bisnis shift (ISO) dan waktu struk dicetak (ISO).
+  tanggalIso: string;
+  dicetakIso: string;
+  transaksi: number;
+  subtotal: number;
+  diskon: number;
+  total: number;
+  pembatalan: { count: number; cup: number; amount: number };
+  tunai: { amount: number };
+  qris: { amount: number };
+  uangJalan: number;
+  setoranDiharapkan: number;
+  kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number }[] }[];
+}
+
+/// Struk ringkasan penjualan satu shift (dicetak Barista saat Check-Out), bentuknya mengikuti struk
+/// "Ringkasan Penjualan" client: label bahasa Indonesia, blok per pembayaran, per produk dengan TOTAL tiap
+/// kategori. Gaya garis, info dan nominal sama dengan struk penjualan; Biaya Layanan, Pajak, Pembulatan,
+/// Tipe Penjualan dan Tamu tidak ada di sistem ini. Uang Jalan dan Setoran adalah tambahan khas Obbel.
+export function buatStrukRingkasanShift(input: RingkasanShiftInput): PrintLine[] {
+  const tanggal = formatTanggalStruk(input.tanggalIso);
+  const baris: PrintLine[] = [...judulMerek(input.perusahaan.nama), tengah(input.boothName, true), garis("=")];
+  baris.push(tengah("RINGKASAN PENJUALAN", true), tengah(`${tanggal} - ${tanggal}`), garis("="));
+  baris.push(
+    ...info("Shift", input.shiftName),
+    ...info("Barista", input.barista),
+    ...info("Dicetak", formatWaktuStruk(input.dicetakIso)),
+    garis("="),
+  );
+
+  baris.push(...kiriKanan("Penjualan", angka(input.subtotal)), ...kiriKanan("Diskon", input.diskon > 0 ? `-${angka(input.diskon)}` : "0"));
+  baris.push(garis("-"), ...kiriKanan("TOTAL", angka(input.total), true), garis("-"));
+
+  baris.push(kiri("Invoices"), ...kiriKanan("Jumlah Invoices", String(input.transaksi), false, 1));
+  baris.push(...kiriKanan("Rata-rata Per Inv", angka(input.transaksi > 0 ? input.total / input.transaksi : 0), false, 1), garis("-"));
+
+  if (input.pembatalan.count > 0) {
+    baris.push(
+      kiri("Ringkasan Pembatalan"),
+      ...kiriKanan("Jumlah Invoices", String(input.pembatalan.count), false, 1),
+      ...kiriKanan("Jumlah item", String(input.pembatalan.cup), false, 1),
+      ...kiriKanan("Total", angka(input.pembatalan.amount), false, 1),
+      garis("-"),
+    );
+  }
+
+  baris.push(kiri("Ringkasan Pembayaran"), ...kiriKanan("Tunai", angka(input.tunai.amount), false, 1), ...kiriKanan("QRIS", angka(input.qris.amount), false, 1));
+  baris.push(garis("-"), ...kiriKanan("TOTAL", angka(input.total), true), garis("-"));
+
+  baris.push(kiri("Ringkasan Berdasarkan Produk"));
+  if (input.kategori.length === 0) baris.push(tengah("Belum ada penjualan"));
+  for (const k of input.kategori) {
+    baris.push(kiri(k.name.toUpperCase(), true));
+    for (const p of k.produk) baris.push(...kiriKanan(`x${p.qty} ${p.name}`, angka(p.amount), false, 1));
+    baris.push(...kiriKanan("TOTAL", `(${k.qty}) ${angka(k.amount)}`, true));
+  }
+
+  baris.push(garis("-"));
+  if (input.uangJalan > 0) baris.push(...kiriKanan("Uang Jalan", angka(input.uangJalan)));
+  baris.push(...kiriKanan("Setoran", angka(input.setoranDiharapkan), true), garis("="));
   return baris;
 }
 

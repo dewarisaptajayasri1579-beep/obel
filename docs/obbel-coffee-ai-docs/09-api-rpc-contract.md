@@ -122,6 +122,7 @@ Semua absen membawa `latitude`, `longitude`, `photo_url` (hasil `POST /shifts/at
   memuat `arrivedAt` dan `cashFloat`.
 - Tiba: `POST /shifts/:id/arrive` (acuan Booth, shift OPEN milik Barista, idempotent).
 - Kembali: `POST /shifts/:id/return` (acuan Gudang, shift CLOSED milik Barista, idempotent).
+- `GET /shifts/:id/sales-summary` (Barista pemilik shift, Admin/Owner dengan akses Setor & Pengembalian atau Check-In/Out): ringkasan penjualan shift untuk struk — `transaksi`, `cup`, `subtotal`, `diskon`, `total`, `pembatalan{count,cup,amount}`, `tunai{count,amount}`, `qris{count,amount}` (dari baris Payment, Split masuk dua sisi), `uangJalan`, `setoranDiharapkan` (tunai + uang jalan), `kategori[{name,qty,amount,produk[]}]`. Sale yang sudah direvisi tidak dihitung (versi baru yang terhitung); pembatalan = sale VOIDED.
 - `GET /shifts/pending-return` (Barista): shift yang sudah Check-Out tapi belum Kembali, atau kosong.
 - Izin: `POST /attendance-permits` (Admin: `staff_id`, `type` LOCATION|EARLY_CHECKOUT, `point` untuk LOCATION,
   `reason`), `GET /attendance-permits?date=YYYY-MM-DD` (Admin/Owner, default hari ini).

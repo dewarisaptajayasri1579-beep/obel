@@ -1141,6 +1141,102 @@ export class ShiftsService {
     };
   }
 
+  /// Ringkasan PENJUALAN satu shift untuk struk Check-Out — sengaja terpisah dari getShiftReport
+  /// (berorientasi stok, 9 query). Sale yang direvisi TIDAK berubah status (tetap PAID, atau VOIDED
+  /// kalau dibatalkan lebih dulu); penandanya hanya revisionOfId di versi barunya (pola yang sama
+  /// dengan SalesService.findAll), jadi versi lama dibuang dari penjualan maupun pembatalan.
+  /// Total per metode dari baris Payment, bukan Sale.paymentMethod, supaya sale Split masuk dua sisi.
+  async getSalesSummary(shiftSessionId: string, user: JwtPayload) {
+    const shift = await this.loadOwnedShift(shiftSessionId, user);
+    const [booth, shiftTemplate, staff, sales] = await Promise.all([
+      this.prisma.booth.findUniqueOrThrow({ where: { id: shift.boothId } }),
+      this.prisma.shiftTemplate.findUniqueOrThrow({ where: { id: shift.shiftTemplateId } }),
+      this.prisma.profile.findUniqueOrThrow({ where: { id: shift.staffId }, select: SAFE_PROFILE_SELECT }),
+      this.prisma.sale.findMany({
+        where: { shiftSessionId, status: { in: [SaleStatus.PAID, SaleStatus.VOIDED] } },
+        include: {
+          payments: { where: { status: 'POSTED' } },
+          items: { include: { product: { include: { category: true } } } },
+        },
+      }),
+    ]);
+
+    const revisiBaru = await this.prisma.sale.findMany({
+      where: { revisionOfId: { in: sales.map((s) => s.id) } },
+      select: { revisionOfId: true },
+    });
+    const diganti = new Set(revisiBaru.map((r) => r.revisionOfId));
+    const lunas = sales.filter((s) => s.status === SaleStatus.PAID && !diganti.has(s.id));
+    const batal = sales.filter((s) => s.status === SaleStatus.VOIDED && !diganti.has(s.id));
+
+    let subtotal = 0;
+    let diskon = 0;
+    let total = 0;
+    let cup = 0;
+    const metode = { CASH: { count: 0, amount: 0 }, QRIS: { count: 0, amount: 0 } };
+    type Baris = { name: string; qty: number; amount: number };
+    const kategori = new Map<string, { name: string; sortOrder: number; qty: number; amount: number; produk: Map<string, Baris> }>();
+
+    for (const s of lunas) {
+      subtotal += Number(s.subtotal);
+      diskon += Number(s.discount);
+      total += Number(s.total);
+      for (const m of ['CASH', 'QRIS'] as const) {
+        const dibayar = s.payments.filter((p) => p.method === m);
+        if (dibayar.length === 0) continue;
+        metode[m].count += 1;
+        metode[m].amount += dibayar.reduce((n, p) => n + Number(p.amount), 0);
+      }
+      for (const it of s.items) {
+        cup += it.qty;
+        const kat = it.product.category;
+        const kunci = kat?.id ?? '-';
+        let k = kategori.get(kunci);
+        if (!k) {
+          k = { name: kat?.name ?? 'Lainnya', sortOrder: kat?.sortOrder ?? Number.MAX_SAFE_INTEGER, qty: 0, amount: 0, produk: new Map() };
+          kategori.set(kunci, k);
+        }
+        k.qty += it.qty;
+        k.amount += Number(it.lineTotal);
+        const p = k.produk.get(it.productId) ?? { name: it.product.name, qty: 0, amount: 0 };
+        p.qty += it.qty;
+        p.amount += Number(it.lineTotal);
+        k.produk.set(it.productId, p);
+      }
+    }
+
+    const uangJalan = Number(shift.cashFloat);
+    return {
+      boothName: booth.name,
+      shiftTemplateName: shiftTemplate.name,
+      staffName: staff.fullName,
+      businessDate: shift.businessDate,
+      openedAt: shift.openedAt,
+      transaksi: lunas.length,
+      cup,
+      subtotal,
+      diskon,
+      total,
+      pembatalan: {
+        count: batal.length,
+        cup: batal.reduce((n, s) => n + s.items.reduce((m, it) => m + it.qty, 0), 0),
+        amount: batal.reduce((n, s) => n + Number(s.total), 0),
+      },
+      tunai: metode.CASH,
+      qris: metode.QRIS,
+      uangJalan,
+      setoranDiharapkan: metode.CASH.amount + uangJalan,
+      kategori: [...kategori.values()]
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+        .map((k) => ({
+          name: k.name,
+          qty: k.qty,
+          amount: k.amount,
+          produk: [...k.produk.values()].sort((a, b) => a.name.localeCompare(b.name)),
+        })),
+    };
+  }
+
   /// TX-07 — Impact Preview untuk Shift Correction. Reassignment Booth
   /// hanya boleh jika shift belum punya transaksi terikat (sales/movement),
   /// karena seluruh ledger sudah terikat ke Booth tersebut.

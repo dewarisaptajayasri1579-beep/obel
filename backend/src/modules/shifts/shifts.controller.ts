@@ -62,6 +62,13 @@ export class ShiftsController {
     return this.shiftsService.getShiftReport(id, user);
   }
 
+  @Get(':id/sales-summary')
+  @Menu(['SETOR_PENGEMBALIAN', 'CHECKIN_CHECKOUT'], AccessLevel.VIEW)
+  @Roles(UserRole.BOOTH_STAFF, UserRole.ADMIN, UserRole.OWNER)
+  getSalesSummary(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.shiftsService.getSalesSummary(id, user);
+  }
+
   @Post('check-in')
   @Roles(UserRole.BOOTH_STAFF)
   checkIn(@CurrentUser() user: JwtPayload, @Body() dto: CheckInDto) {

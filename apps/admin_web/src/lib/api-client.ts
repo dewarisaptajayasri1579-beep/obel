@@ -1293,6 +1293,26 @@ export interface ShiftReportSetoran {
   confirmedAt: string | null
 }
 
+/// Ringkasan penjualan satu shift untuk struk Check-Out (GET /shifts/:id/sales-summary).
+export interface ShiftSalesSummary {
+  boothName: string
+  shiftTemplateName: string
+  staffName: string
+  businessDate: string
+  openedAt: string | null
+  transaksi: number
+  cup: number
+  subtotal: number
+  diskon: number
+  total: number
+  pembatalan: { count: number; cup: number; amount: number }
+  tunai: { count: number; amount: number }
+  qris: { count: number; amount: number }
+  uangJalan: number
+  setoranDiharapkan: number
+  kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number }[] }[]
+}
+
 export interface ShiftReport {
   boothName: string
   shiftTemplateName: string
@@ -1950,6 +1970,7 @@ export const api = {
     request<ShiftHistoryResponse>(`/shifts/history${month ? `?month=${month}` : ""}`),
   getShiftAdminHistory: () => request<ShiftAdminHistoryItem[]>("/shifts/admin-history"),
   getShiftReport: (shiftSessionId: string) => request<ShiftReport>(`/shifts/${shiftSessionId}/report`),
+  getShiftSalesSummary: (shiftSessionId: string) => request<ShiftSalesSummary>(`/shifts/${shiftSessionId}/sales-summary`),
   confirmCashDeposit: (shiftSessionId: string, input: { depositedAmount: number; note?: string }) =>
     request<{ status: "PENDING" | "CONFIRMED" | "DISCREPANCY" }>(`/shifts/${shiftSessionId}/cash-deposit/confirm`, {
       method: "POST",

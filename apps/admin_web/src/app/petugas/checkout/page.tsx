@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, ReceiptText, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock, Printer, ReceiptText, type LucideIcon } from "lucide-react";
 import { api, ApiError, type ActiveShift, type ShiftReport, type ClosingItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,13 +14,23 @@ import { QtyStepper } from "../_components/QtyStepper";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
 import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "../_components/LokasiDitolak";
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
-import { stopGpsTracking } from "../_lib/native-bridge";
+import { isNativeBridgeAvailable, printBaris, stopGpsTracking } from "../_lib/native-bridge";
+import { buatStrukRingkasanShift } from "../_lib/receipt";
+import { usePerusahaan } from "../_lib/use-perusahaan";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 function kelasAngka(n: number) {
   return n === 0 ? "text-slate-400 font-normal" : "text-slate-800 font-bold";
+}
+
+/// Cara bayar satu transaksi untuk daftar Rekap Penjualan; Split = Tunai + QRIS pada transaksi yang sama.
+function labelBayar(t: { tunai: number; qris: number }): string {
+  if (t.tunai > 0 && t.qris > 0) return "Split (Tunai + QRIS)";
+  if (t.tunai > 0) return "Tunai";
+  if (t.qris > 0) return "QRIS";
+  return "-";
 }
 
 type Step = "LAPORAN" | "ABSEN";
@@ -83,6 +93,7 @@ function CheckoutContent() {
   const router = useRouter();
   const toast = useToast();
   useHidePetugasNav();
+  const perusahaan = usePerusahaan();
 
   const [loading, setLoading] = useState(true);
   const [shift, setShift] = useState<ActiveShift | null>(null);
@@ -94,6 +105,7 @@ function CheckoutContent() {
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mencetak, setMencetak] = useState(false);
   const [sekarang, setSekarang] = useState(new Date());
   /// Nomor draft transaksi shift ini yang belum dibayar — Check-Out ditolak backend
   /// (PENDING_DRAFTS_EXIST) sampai semuanya dibayar atau dihapus di Kasir.
@@ -174,9 +186,38 @@ function CheckoutContent() {
   const adaSelisih = baris.some((b) => (stokFisik[b.productId] ?? b.sisaSistem) !== b.sisaSistem);
   const catatanTerisi = !adaSelisih || catatan.trim().length > 0;
 
+  /// Struk ringkasan penjualan shift. Dibaca ulang dari server saat dicetak (bukan dari laporan di layar),
+  /// jadi angkanya selalu yang terkini. Hanya bisa lewat printer Bluetooth di aplikasi Barista.
+  async function cetakRingkasan() {
+    if (!shift) return;
+    if (!isNativeBridgeAvailable()) {
+      toast.warning("Cetak ringkasan hanya bisa dari aplikasi Barista (printer Bluetooth).");
+      return;
+    }
+    setMencetak(true);
+    try {
+      const r = await api.getShiftSalesSummary(shift.shiftSessionId);
+      await printBaris(
+        buatStrukRingkasanShift({
+          perusahaan,
+          shiftName: r.shiftTemplateName,
+          barista: r.staffName,
+          tanggalIso: r.businessDate,
+          dicetakIso: new Date().toISOString(),
+          ...r,
+        }),
+      );
+      toast.success("Ringkasan penjualan dicetak.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mencetak ringkasan. Cek printer sudah dipilih & menyala.");
+    } finally {
+      setMencetak(false);
+    }
+  }
+
   function lanjutCheckOut() {
     if (!catatanTerisi) {
-      toast.warning("Ada selisih Stok Fisik — isi Catatan dulu sebelum lanjut.");
+      toast.warning("Ada selisih Stok Fisik — isi alasannya dulu sebelum lanjut.");
       return;
     }
     setStep("ABSEN");
@@ -265,83 +306,68 @@ function CheckoutContent() {
 
           <p className="text-base font-bold text-slate-800 mb-2">Rekap Stok Produk</p>
           <p className="text-sm text-slate-500 mb-2">
-            Masukkan jumlah fisik cup yang tersisa di kolom Stok Fisik. Isi Catatan kalau ada selisih dari sistem.
+            Masukkan jumlah fisik cup yang tersisa di kolom Stok Fisik. Kalau ada selisih dari sistem, isi alasannya di bawah.
           </p>
-          <div className="rounded-2xl bg-white border border-slate-200 overflow-x-auto mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-slate-400 text-left whitespace-nowrap">
-                  <th className="p-3 font-semibold">Produk</th>
-                  <th className="p-3 font-semibold text-center">Awal</th>
-                  <th className="p-3 font-semibold text-center">Restock</th>
-                  <th className="p-3 font-semibold text-center">Terjual</th>
-                  <th className="p-3 font-semibold text-center">Retur</th>
-                  <th className="p-3 font-semibold text-center">Sisa Sistem</th>
-                  <th className="p-3 font-semibold text-center">Stok Fisik</th>
-                  <th className="p-3 font-semibold text-center">Selisih</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {baris.map((b) => {
-                  const fisik = stokFisik[b.productId] ?? b.sisaSistem;
-                  const selisih = fisik - b.sisaSistem;
-                  return (
-                    <tr key={b.productId}>
-                      <td className="p-3 font-semibold text-slate-800 whitespace-nowrap">{b.productName}</td>
-                      <td className={`p-3 text-center text-base ${kelasAngka(b.stokAwal)}`}>{b.stokAwal}</td>
-                      <td className={`p-3 text-center text-base ${kelasAngka(b.restock)}`}>{b.restock}</td>
-                      <td className={`p-3 text-center text-base ${kelasAngka(b.terjual)}`}>{b.terjual}</td>
-                      <td className={`p-3 text-center text-base ${kelasAngka(b.retur)}`}>{b.retur}</td>
-                      <td className={`p-3 text-center text-base ${kelasAngka(b.sisaSistem)}`}>{b.sisaSistem}</td>
-                      <td className="p-2 text-center">
-                        <QtyStepper
-                          value={fisik}
-                          highlighted={selisih !== 0}
-                          onChange={(n) => setStokFisik((prev) => ({ ...prev, [b.productId]: n }))}
-                        />
-                      </td>
-                      <td className={`p-3 text-center text-base font-bold ${selisih === 0 ? "text-slate-400" : "text-rose-600"}`}>
-                        {selisih === 0 ? "0" : selisih > 0 ? `+${selisih}` : selisih}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-2 mb-4">
+            {baris.map((b) => {
+              const fisik = stokFisik[b.productId] ?? b.sisaSistem;
+              const selisih = fisik - b.sisaSistem;
+              const angka: [string, number][] = [
+                ["Awal", b.stokAwal],
+                ["Restock", b.restock],
+                ["Terjual", b.terjual],
+                ["Retur", b.retur],
+                ["Sisa Sistem", b.sisaSistem],
+              ];
+              return (
+                <div
+                  key={b.productId}
+                  className={`rounded-2xl bg-white border p-3 ${selisih !== 0 ? "border-amber-300" : "border-slate-200"}`}
+                >
+                  <p className="font-bold text-slate-900 wrap-break-word">{b.productName}</p>
+                  <div className="grid grid-cols-5 gap-1 mt-2 text-center">
+                    {angka.map(([label, nilai]) => (
+                      <div key={label}>
+                        <p className="text-[11px] leading-tight text-slate-400">{label}</p>
+                        <p className={`text-base ${kelasAngka(nilai)}`}>{nilai}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-100">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-600">Stok Fisik</p>
+                      <p className={`text-sm font-bold ${selisih === 0 ? "text-slate-400" : "text-rose-600"}`}>
+                        Selisih {selisih === 0 ? "0" : selisih > 0 ? `+${selisih}` : selisih}
+                      </p>
+                    </div>
+                    <QtyStepper
+                      value={fisik}
+                      highlighted={selisih !== 0}
+                      onChange={(n) => setStokFisik((prev) => ({ ...prev, [b.productId]: n }))}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <p className="text-base font-bold text-slate-800 mb-2">Rekap Penjualan</p>
-          <div className="rounded-2xl bg-white border border-slate-200 overflow-x-auto mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-slate-400 text-left whitespace-nowrap">
-                  <th className="p-3 font-semibold">No Transaksi</th>
-                  <th className="p-3 font-semibold text-center">Jml Cup</th>
-                  <th className="p-3 font-semibold text-center">Nominal</th>
-                  <th className="p-3 font-semibold text-center">Tunai</th>
-                  <th className="p-3 font-semibold text-center">QRIS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {report.transaksi.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-3 text-center text-slate-400">
-                      Belum ada transaksi.
-                    </td>
-                  </tr>
-                ) : (
-                  report.transaksi.map((t) => (
-                    <tr key={t.saleId}>
-                      <td className="p-3 font-semibold text-slate-800 whitespace-nowrap">{t.saleNo}</td>
-                      <td className="p-3 text-center">{t.cupCount}</td>
-                      <td className="p-3 text-center font-bold">{formatRupiah(t.total)}</td>
-                      <td className="p-3 text-center">{t.tunai > 0 ? formatRupiah(t.tunai) : "-"}</td>
-                      <td className="p-3 text-center">{t.qris > 0 ? formatRupiah(t.qris) : "-"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="rounded-2xl bg-white border border-slate-200 divide-y divide-slate-100 mb-4">
+            {report.transaksi.length === 0 ? (
+              <p className="p-3 text-center text-sm text-slate-400">Belum ada transaksi.</p>
+            ) : (
+              report.transaksi.map((t) => (
+                <div key={t.saleId} className="flex items-center justify-between gap-3 p-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800">{t.saleNo}</p>
+                    <p className="text-sm text-slate-500">
+                      {t.cupCount} cup • {labelBayar(t)}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-bold text-slate-900">{formatRupiah(t.total)}</p>
+                </div>
+              ))
+            )}
           </div>
 
           <p className="text-base font-bold text-slate-800 mb-2">Rekap Keuangan</p>
@@ -375,18 +401,29 @@ function CheckoutContent() {
             </div>
           )}
 
-          <textarea
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            placeholder="Contoh: kondisi stok, kendala, atau catatan lainnya..."
-            rows={3}
-            maxLength={500}
-            className={`w-full rounded-xl border px-3 py-3 text-base ${
-              adaSelisih && !catatanTerisi ? "border-rose-300 bg-rose-50" : "border-slate-200"
-            }`}
-          />
-          {adaSelisih && !catatanTerisi && (
-            <p className="text-sm text-rose-600 mt-1.5">Ada selisih Stok Fisik — Catatan wajib diisi.</p>
+          <button
+            type="button"
+            onClick={cetakRingkasan}
+            disabled={mencetak}
+            className="w-full mb-4 flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white py-3 font-bold text-slate-700 disabled:opacity-50"
+          >
+            {mencetak ? <Spinner size="sm" /> : <Printer size={18} />}
+            Cetak Ringkasan Penjualan
+          </button>
+
+          {adaSelisih && (
+            <div>
+              <p className="text-base font-bold text-slate-800 mb-2">Alasan Selisih Stok</p>
+              <textarea
+                value={catatan}
+                onChange={(e) => setCatatan(e.target.value)}
+                placeholder="Contoh: 1 cup tumpah, salah hitung saat restock..."
+                rows={3}
+                maxLength={500}
+                className={`w-full rounded-xl border px-3 py-3 text-base ${catatanTerisi ? "border-slate-200" : "border-rose-300 bg-rose-50"}`}
+              />
+              {!catatanTerisi && <p className="text-sm text-rose-600 mt-1.5">Ada selisih Stok Fisik — alasan wajib diisi.</p>}
+            </div>
           )}
         </div>
 
