@@ -67,16 +67,41 @@ export class UsersService {
       throw new ConflictException(`Username "${dto.username}" sudah dipakai.`);
     }
 
+    // Memasang peran saat membuat akun sama dengan memasangnya sesudahnya: hanya Owner, hanya Admin.
+    let peran: { id: string; name: string } | null = null;
+    if (dto.accessRoleId) {
+      if (actor.role !== UserRole.OWNER) throw aksesDitolak();
+      if (dto.role !== UserRole.ADMIN) {
+        throw new DomainError('ACCESS_ROLE_ADMIN_ONLY', 'Peran akses hanya bisa dipasang ke akun Admin.');
+      }
+      peran = await this.prisma.accessRole.findUnique({ where: { id: dto.accessRoleId }, select: { id: true, name: true } });
+      if (!peran) throw new NotFoundException('Peran tidak ditemukan.');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    return this.prisma.profile.create({
-      data: {
-        username: dto.username,
-        passwordHash,
-        fullName: dto.fullName,
-        role: dto.role,
-        defaultBoothId: dto.defaultBoothId,
-      },
-      select: SELECT_SAFE_FIELDS,
+    return this.prisma.$transaction(async (tx) => {
+      const dibuat = await tx.profile.create({
+        data: {
+          username: dto.username,
+          passwordHash,
+          fullName: dto.fullName,
+          role: dto.role,
+          defaultBoothId: dto.defaultBoothId,
+          accessRoleId: peran?.id,
+        },
+        select: SELECT_SAFE_FIELDS,
+      });
+      if (peran) {
+        await this.activityLog.record(tx, {
+          entityType: 'profile',
+          entityId: dibuat.id,
+          action: 'ASSIGN_ACCESS_ROLE',
+          actorId: actor.sub,
+          actorName: actor.fullName,
+          note: `Peran: ${peran.name}`,
+        });
+      }
+      return dibuat;
     });
   }
 
@@ -106,6 +131,10 @@ export class UsersService {
       throw new NotFoundException('User tidak ditemukan.');
     }
     pastikanBolehKelolaAkun(actor, existing.role);
+    // Menonaktifkan akun sendiri bisa mengunci satu-satunya Owner/Admin di luar sistem.
+    if (dto.active === false && id === actor.sub) {
+      throw new DomainError('CANNOT_DEACTIVATE_SELF', 'Anda tidak bisa menonaktifkan akun Anda sendiri.');
+    }
 
     return this.prisma.profile.update({
       where: { id },

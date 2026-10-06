@@ -12,7 +12,7 @@ const INCLUDE = {
 } as const;
 
 /// Peran hak akses Admin (BR-044). Hanya Owner yang membuat/mengubah/menghapus; peran sistem
-/// (fullAccess, "Admin Pusat") tidak bisa diubah/dihapus; peran yang masih dipakai tidak bisa dihapus.
+/// (fullAccess, "Akses Penuh") tidak bisa diubah/dihapus; peran yang masih dipakai tidak bisa dihapus.
 @Injectable()
 export class AccessRolesService {
   constructor(

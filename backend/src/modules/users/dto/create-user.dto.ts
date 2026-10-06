@@ -20,4 +20,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsUUID()
   defaultBoothId?: string;
+
+  /// Peran akses untuk akun Admin baru (BR-044). Hanya Owner yang boleh mengisinya.
+  @IsOptional()
+  @IsUUID()
+  accessRoleId?: string;
 }

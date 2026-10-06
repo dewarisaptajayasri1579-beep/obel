@@ -117,7 +117,7 @@ describe('RBAC per menu (e2e)', () => {
     const sistem = (await request(server()).get('/access-roles').set(bearer(ownerToken)).expect(200)).body.find(
       (r: { fullAccess: boolean }) => r.fullAccess,
     );
-    expect(sistem.name).toBe('Admin Pusat');
+    expect(sistem.name).toBe('Akses Penuh');
     expect((await request(server()).patch(`/access-roles/${sistem.id}`).set(bearer(ownerToken)).send(peranBody('Ganti', [])).expect(400)).body.code).toBe(
       'ACCESS_ROLE_SYSTEM',
     );
@@ -179,6 +179,46 @@ describe('RBAC per menu (e2e)', () => {
     expect((await request(server()).patch(`/users/${barista.id}/access-role`).set(bearer(ownerToken)).send({ accessRoleId: null }).expect(400)).body.code).toBe(
       'ACCESS_ROLE_ADMIN_ONLY',
     );
+  });
+
+  it('lets only Owner attach an access role while creating an Admin account', async () => {
+    const username = `e2e_rbac_${randomUUID().slice(0, 8)}`;
+    const akun = (extra: object, role = 'ADMIN') => ({ username, password: 'obbel123', fullName: 'E2E Dibuat Owner', role, ...extra });
+    const peran = (await request(server()).post('/access-roles').set(bearer(ownerToken)).send(peranBody(`${PREFIX} Saat Buat`, [{ menu: 'KASIR', level: 'VIEW' }])).expect(201)).body;
+    try {
+      // Admin (bahkan Akses Penuh) tidak boleh memasang peran, dan akunnya tidak boleh terbentuk.
+      await request(server()).post('/users').set(bearer(adminToken)).send(akun({ accessRoleId: peran.id })).expect(403);
+      expect(await prisma.profile.findUnique({ where: { username } })).toBeNull();
+      // Peran hanya untuk akun Admin; peran yang tidak ada ditolak dan tidak membuat akun.
+      expect((await request(server()).post('/users').set(bearer(ownerToken)).send(akun({ accessRoleId: peran.id }, 'OWNER')).expect(400)).body.code).toBe('ACCESS_ROLE_ADMIN_ONLY');
+      await request(server()).post('/users').set(bearer(ownerToken)).send(akun({ accessRoleId: randomUUID() })).expect(404);
+      expect(await prisma.profile.findUnique({ where: { username } })).toBeNull();
+      // Owner: akun terbentuk dengan peran terpasang dan langsung berlaku.
+      const dibuat = (await request(server()).post('/users').set(bearer(ownerToken)).send(akun({ accessRoleId: peran.id })).expect(201)).body;
+      expect(dibuat.accessRole).toEqual({ id: peran.id, name: peran.name });
+      const token = (await login(username)).accessToken as string;
+      await request(server()).get('/sales').set(bearer(token)).expect(200);
+      await request(server()).get('/stock-receipts').set(bearer(token)).expect(403);
+    } finally {
+      await prisma.profile.deleteMany({ where: { username } });
+      await prisma.accessRole.deleteMany({ where: { id: peran.id } });
+    }
+  });
+
+  it('refuses to deactivate your own account', async () => {
+    for (const [username, token] of [['owner', ownerToken], ['admin', adminToken]] as const) {
+      const saya = await prisma.profile.findUniqueOrThrow({ where: { username } });
+      try {
+        const res = await request(server()).patch(`/users/${saya.id}`).set(bearer(token)).send({ active: false }).expect(400);
+        expect(res.body.code).toBe('CANNOT_DEACTIVATE_SELF');
+        expect((await prisma.profile.findUniqueOrThrow({ where: { username } })).active).toBe(true);
+        // Mengubah hal lain di akun sendiri tetap boleh (tidak ikut terblokir).
+        await request(server()).patch(`/users/${saya.id}`).set(bearer(token)).send({ active: true }).expect(200);
+      } finally {
+        // Akun seed dipakai semua suite: kalau guard gagal, jangan tinggalkan nonaktif.
+        await prisma.profile.update({ where: { id: saya.id }, data: { active: true } });
+      }
+    }
   });
 
   it('keeps Owner read-only: View everywhere, no Manage', async () => {

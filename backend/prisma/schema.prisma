@@ -389,7 +389,7 @@ model StaffLiability {
 /// `actorName` di-snapshot saat penulisan (pola yang sama dengan
 /// SaleItem.productNameSnapshot) — supaya baris lama tetap terbaca kalau nama
 /// akun pelakunya berubah belakangan, tanpa join ke Profile.
-/// Peran hak akses Admin (BR-044), dibuat Owner. `fullAccess` hanya untuk peran sistem "Admin Pusat"
+/// Peran hak akses Admin (BR-044), dibuat Owner. `fullAccess` hanya untuk peran sistem "Akses Penuh"
 /// (Kelola di semua menu, termasuk menu yang ditambahkan kemudian; tidak bisa diubah/dihapus).
 model AccessRole {
   id          String   @id @default(uuid())

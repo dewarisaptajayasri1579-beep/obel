@@ -1521,6 +1521,8 @@ export const api = {
     fullName: string
     role: "BOOTH_STAFF" | "ADMIN" | "OWNER"
     defaultBoothId?: string
+    /// Hanya Owner, hanya untuk akun Admin (BR-044).
+    accessRoleId?: string
   }) => request<UserAccount>("/users", { method: "POST", body: input }),
   updateUser: (id: string, input: { fullName?: string; defaultBoothId?: string; active?: boolean }) =>
     request<UserAccount>(`/users/${id}`, { method: "PATCH", body: input }),
