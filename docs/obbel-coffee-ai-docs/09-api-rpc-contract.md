@@ -256,9 +256,12 @@ Seluruh correction RPC: authorization, idempotency, row locks/atomic validation,
 - `POST /access-roles`, `PATCH /access-roles/:id` — `{ name, description?, permissions: [{ menu, level: VIEW|MANAGE }] }`
   (daftar lengkap, menggantikan yang lama). `DELETE /access-roles/:id`. Owner only.
 - `PATCH /users/:id/access-role` — `{ accessRoleId: uuid | null }`, Owner only, target harus ADMIN.
+- `POST /users` menerima `accessRoleId?: uuid` (Owner only, hanya untuk `role: ADMIN`; selain itu 403 / `ACCESS_ROLE_ADMIN_ONLY`),
+  jadi akun Admin bisa langsung dibuat dengan perannya. Dicatat di activity log seperti pemasangan peran biasa.
 - Login & `GET /users/me` membawa `access: { roleName, levels: { [menu]: VIEW|MANAGE } }`; `GET /users` membawa
   `accessRole { id, name }`.
 
 Error: `MENU_ACCESS_DENIED` (403, details `menus`, `level`), `MENU_ACCESS_NOT_CONFIGURED` (403, endpoint belum
 ditandai), `ACCESS_ROLE_SYSTEM`, `ACCESS_ROLE_IN_USE` (details `users`), `ACCESS_ROLE_NAME_TAKEN`,
-`ACCESS_ROLE_DUPLICATE_MENU`, `ACCESS_ROLE_ADMIN_ONLY`. Akun nonaktif → 401 di request berikutnya.
+`ACCESS_ROLE_DUPLICATE_MENU`, `ACCESS_ROLE_ADMIN_ONLY`, `CANNOT_DEACTIVATE_SELF` (400, `PATCH /users/:id` dengan `active: false` pada akun sendiri).
+Akun nonaktif → 401 di request berikutnya. Halaman Master User punya tombol Nonaktifkan/Aktifkan per akun (tidak tampil di akun sendiri).

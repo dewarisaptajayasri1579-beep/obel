@@ -447,7 +447,7 @@ Peran hak akses Admin, dibuat Owner.
 - id uuid PK
 - name text unique (dicek juga tanpa beda huruf besar/kecil di service)
 - description text nullable
-- full_access bool default false — hanya peran sistem "Admin Pusat" (Kelola semua menu, tidak bisa diubah/dihapus)
+- full_access bool default false — hanya peran sistem "Akses Penuh" (Kelola semua menu, tidak bisa diubah/dihapus)
 - created_at, updated_at
 
 ### `access_role_permissions` (BR-044)

@@ -42,7 +42,7 @@ client 2026-10-05. Identifier kode/enum tetap `BOOTH_STAFF`; dokumen spec ini ma
 - melihat dashboard Owner global.
 
 ## 3. ADMIN
-Daftar di bawah adalah batas maksimum (peran sistem "Admin Pusat"); Admin dengan peran lain hanya boleh
+Daftar di bawah adalah batas maksimum (peran sistem "Akses Penuh"); Admin dengan peran lain hanya boleh
 sebatas izin perannya (§9).
 
 ### Boleh
@@ -126,7 +126,7 @@ Read-only terhadap correction. Owner dapat melihat nilai effective terbaru dan a
 ## 9. Peran & hak akses Admin (BR-044)
 - Owner membuat peran berisi izin per menu admin web: **Tidak ada / Lihat / Kelola**. Lihat = baca halaman &
   export; Kelola = juga mengubah data. Katalog menu: `backend/src/common/access/menus.ts`.
-- Tiap Admin memakai satu peran; tanpa peran = tidak bisa membuka menu apa pun. Peran sistem "Admin Pusat"
+- Tiap Admin memakai satu peran; tanpa peran = tidak bisa membuka menu apa pun. Peran sistem "Akses Penuh"
   = Kelola semua menu, tidak bisa diubah/dihapus.
 - Owner: Lihat di semua menu (read-only) + satu-satunya pengelola peran.
 - Akun: Barista lewat Kelola Barista; Admin lewat Kelola User atau Owner (akun Admin baru tanpa peran sampai
