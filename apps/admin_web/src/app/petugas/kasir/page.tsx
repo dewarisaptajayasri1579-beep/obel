@@ -57,9 +57,13 @@ type Sheet = null | "cart" | "payment" | "drafts";
 /// Ukuran huruf kartu tulisan produk per kelompok panjang nama — nama pendek tampil
 /// besar, nama panjang mengecil supaya muat 2–3 baris tanpa terpotong. Bertingkat
 /// (bukan dihitung per huruf) supaya kartu yang bersebelahan tetap terlihat seragam.
+/// Kata terpanjang ikut dihitung: satu kata panjang tidak boleh lebih lebar dari kartu
+/// (~163px di layar 470px) karena tidak bisa dipecah per kata, hanya dipotong per huruf.
 function ukuranNamaKartu(nama: string): string {
-  if (nama.length <= 8) return "text-2xl";
-  if (nama.length <= 16) return "text-xl";
+  const kataTerpanjang = Math.max(...nama.split(/\s+/).map((kata) => kata.length));
+  if (nama.length <= 8) return "text-3xl";
+  if (nama.length <= 14 && kataTerpanjang <= 11) return "text-2xl";
+  if (kataTerpanjang <= 14) return "text-xl";
   return "text-lg";
 }
 
@@ -596,7 +600,7 @@ function KasirContent() {
                     Stok habis
                   </p>
                 ) : (
-                  <p className="text-sm text-slate-500">Stok {stock} pack</p>
+                  <p className="text-sm text-slate-500">Stok {stock} cup</p>
                 )}
                 <div className="flex items-end justify-between mt-1.5">
                   <p className="font-extrabold text-base" style={{ color: GREEN }}>
@@ -626,7 +630,7 @@ function KasirContent() {
           <div className="max-w-md mx-auto flex items-center justify-between bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm text-slate-500 font-semibold flex items-center gap-1.5">
-                <ShoppingCart size={14} /> {totalItems} pack{draftAktif ? " · Draft" : ""}
+                <ShoppingCart size={14} /> {totalItems} cup{draftAktif ? " · Draft" : ""}
               </p>
               <p className="font-extrabold text-base text-slate-900">{formatRupiah(total)}</p>
             </div>
@@ -667,7 +671,7 @@ function KasirContent() {
                     <button type="button" onClick={() => openDraft(d)} className="flex-1 text-left">
                       <p className="font-bold text-base text-slate-900">{d.saleNo}</p>
                       <p className="text-sm text-slate-500 mt-0.5">
-                        {d.items.reduce((sum, i) => sum + i.qty, 0)} pack · {formatRupiah(d.total)}
+                        {d.items.reduce((sum, i) => sum + i.qty, 0)} cup · {formatRupiah(d.total)}
                       </p>
                     </button>
                     <button type="button" onClick={() => handleHapusDraft(d.id)} style={{ color: OBBEL.accentRed }}>
@@ -731,7 +735,7 @@ function KasirContent() {
             </div>
             <div className="p-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-base text-slate-500">Subtotal ({totalItems} pack)</span>
+                <span className="text-base text-slate-500">Subtotal ({totalItems} cup)</span>
                 <span className="text-base font-semibold">{formatRupiah(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between mb-3 gap-3">
