@@ -15,6 +15,11 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 
 ## Commands
 
+### Root (`/`)
+- `npm install` once, then `npm run dev` — starts the backend (4000) and the admin web (3000) together in one terminal (`concurrently -k`: if one stops, the other stops too). Run it from the root, not from the app folders.
+- `predev` (`scripts/check-ports.js`) refuses to start while 3000 or 4000 is already taken, usually a leftover `npm run dev`.
+- `.npmrc` sets `script-shell` to `cmd.exe` on purpose: with Git Bash as npm's script shell, Ctrl+C only stops npm and leaves orphaned servers holding the ports. Don't remove it without re-testing Ctrl+C.
+
 ### Backend (`backend/`)
 - `npm run start:dev` — run API with ts-node-dev (hot reload).
 - `npm run build` / `npm run start` — compile to `dist` and run.
