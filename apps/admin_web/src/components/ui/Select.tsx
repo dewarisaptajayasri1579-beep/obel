@@ -160,7 +160,9 @@ export const Select: React.FC<SelectProps> = ({
   const openDropdown = () => {
     if (disabled) return;
     setQuery("");
-    setActiveIndex(firstEnabledIndex(options));
+    // Buka dengan sorotan di opsi yang sedang terpilih, supaya sorotan dan centangnya satu baris.
+    const selectedIdx = options.findIndex((opt) => opt.value === value && !opt.disabled);
+    setActiveIndex(selectedIdx === -1 ? firstEnabledIndex(options) : selectedIdx);
     updateCoords();
     setOpen(true);
     if (searchable) {
@@ -300,7 +302,7 @@ export const Select: React.FC<SelectProps> = ({
           <div
             ref={panelRef}
             style={{ position: "fixed", top: coords.top, left: coords.left, width: coords.width }}
-            className="z-50 rounded-2xl bg-white/95 dark:bg-(--field-bg) backdrop-blur-xl border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] shadow-2xl shadow-slate-900/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="z-110 rounded-2xl bg-white/95 dark:bg-(--field-bg) backdrop-blur-xl border border-slate-200/80 dark:border-[rgba(148,163,184,0.14)] shadow-2xl shadow-slate-900/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             {searchable && (
               <div className="p-2 border-b border-slate-100 dark:border-[rgba(148,163,184,0.14)]">
