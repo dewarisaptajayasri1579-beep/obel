@@ -70,10 +70,15 @@ class BluetoothReceiptPrinter implements ReceiptPrinter {
     final generator = Generator(PaperSize.mm58, profile);
     final bytes = <int>[];
 
-    bytes.addAll(generator.text(
-      'OBBEL COFFEE & MILK',
-      styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
-    ));
+    // Kertas 58mm muat 32 karakter; lebar ganda (size2) tinggal 16, sedangkan
+    // "OBBEL COFFEE & MILK" 19 karakter dan terpotong di tengah kata. Dua baris
+    // pendek supaya pecahnya di batas kata.
+    for (final baris in const ['OBBEL COFFEE', '& MILK']) {
+      bytes.addAll(generator.text(
+        baris,
+        styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
+      ));
+    }
     bytes.addAll(generator.text(receipt.boothName, styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.hr());
     bytes.addAll(generator.text('No: ${receipt.saleNo}'));
