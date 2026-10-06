@@ -1,5 +1,3 @@
-import { formatRupiah } from "./format";
-
 /// Struk thermal 58mm dibangun DI SINI (web), bukan di aplikasi Flutter: web menyusun daftar baris yang
 /// sudah dibungkus dan dirata ke lebar kertas, aplikasi Android hanya menerjemahkannya ke ESC/POS.
 /// Satu susunan yang sama dipakai untuk cetak Bluetooth, teks WhatsApp dan cetak browser, dan mengubah
@@ -8,6 +6,9 @@ import { formatRupiah } from "./format";
 /// Kertas 58mm memuat 32 karakter font normal; dengan lebar ganda (judul) tinggal 16.
 export const LEBAR_STRUK = 32;
 export const LEBAR_JUDUL = 16;
+
+/// Nominal tanpa "Rp", seperti struk client: `18.000`.
+const angka = (n: number): string => Math.round(n).toLocaleString("id-ID");
 
 export interface PrintLine {
   text: string;
@@ -40,14 +41,12 @@ export interface StrukPenjualanInput {
   cetakUlang?: boolean;
 }
 
-const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-
-/// Waktu struk dalam Asia/Jakarta (UTC+7, tanpa DST) sesuai konvensi UI: `23 Agu 2026, 15.40`.
+/// Waktu struk dalam Asia/Jakarta (UTC+7, tanpa DST), format struk client: `29/09/2026 12:00`.
 /// Dihitung manual (bukan Intl) supaya tidak bergantung data locale WebView atau zona waktu HP.
 export function formatWaktuStruk(iso: string): string {
   const wib = new Date(Date.parse(iso) + 7 * 3600_000);
   const dua = (n: number) => String(n).padStart(2, "0");
-  return `${wib.getUTCDate()} ${BULAN[wib.getUTCMonth()]} ${wib.getUTCFullYear()}, ${dua(wib.getUTCHours())}.${dua(wib.getUTCMinutes())}`;
+  return `${dua(wib.getUTCDate())}/${dua(wib.getUTCMonth() + 1)}/${wib.getUTCFullYear()} ${dua(wib.getUTCHours())}:${dua(wib.getUTCMinutes())}`;
 }
 
 /// Bungkus per kata ke `lebar`; kata yang lebih panjang dari satu baris dipotong per huruf.
@@ -75,6 +74,9 @@ export function bungkus(teks: string, lebar: number): string[] {
   return hasil.length ? hasil : [""];
 }
 
+/// "Order Number" (12) + satu spasi sebelum titik dua, seperti struk client.
+const LEBAR_LABEL = 13;
+
 const kiri = (text: string, bold = false): PrintLine => ({ text, align: "left", bold, size: 1 });
 const tengah = (text: string, bold = false): PrintLine => ({ text, align: "center", bold, size: 1 });
 const judul = (text: string): PrintLine => ({ text, align: "center", bold: true, size: 2 });
@@ -94,9 +96,9 @@ function kiriKanan(label: string, nilai: string, tebal = false): PrintLine[] {
   return [...potongan.map((p) => kiri(p, tebal)), kiri(nilai.padStart(LEBAR_STRUK), tebal)];
 }
 
-/// `Label   : nilai` dengan titik dua sejajar; nilai panjang dilanjutkan di bawahnya dengan indentasi.
+/// `Label        : nilai` dengan titik dua sejajar; nilai panjang dilanjutkan di bawahnya dengan indentasi.
 function info(label: string, nilai: string): PrintLine[] {
-  const awalan = `${label.padEnd(8)}: `;
+  const awalan = `${label.padEnd(LEBAR_LABEL)}: `;
   const potongan = bungkus(nilai, LEBAR_STRUK - awalan.length);
   return potongan.map((p, i) => kiri((i === 0 ? awalan : " ".repeat(awalan.length)) + p));
 }
@@ -115,25 +117,25 @@ export function buatStrukPenjualan(input: StrukPenjualanInput): PrintLine[] {
   const baris: PrintLine[] = [...judulMerek(perusahaan.nama)];
 
   if (perusahaan.alamat) baris.push(...bungkus(perusahaan.alamat, LEBAR_STRUK).map((b) => tengah(b)));
-  if (perusahaan.telepon) baris.push(tengah(`Telp: ${perusahaan.telepon}`));
+  if (perusahaan.telepon) baris.push(tengah(`Phone: ${perusahaan.telepon}`));
   baris.push(tengah(input.boothName, true), garis("="));
 
-  baris.push(...info("No", input.saleNo), ...info("Tanggal", formatWaktuStruk(input.waktuIso)));
+  baris.push(...info("Date", formatWaktuStruk(input.waktuIso)), ...info("Order Number", input.saleNo));
   if (input.barista) baris.push(...info("Barista", input.barista));
   baris.push(garis("="));
-  if (input.cetakUlang) baris.push(tengah("** CETAK ULANG **", true), garis("="));
+  if (input.cetakUlang) baris.push(tengah("** REPRINT BILL **", true), garis("="));
 
   for (const item of items) {
     baris.push(...bungkus(item.name, LEBAR_STRUK).map((b) => kiri(b, true)));
-    baris.push(...kiriKanan(`${item.qty} x ${formatRupiah(item.unitPrice)}`, formatRupiah(item.lineTotal)));
+    baris.push(...kiriKanan(`${item.qty} x ${angka(item.unitPrice)}`, angka(item.lineTotal)));
   }
 
-  baris.push(garis("-"), ...kiriKanan("Jumlah item", `${items.reduce((n, i) => n + i.qty, 0)} cup`), garis("-"));
+  baris.push(garis("-"), ...kiriKanan("Total Item", `${items.reduce((n, i) => n + i.qty, 0)}`), garis("-"));
   if (input.discount > 0) {
-    baris.push(...kiriKanan("Subtotal", formatRupiah(input.subtotal)), ...kiriKanan("Diskon", `-${formatRupiah(input.discount)}`));
+    baris.push(...kiriKanan("Subtotal", angka(input.subtotal)), ...kiriKanan("Discount", `-${angka(input.discount)}`));
   }
-  baris.push(...kiriKanan("TOTAL", formatRupiah(input.total), true), ...kiriKanan("Metode", input.metode), garis("="));
-  baris.push(kiri(""), tengah("Terima kasih!"));
+  baris.push(...kiriKanan("Total", angka(input.total), true), ...kiriKanan("Payment", input.metode), garis("="));
+  baris.push(kiri(""), tengah("Terima kasih"));
   return baris;
 }
 
