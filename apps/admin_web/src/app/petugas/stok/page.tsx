@@ -8,22 +8,13 @@ import {
   Send,
   Package,
   FilePlus2,
-  History,
   Search,
   SlidersHorizontal,
   CheckCircle2,
   AlertTriangle,
   Ban,
-  ImageOff,
-  Store,
-  FileText,
   Bookmark,
   Calendar,
-  ArrowUp,
-  ArrowDown,
-  Equal,
-  Download,
-  ChevronDown,
   Clock,
   XCircle,
 } from "lucide-react";
@@ -33,7 +24,6 @@ import {
   type BoothStockRow,
   type Product,
   type RestockRequest,
-  type StockLedgerResponse,
   type WarehouseStockItem,
 } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
@@ -42,8 +32,7 @@ import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { RequireActiveShift, useActiveShift } from "../_components/RequireActiveShift";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
-import { formatTanggalJakarta, formatJamJakarta } from "../_lib/format";
-import { shareFile } from "../_lib/native-bridge";
+import { formatTanggalJakarta } from "../_lib/format";
 
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
@@ -92,38 +81,7 @@ function hitungSaranRestock(params: {
   return Math.max(0, Math.ceil(prediksiTerjual + minimumQty - stokSaatIni));
 }
 
-type Periode = "HARI_INI" | "7_HARI" | "30_HARI" | "BULAN_INI";
-
-const PERIODE_LABEL: Record<Periode, string> = {
-  HARI_INI: "Hari Ini",
-  "7_HARI": "7 Hari Terakhir",
-  "30_HARI": "30 Hari Terakhir",
-  BULAN_INI: "Bulan Ini",
-};
-
-/// Rentang tanggal utk dropdown "Periode" di Riwayat Stok. Backend
-/// (`rinciUntukBooth`) sendiri sudah menormalkan ke granularitas hari,
-/// jadi cukup kirim timestamp `from`/`to` apa adanya.
-function rentangPeriode(preset: Periode): { from: string; to: string } {
-  const now = new Date();
-  let from: Date;
-  switch (preset) {
-    case "HARI_INI":
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      break;
-    case "30_HARI":
-      from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case "BULAN_INI":
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-    default:
-      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  }
-  return { from: from.toISOString(), to: now.toISOString() };
-}
-
-type Tab = "STOK" | "RESTOCK" | "RIWAYAT";
+type Tab = "STOK" | "RESTOCK";
 
 const petaStokGudang = (rows: WarehouseStockItem[]) => new Map(rows.map((r) => [r.productId, r.qtyOnHand]));
 type FilterStatus = "SEMUA" | BoothStockRow["status"];
@@ -136,13 +94,13 @@ const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
   { value: "Habis", label: "Habis" },
 ];
 
-const VALID_TABS: Tab[] = ["STOK", "RESTOCK", "RIWAYAT"];
+const VALID_TABS: Tab[] = ["STOK", "RESTOCK"];
 
 function StokContent() {
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Tab mengikuti ?tab= di URL, jadi menu Riwayat di bottom nav bisa berpindah tab walau halaman Stok sudah terbuka.
+  // Tab mengikuti ?tab= di URL (mis. notifikasi Restock Ditolak membuka ?tab=restock).
   const tabFromQuery = searchParams.get("tab")?.toUpperCase();
   const tab: Tab = VALID_TABS.includes(tabFromQuery as Tab) ? (tabFromQuery as Tab) : "STOK";
   const [loading, setLoading] = useState(true);
@@ -159,11 +117,6 @@ function StokContent() {
   const sisaJamShift = (new Date(shift.scheduledEndAt).getTime() - Date.now()) / 3_600_000;
   const [qtyTerjual7Hari, setQtyTerjual7Hari] = useState<Map<string, number>>(new Map());
   const [saranDihitung, setSaranDihitung] = useState(false);
-  const [ledgerProductId, setLedgerProductId] = useState<string | null>(null);
-  const [ledgerPeriode, setLedgerPeriode] = useState<Periode>("7_HARI");
-  const [ledger, setLedger] = useState<StockLedgerResponse | null>(null);
-  const [loadingLedger, setLoadingLedger] = useState(false);
-  const [exportingExcel, setExportingExcel] = useState(false);
   const [riwayatRestock, setRiwayatRestock] = useState<RestockRequest[]>([]);
   // Stok Gudang per produk — permintaan restock dibatasi ke angka ini (backend
   // juga menolak yang melebihi, RESTOCK_EXCEEDS_WAREHOUSE). null = gagal dimuat,
@@ -236,47 +189,6 @@ function StokContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saranDihitung, products]);
 
-  // Produk default utk dropdown "Pilih Stok" — begitu daftar produk siap,
-  // sekali saja (bukan tiap re-render, biar pilihan manual Petugas tidak
-  // ketiban ulang).
-  useEffect(() => {
-    if (ledgerProductId || products.length === 0) return;
-    setLedgerProductId(products[0].id);
-  }, [ledgerProductId, products]);
-
-  useEffect(() => {
-    if (tab !== "RIWAYAT" || !ledgerProductId) return;
-    setLoadingLedger(true);
-    const { from, to } = rentangPeriode(ledgerPeriode);
-    api
-      .getMyStockLedger({ productId: ledgerProductId, from, to })
-      .then(setLedger)
-      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Gagal memuat riwayat stok."))
-      .finally(() => setLoadingLedger(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, ledgerProductId, ledgerPeriode]);
-
-  async function handleExportRiwayat() {
-    if (!ledger || !ledgerProductId) return;
-    setExportingExcel(true);
-    try {
-      const { from, to } = rentangPeriode(ledgerPeriode);
-      const blob = await api.getMyStockLedgerExcel({ productId: ledgerProductId, from, to });
-      const namaFile = `riwayat-stok-${ledger.product.name}.xlsx`;
-      if (await shareFile(blob, namaFile)) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = namaFile;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal mengekspor Excel.");
-    } finally {
-      setExportingExcel(false);
-    }
-  }
-
   function changeRequestQty(p: Product, delta: number) {
     const sekarang = requestQty[p.id] ?? 0;
     const batas = batasGudang(p.id);
@@ -328,14 +240,14 @@ function StokContent() {
 
   const itemDiajukan = Object.values(requestQty).filter((q) => q > 0).length;
   const totalCupDiajukan = Object.values(requestQty).reduce((sum, q) => sum + q, 0);
-  const itemKritisRestock = products.filter((p) => {
-    const s = stock.find((row) => row.productId === p.id)?.status;
-    return s === "Kritis" || s === "Habis";
-  }).length;
   const semuaTerpilih =
     products.length > 0 && products.every((p) => (requestQty[p.id] ?? 0) > 0 || batasGudang(p.id) === 0);
 
   useHidePetugasNav(tab === "RESTOCK");
+
+  useEffect(() => {
+    if (tabFromQuery === "RIWAYAT") router.replace("/petugas/riwayat-stok");
+  }, [tabFromQuery, router]);
 
   // Kartu ringkasan cuma 4 kotak (ikut mockup) — level "Menipis" digabung ke
   // "Kritis" DI KARTU SAJA (keduanya sama-sama "perlu direstock segera",
@@ -360,32 +272,31 @@ function StokContent() {
   }, [stock, cari, filterStatus]);
 
   return (
-    <div className="min-h-screen bg-[#F7F9F6] pb-10">
-      <TopBar title="Stok" subtitle="Kelola stok bahan dan produk di booth" back="/petugas" />
+    <div className="min-h-screen bg-[#F7F9F6]">
+      <TopBar title="Stok" subtitle={shift.booth.name} back="/petugas" />
 
-      <div className="px-4 pt-3 flex gap-2">
-        {(
-          [
-            ["STOK", "Stok Booth", Package],
-            ["RESTOCK", "Ajukan Restock", FilePlus2],
-            ["RIWAYAT", "Riwayat Stok", History],
-          ] as [Tab, string, typeof Package][]
-        ).map(([key, label, Icon]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => router.replace(`/petugas/stok?tab=${key}`, { scroll: false })}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold"
-            style={
-              tab === key
-                ? { backgroundColor: GREEN, color: "white" }
-                : { backgroundColor: "white", color: "#475569", border: "1px solid #E2E8F0" }
-            }
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
+      {/* Segmented control: dua segmen sama lebar, teksnya tidak pernah turun baris. */}
+      <div className="px-4 pt-3">
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white border border-slate-200 p-1">
+          {(
+            [
+              ["STOK", "Stok Booth", Package],
+              ["RESTOCK", "Ajukan Restock", FilePlus2],
+            ] as [Tab, string, typeof Package][]
+          ).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={tab === key}
+              onClick={() => router.replace(`/petugas/stok?tab=${key}`, { scroll: false })}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold whitespace-nowrap transition"
+              style={tab === key ? { backgroundColor: GREEN, color: "white" } : { color: "#475569" }}
+            >
+              <Icon size={15} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -475,86 +386,114 @@ function StokContent() {
                 const Icon = style.icon;
                 const pct = s.minimumQty <= 0 ? 100 : Math.min(100, Math.round((s.qtyOnHand / s.minimumQty) * 100));
                 return (
-                  <div key={s.productId} className="rounded-xl bg-white border border-slate-200 p-3 flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                      {s.productImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.productImageUrl} alt={s.productName} className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageOff size={18} className="text-slate-300" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-base text-slate-900 truncate">{s.productName}</p>
-                      <p className="text-sm text-slate-400 truncate">
-                        {s.categoryName ?? "Tanpa Kategori"} / {s.boothName}
-                      </p>
-                      {s.dalamProsesKembali > 0 && (
-                        <p className="text-xs font-bold text-sky-600 mt-0.5">
-                          {s.dalamProsesKembali} cup Proses Kembali ke Gudang
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="w-24 shrink-0">
-                      <p className="text-base font-extrabold text-right" style={{ color: style.fg }}>
-                        {s.qtyOnHand} cup
-                      </p>
-                      <div className="h-1.5 rounded-full bg-slate-100 mt-1.5 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: style.bar }} />
+                  <div key={s.productId} className="rounded-2xl bg-white border border-slate-200 p-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-base text-slate-900 truncate">{s.productName}</p>
+                        <p className="text-sm text-slate-400 truncate">{s.categoryName ?? "Tanpa Kategori"}</p>
                       </div>
-                      <p className="text-xs text-slate-400 text-right mt-1">Min. {s.minimumQty} cup</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-base font-extrabold text-slate-900">{s.qtyOnHand} cup</p>
+                        <p className="text-xs text-slate-400">Min. {s.minimumQty} cup</p>
+                      </div>
+                      <span
+                        className="flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1.5 shrink-0"
+                        style={{ backgroundColor: style.bg, color: style.fg }}
+                      >
+                        <Icon size={12} />
+                        {s.status}
+                      </span>
                     </div>
-
-                    <span
-                      className="flex items-center gap-1 text-sm font-bold rounded-full px-2.5 py-2 shrink-0"
-                      style={{ backgroundColor: style.bg, color: style.fg }}
-                    >
-                      <Icon size={12} />
-                      {s.status}
-                    </span>
+                    <div className="h-1.5 rounded-full bg-slate-100 mt-3 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: style.bar }} />
+                    </div>
+                    {s.dalamProsesKembali > 0 && (
+                      <p className="text-xs font-semibold text-sky-600 mt-2">{s.dalamProsesKembali} cup Proses Kembali ke Gudang</p>
+                    )}
                   </div>
                 );
               })
             )}
           </div>
         </div>
-      ) : tab === "RESTOCK" ? (
-        <div className="p-4 pb-32">
-          <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-              <Store size={20} style={{ color: GREEN }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-base text-slate-900 truncate">{shift.booth.name}</p>
-              <p className="text-sm text-slate-500">Butuh Restock Hari Ini</p>
-              <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
-                <Calendar size={11} /> {formatTanggalJakarta(new Date().toISOString())}
-              </p>
-            </div>
+      ) : (
+        <div className="p-4 pb-36">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-base font-extrabold text-slate-900">Pilih Produk untuk Direstock</p>
+            <label className="flex items-center gap-1.5 text-sm font-semibold cursor-pointer" style={{ color: GREEN }}>
+              Pilih Semua
+              <input
+                type="checkbox"
+                checked={semuaTerpilih}
+                onChange={(e) => handlePilihSemua(e.target.checked)}
+                className="w-4 h-4 rounded accent-current"
+              />
+            </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-              <FileText size={16} style={{ color: GREEN }} />
-              <p className="text-lg font-extrabold text-slate-900 mt-1.5">{itemDiajukan}</p>
-              <p className="text-xs text-slate-500">item diajukan</p>
-            </div>
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FFF3E0" }}>
-              <AlertTriangle size={16} style={{ color: "#C2740C" }} />
-              <p className="text-lg font-extrabold mt-1.5" style={{ color: "#C2740C" }}>{itemKritisRestock}</p>
-              <p className="text-xs text-slate-500">item kritis</p>
-            </div>
-            <div className="rounded-xl p-2.5" style={{ backgroundColor: "#E1EEFB" }}>
-              <Package size={16} style={{ color: "#1D63D8" }} />
-              <p className="text-lg font-extrabold mt-1.5" style={{ color: "#1D63D8" }}>{totalCupDiajukan}</p>
-              <p className="text-xs text-slate-500">estimasi total cup</p>
-            </div>
+          <div className="flex flex-col gap-2.5">
+            {products.map((p) => {
+              const stockRow = stock.find((s) => s.productId === p.id);
+              const status = stockRow?.status ?? "Aman";
+              const style = STATUS_STYLE[status];
+              const Icon = style.icon;
+              const qty = requestQty[p.id] ?? 0;
+              const gudang = stokGudang?.get(p.id);
+              const gudangKosong = gudang === 0;
+              return (
+                <div key={p.id} className="rounded-2xl bg-white border border-slate-200 p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
+                      <p className="text-sm text-slate-500">
+                        Stok {stockRow?.qtyOnHand ?? 0} cup
+                        {gudang !== undefined && (
+                          <>
+                            {" · "}
+                            <span className={gudangKosong ? "font-bold text-rose-600" : undefined}>
+                              {gudangKosong ? "Gudang kosong" : `Gudang ${gudang} cup`}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className="flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1 shrink-0"
+                      style={{ backgroundColor: style.bg, color: style.fg }}
+                    >
+                      <Icon size={12} />
+                      {status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 mt-3">
+                    <p className="text-sm text-slate-500">
+                      Saran <span className="font-bold text-slate-700">{saranUntuk(p)} cup</span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => changeRequestQty(p, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                        <Minus size={18} />
+                      </button>
+                      <span className="w-10 text-center text-base font-bold rounded-lg py-1.5" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
+                        {qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => changeRequestQty(p, 1)}
+                        disabled={gudangKosong || qty >= batasGudang(p.id)}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white active:opacity-80 disabled:opacity-30"
+                        style={{ backgroundColor: GREEN }}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {riwayatRestock.length > 0 && (
-            <div className="mb-4">
+            <div className="mt-6">
               <p className="text-base font-extrabold text-slate-900 mb-2.5">Riwayat Pengajuan</p>
               <div className="flex flex-col gap-2">
                 {riwayatRestock.slice(0, 5).map((r) => {
@@ -590,98 +529,17 @@ function StokContent() {
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-base font-extrabold text-slate-900">Pilih Produk untuk Direstock</p>
-            <label className="flex items-center gap-1.5 text-sm font-semibold cursor-pointer" style={{ color: GREEN }}>
-              Pilih Semua
-              <input
-                type="checkbox"
-                checked={semuaTerpilih}
-                onChange={(e) => handlePilihSemua(e.target.checked)}
-                className="w-4 h-4 rounded accent-current"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-col gap-2.5">
-            {products.map((p) => {
-              const stockRow = stock.find((s) => s.productId === p.id);
-              const status = stockRow?.status ?? "Aman";
-              const style = STATUS_STYLE[status];
-              const Icon = style.icon;
-              const qty = requestQty[p.id] ?? 0;
-              const gudang = stokGudang?.get(p.id);
-              const gudangKosong = gudang === 0;
-              return (
-                <div key={p.id} className="rounded-2xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                    {stockRow?.productImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={stockRow.productImageUrl} alt={p.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageOff size={16} className="text-slate-300" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-base text-slate-900 truncate">{p.name}</p>
-                    <p className="text-sm text-slate-500">Stok saat ini {stockRow?.qtyOnHand ?? 0} cup</p>
-                    {gudang !== undefined && (
-                      <p className={`text-sm mb-1 ${gudangKosong ? "font-bold text-rose-600" : "text-slate-500"}`}>
-                        {gudangKosong ? "Gudang kosong" : `Gudang ${gudang} cup`}
-                      </p>
-                    )}
-                    <span
-                      className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1"
-                      style={{ backgroundColor: style.bg, color: style.fg }}
-                    >
-                      <Icon size={10} />
-                      {status}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <p className="text-xs text-slate-400 whitespace-nowrap">
-                      Saran restock <span className="font-bold text-slate-600">{saranUntuk(p)} cup</span>
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => changeRequestQty(p, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
-                        <Minus size={18} />
-                      </button>
-                      <span className="w-10 text-center text-base font-bold rounded-lg py-1.5" style={{ backgroundColor: OBBEL_SCALE[50], color: GREEN }}>
-                        {qty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => changeRequestQty(p, 1)}
-                        disabled={gudangKosong || qty >= batasGudang(p.id)}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white active:opacity-80 disabled:opacity-30"
-                        style={{ backgroundColor: GREEN }}
-                      >
-                        <Plus size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="fixed bottom-4 inset-x-4 z-20">
-            <div className="max-w-md mx-auto bg-white rounded-2xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 p-3 flex items-center gap-2.5">
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-                  <Package size={14} style={{ color: GREEN }} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900 leading-tight">{itemDiajukan} item dipilih</p>
-                  <p className="text-xs text-slate-500 leading-tight">Total {totalCupDiajukan} cup</p>
-                </div>
+          {/* Latar seperti bottom nav (PetugasShell): produk yang di-scroll tidak tampak di sekeliling bar. */}
+          <div className="fixed inset-x-0 bottom-0 z-20 pt-6 pb-4 px-4 bg-linear-to-t from-[#F7F9F6] from-70% to-transparent pointer-events-none">
+            <div className="max-w-md mx-auto pointer-events-auto bg-white rounded-3xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)] border border-slate-100 p-3 flex items-center gap-2.5">
+              <div className="flex-1 min-w-0 pl-1">
+                <p className="text-sm font-bold text-slate-900 leading-tight">{itemDiajukan} produk dipilih</p>
+                <p className="text-xs text-slate-500 leading-tight mt-0.5">Total {totalCupDiajukan} cup</p>
               </div>
               <button
                 type="button"
                 onClick={handleSimpanDraft}
-                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 text-sm font-bold shrink-0"
+                className="flex items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2.5 text-sm font-bold shrink-0"
                 style={{ borderColor: GREEN, color: GREEN }}
               >
                 <Bookmark size={14} /> Draft
@@ -690,170 +548,19 @@ function StokContent() {
                 type="button"
                 onClick={handleSubmitRestock}
                 disabled={submitting || totalCupDiajukan === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-bold text-white shrink-0 disabled:opacity-50"
                 style={{ backgroundColor: GREEN }}
               >
                 {submitting ? <Spinner size="sm" color="white" /> : (
                   <>
-                    <Send size={14} /> Kirim Pengajuan
+                    <Send size={14} /> Kirim
                   </>
                 )}
               </button>
             </div>
           </div>
         </div>
-      ) : (
-        <div className="p-4">
-          <div className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-              <Store size={20} style={{ color: GREEN }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-base text-slate-900 truncate">{shift.booth.name}</p>
-              <p className="text-sm text-slate-500">Pilih produk untuk melihat riwayat stok</p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2.5 mb-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-500 mb-1">Pilih Stok</p>
-              <div className="relative">
-                <select
-                  value={ledgerProductId ?? ""}
-                  onChange={(e) => setLedgerProductId(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-3 text-base font-semibold text-slate-800"
-                >
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-500 mb-1">Periode</p>
-              <div className="relative">
-                <select
-                  value={ledgerPeriode}
-                  onChange={(e) => setLedgerPeriode(e.target.value as Periode)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 py-3 text-base font-semibold text-slate-800"
-                >
-                  {(Object.keys(PERIODE_LABEL) as Periode[]).map((p) => (
-                    <option key={p} value={p}>
-                      {PERIODE_LABEL[p]}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-
-          {loadingLedger || !ledger ? (
-            <div className="flex items-center justify-center py-16">
-              <Spinner />
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-2 mb-5">
-                <div className="rounded-xl p-2.5 bg-slate-50 border border-slate-100">
-                  <Package size={15} className="text-slate-500" />
-                  <p className="text-xs text-slate-500 mt-1.5">Stok Awal</p>
-                  <p className="text-base font-extrabold text-slate-900">{ledger.ringkasan.stokAwal}</p>
-                </div>
-                <div className="rounded-xl p-2.5" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-                  <ArrowUp size={15} style={{ color: GREEN }} />
-                  <p className="text-xs mt-1.5" style={{ color: GREEN }}>Masuk</p>
-                  <p className="text-base font-extrabold" style={{ color: GREEN }}>{ledger.ringkasan.masuk}</p>
-                </div>
-                <div className="rounded-xl p-2.5" style={{ backgroundColor: "#FEE2E2" }}>
-                  <ArrowDown size={15} style={{ color: "#D21919" }} />
-                  <p className="text-xs mt-1.5" style={{ color: "#D21919" }}>Keluar</p>
-                  <p className="text-base font-extrabold" style={{ color: "#D21919" }}>{ledger.ringkasan.keluar}</p>
-                </div>
-                <div className="rounded-xl p-2.5 bg-slate-50 border border-slate-100">
-                  <Package size={15} className="text-slate-500" />
-                  <p className="text-xs text-slate-500 mt-1.5">Stok Akhir</p>
-                  <p className="text-base font-extrabold text-slate-900">{ledger.ringkasan.stokAkhir}</p>
-                </div>
-              </div>
-
-              <p className="text-base font-extrabold text-slate-900">Riwayat Mutasi Stok</p>
-              <p className="text-sm text-slate-500 mb-3">Catatan masuk dan keluar stok produk terpilih</p>
-
-              <div className="flex flex-col gap-2 mb-4">
-                {ledger.rows.length === 0 ? (
-                  <p className="text-base text-slate-500 text-center py-10">Belum ada mutasi pada periode ini.</p>
-                ) : (
-                  ledger.rows
-                    .slice()
-                    .reverse()
-                    .map((r) => {
-                      const jenisStyle =
-                        r.jenis === "MASUK"
-                          ? { bg: OBBEL_SCALE[50], fg: GREEN, Icon: ArrowUp }
-                          : r.jenis === "KELUAR"
-                            ? { bg: "#FEE2E2", fg: "#D21919", Icon: ArrowDown }
-                            : { bg: "#E1EEFB", fg: "#1D63D8", Icon: Equal };
-                      const JenisIcon = jenisStyle.Icon;
-                      return (
-                        <div key={r.id} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
-                          <div className="w-20 shrink-0">
-                            <p className="text-sm font-bold text-slate-800">{formatTanggalJakarta(r.tanggal)}</p>
-                            <p className="text-xs text-slate-400">{formatJamJakarta(r.tanggal)}</p>
-                          </div>
-                          <span
-                            className="flex items-center gap-1 text-xs font-bold rounded-full px-2 py-1 shrink-0"
-                            style={{ backgroundColor: jenisStyle.bg, color: jenisStyle.fg }}
-                          >
-                            <JenisIcon size={10} />
-                            {r.jenis === "MASUK" ? "Masuk" : r.jenis === "KELUAR" ? "Keluar" : "Penyesuaian"}
-                          </span>
-                          <p className="text-base font-extrabold w-14 text-right shrink-0" style={{ color: jenisStyle.fg }}>
-                            {r.qty > 0 ? "+" : ""}{r.qty}
-                          </p>
-                          <p className="text-sm font-bold text-slate-700 w-10 text-right shrink-0">{r.stokAkhir}</p>
-                          <p className="text-sm text-slate-500 flex-1 min-w-0 truncate">{r.keterangan}</p>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
-
-              <div className="rounded-2xl bg-white border border-slate-200 p-3.5 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: OBBEL_SCALE[50] }}>
-                    <ArrowUp size={14} style={{ color: GREEN }} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 leading-tight">Total Masuk</p>
-                    <p className="text-base font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.masuk} cup</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FEE2E2" }}>
-                    <ArrowDown size={14} style={{ color: "#D21919" }} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 leading-tight">Total Keluar</p>
-                    <p className="text-base font-extrabold text-slate-900 leading-tight">{ledger.ringkasan.keluar} cup</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleExportRiwayat}
-                  disabled={exportingExcel}
-                  className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 shrink-0 disabled:opacity-50"
-                >
-                  {exportingExcel ? <Spinner size="sm" /> : <Download size={13} />}
-                  {exportingExcel ? "Menyiapkan..." : "Ekspor Excel"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       )}
     </div>
   );

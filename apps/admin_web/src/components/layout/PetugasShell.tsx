@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, Suspense, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, Clock, Receipt, Settings, CreditCard, History, Package, Check } from "lucide-react";
 import { OBBEL } from "@/app/petugas/_lib/theme";
 
@@ -13,8 +13,8 @@ type RiwayatItem = {
   label: string;
   desc: string;
   icon: typeof Home;
-  /// Halaman ini sedang dibuka? `tab` = nilai ?tab= di URL (Riwayat Stok memakai tab di halaman Stok).
-  aktif: (pathname: string, tab: string | null) => boolean;
+  /// Halaman ini sedang dibuka?
+  aktif: (pathname: string) => boolean;
 };
 
 const RIWAYAT_MENU: RiwayatItem[] = [
@@ -26,11 +26,11 @@ const RIWAYAT_MENU: RiwayatItem[] = [
     aktif: (p) => p.startsWith("/petugas/riwayat-absen"),
   },
   {
-    href: "/petugas/stok?tab=RIWAYAT",
+    href: "/petugas/riwayat-stok",
     label: "Riwayat Stok",
     desc: "Stok masuk dan keluar booth",
     icon: Package,
-    aktif: (p, tab) => p === "/petugas/stok" && tab?.toUpperCase() === "RIWAYAT",
+    aktif: (p) => p.startsWith("/petugas/riwayat-stok"),
   },
   {
     href: "/petugas/riwayat-penjualan",
@@ -76,24 +76,22 @@ export function useHidePetugasNav(active: boolean = true) {
   }, [active, hide]);
 }
 
-/// Bottom nav mengambang + menu Riwayat. Terpisah dari PetugasShell karena membaca ?tab= (useSearchParams
-/// wajib dibungkus Suspense di App Router). Saat menu Riwayat terbuka hanya tab Riwayat yang menyala,
+/// Bottom nav mengambang + menu Riwayat. Saat menu Riwayat terbuka hanya tab Riwayat yang menyala,
 /// supaya tidak ada dua tab aktif sekaligus (mis. Kasir dan Riwayat).
 function NavBawah() {
   const pathname = usePathname();
-  const tab = useSearchParams().get("tab");
   const [menuBuka, setMenuBuka] = useState(false);
   /// Tujuan yang baru diketuk dan belum selesai dimuat ("riwayat" atau href tab). Tanpa ini, indikator
   /// kembali sebentar ke tab halaman lama (menu sudah menutup, URL belum berganti) lalu loncat ke tujuan.
   const [menuju, setMenuju] = useState<string | null>(null);
 
-  // Menu ditutup dan tujuan dilepas begitu halaman atau tab benar-benar berganti (mis. Riwayat Stok dari halaman Stok).
+  // Menu ditutup dan tujuan dilepas begitu halaman benar-benar berganti.
   useEffect(() => {
     setMenuBuka(false);
     setMenuju(null);
-  }, [pathname, tab]);
+  }, [pathname]);
 
-  const riwayatAktif = menuju ? menuju === "riwayat" : RIWAYAT_MENU.some((m) => m.aktif(pathname, tab));
+  const riwayatAktif = menuju ? menuju === "riwayat" : RIWAYAT_MENU.some((m) => m.aktif(pathname));
   const gayaTab = (aktif: boolean) => ({
     color: aktif ? PETUGAS_GREEN : "#A3ABA6",
     backgroundColor: aktif ? `${PETUGAS_GREEN}14` : "transparent",
@@ -108,7 +106,7 @@ function NavBawah() {
           <div className="absolute bottom-full right-0 mb-3 w-72 max-w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)]">
             {RIWAYAT_MENU.map((item) => {
               const Icon = item.icon;
-              const sedangDibuka = item.aktif(pathname, tab);
+              const sedangDibuka = item.aktif(pathname);
               return (
                 <Link
                   key={item.href}
@@ -205,11 +203,7 @@ export function PetugasShell({ children }: { children: React.ReactNode }) {
     <NavVisibilityContext.Provider value={{ hide }}>
       <div className="min-h-screen flex flex-col bg-[#F7F9F6]">
         <main className={`flex-1 max-w-md w-full mx-auto ${navVisible ? "pb-28" : ""}`}>{children}</main>
-        {navVisible && (
-          <Suspense fallback={null}>
-            <NavBawah />
-          </Suspense>
-        )}
+        {navVisible && <NavBawah />}
       </div>
     </NavVisibilityContext.Provider>
   );
