@@ -117,8 +117,9 @@ export class NotificationsService {
   /// Notifikasi khusus Petugas Booth — hanya kondisi yang relevan untuk
   /// Booth-nya sendiri (stok kritis di booth-nya, distribusi/restock yang
   /// menunggu tindakan dia), bukan feed lintas Booth milik Admin.
+  /// Diurutkan terbaru di atas menurut waktu kejadian aslinya (bukan waktu dibaca):
+  /// stok = terakhir stoknya berubah, kiriman = dikirim, restock = disetujui/ditolak.
   async getForBooth(boothId: string): Promise<NotificationItem[]> {
-    const now = new Date().toISOString();
     const items: NotificationItem[] = [];
 
     const [boothStocks, thresholds, pendingDistributions, myRestockRequests, restockDitolakHariIni] = await Promise.all([
@@ -126,11 +127,11 @@ export class NotificationsService {
       this.prisma.boothStockThreshold.findMany({ where: { boothId } }),
       this.prisma.stockDistribution.findMany({
         where: { boothId, status: DistributionStatus.SENT },
-        select: { id: true, distributionNo: true },
+        select: { id: true, distributionNo: true, sentAt: true, createdAt: true },
       }),
       this.prisma.restockRequest.findMany({
         where: { boothId, status: { in: ['APPROVED'] } },
-        select: { id: true, requestNo: true },
+        select: { id: true, requestNo: true, updatedAt: true },
       }),
       // REJECTED itu status terminal — tanpa batas hari ini, notifnya nongol
       // selamanya (feed ini diturunkan dari state, bukan log event).
@@ -159,7 +160,7 @@ export class NotificationsService {
               : `${s.product.name} tersisa ${s.qtyOnHand}. Segera ajukan restock.`,
           type: status === 'Habis' ? 'error' : status === 'Kritis' ? 'warning' : 'info',
           readAt: null,
-          createdAt: now,
+          createdAt: s.updatedAt.toISOString(),
         });
       }
     }
@@ -171,7 +172,7 @@ export class NotificationsService {
         message: `Distribusi ${d.distributionNo} sudah dikirim, silakan diterima.`,
         type: 'info',
         readAt: null,
-        createdAt: now,
+        createdAt: (d.sentAt ?? d.createdAt).toISOString(),
       });
     }
 
@@ -182,7 +183,7 @@ export class NotificationsService {
         message: `Permintaan restock ${r.requestNo} disetujui dan sedang dikirim.`,
         type: 'success',
         readAt: null,
-        createdAt: now,
+        createdAt: r.updatedAt.toISOString(),
       });
     }
 
@@ -197,6 +198,7 @@ export class NotificationsService {
       });
     }
 
-    return items;
+    // ISO UTC dengan panjang sama -> urutan string = urutan waktu.
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 }

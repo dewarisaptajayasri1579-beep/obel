@@ -9,6 +9,8 @@ Prioritas event:
 - return submitted;
 - discrepancy ditemukan.
 
+Notifikasi Barista (`GET /notifications` dan WebSocket `/notifications`, `NotificationsService.getForBooth`) diturunkan dari kondisi saat ini, bukan log event: stok Menipis/Kritis/Habis di Booth-nya, kiriman berstatus SENT, restock APPROVED, dan restock REJECTED hari ini. Tidak ada status "sudah dibaca": notifikasi hilang sendiri setelah urusannya selesai (kiriman diterima, stok diisi ulang). `createdAt` adalah waktu kejadian aslinya (stok terakhir berubah, kiriman dikirim, restock disetujui/ditolak) dan daftar diurutkan terbaru di atas.
+
 ## 2. PWA Admin notification
 MVP:
 - in-app notification center;
