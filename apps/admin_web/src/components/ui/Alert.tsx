@@ -6,6 +6,8 @@ export interface AlertProps {
   title?: string;
   children: React.ReactNode;
   onClose?: () => void;
+  /// Aksi di sisi kanan (mis. "Buka ›") untuk Alert yang bisa diklik.
+  action?: React.ReactNode;
   className?: string;
 }
 
@@ -14,6 +16,7 @@ export const Alert: React.FC<AlertProps> = ({
   title,
   children,
   onClose,
+  action,
   className = "",
 }) => {
   const configs = {
@@ -42,10 +45,11 @@ export const Alert: React.FC<AlertProps> = ({
       className={`p-4 rounded-2xl border backdrop-blur-md flex items-start gap-3 shadow-xs ${config.bg} ${className}`}
     >
       {config.icon}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {title && <h4 className="font-bold text-sm mb-1">{title}</h4>}
         <div className="text-xs sm:text-sm font-medium leading-relaxed">{children}</div>
       </div>
+      {action && <div className="shrink-0 self-center">{action}</div>}
       {onClose && (
         <button
           onClick={onClose}

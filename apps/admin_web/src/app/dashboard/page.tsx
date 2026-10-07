@@ -12,7 +12,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { LineChartCard, BarChartCard, PieChartCard } from "@/components/ui/charts";
 import { api, ApiError, type AdminDashboard, type ReportsSummary } from "@/lib/api-client";
-import { Truck, Receipt, AlertTriangle, Store, Undo2, RefreshCw, Download } from "lucide-react";
+import { Truck, Receipt, AlertTriangle, Store, Undo2, RefreshCw, Download, ChevronRight } from "lucide-react";
 import { DashboardTabs } from "./DashboardTabs";
 import { SalesReportPanel } from "./SalesReportPanel";
 import { PeriodFilterBar } from "./PeriodFilterBar";
@@ -56,9 +56,18 @@ function RingkasanTab() {
       ) : (
         <>
           {data.reconciliationCasesOpen > 0 && (
-            <Link href="/koreksi">
-              <Alert variant="warning" title="Perlu Rekonsiliasi">
-                Ada {data.reconciliationCasesOpen} kasus yang memerlukan tinjauan Admin. Klik untuk membuka Riwayat & Koreksi Data.
+            <Link href="/koreksi" className="block group">
+              <Alert
+                variant="warning"
+                title="Perlu Rekonsiliasi"
+                className="transition-colors group-hover:bg-amber-100/80 dark:group-hover:bg-amber-500/15"
+                action={
+                  <span className="flex items-center gap-1 text-xs font-bold text-amber-800 dark:text-amber-300">
+                    Buka <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                }
+              >
+                Ada {data.reconciliationCasesOpen} kasus yang memerlukan tinjauan Admin di Riwayat & Koreksi Data.
               </Alert>
             </Link>
           )}
