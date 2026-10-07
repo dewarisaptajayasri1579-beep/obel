@@ -5,5 +5,5 @@
 ///   flutter run --dart-define=PWA_URL=http://10.0.2.2:3000/petugas
 const String kPwaUrl = String.fromEnvironment(
   'PWA_URL',
-  defaultValue: 'https://admin-obel.apps.7smarts.id/petugas/login',
+  defaultValue: 'https://obbel-coffee.apps.7smarts.id/petugas/login',
 );
