@@ -182,6 +182,18 @@ describe('Shift sales summary (e2e)', () => {
 
     // Admin boleh membacanya juga (halaman Laporan Kembali).
     expect((await ringkasan(sid, admin())).total).toBe(subtotal - 1000);
+
+    // Rekap Penjualan di laporan shift (layar Check-Out & Setor & Pengembalian Stok) memakai
+    // aturan yang sama: versi lama sale yang direvisi tidak ikut terdaftar.
+    const laporan = (await request(server()).get(`/shifts/${sid}/report`).set(staff()).expect(200)).body as {
+      transaksi: { saleId: string; cupCount: number; total: number; tunai: number; qris: number }[];
+      totalPenjualan: number;
+    };
+    expect(laporan.transaksi).toHaveLength(hasil.transaksi);
+    expect(laporan.transaksi.map((t) => t.saleId)).not.toContain(direvisi.id);
+    expect(laporan.transaksi.reduce((n, t) => n + t.cupCount, 0)).toBe(hasil.cup);
+    expect(laporan.transaksi.reduce((n, t) => n + t.total, 0)).toBe(hasil.total);
+    expect(laporan.transaksi.reduce((n, t) => n + t.tunai + t.qris, 0)).toBe(laporan.totalPenjualan);
   });
 
   it('is all zero for a shift without sales and rejects a shift of someone else or without token', async () => {

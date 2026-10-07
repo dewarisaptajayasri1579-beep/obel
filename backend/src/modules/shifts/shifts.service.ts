@@ -894,6 +894,17 @@ export class ShiftsService {
   /// qtyOnHand saat ini dikurangi net efek movement shift ini (restock masuk,
   /// terjual/retur keluar, adjustment bertanda) mengembalikan nilai sebelum
   /// shift dimulai.
+  /// Id sale yang sudah digantikan revisinya. Sale yang direvisi TIDAK berubah status (tetap PAID,
+  /// atau VOIDED kalau dibatalkan lebih dulu); penandanya hanya revisionOfId di versi barunya
+  /// (pola yang sama dengan SalesService.findAll), jadi versi lama harus dibuang dari daftar penjualan.
+  private async saleYangDirevisi(saleIds: string[]): Promise<Set<string>> {
+    const revisiBaru = await this.prisma.sale.findMany({
+      where: { revisionOfId: { in: saleIds } },
+      select: { revisionOfId: true },
+    });
+    return new Set(revisiBaru.map((r) => r.revisionOfId as string));
+  }
+
   async getShiftReport(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
     const [booth, shiftTemplate, staff, movements, boothStocks, sales, stockCount, stockReturn, cashDeposit] =
@@ -1057,7 +1068,10 @@ export class ShiftsService {
       }
     }
 
-    const transaksi = sales.map((s) => {
+    // Kas di atas sudah benar tanpa penyaringan (Payment versi lama SUPERSEDED), tapi daftar
+    // transaksinya tidak boleh memuat versi lama sale yang direvisi.
+    const diganti = await this.saleYangDirevisi(sales.map((s) => s.id));
+    const transaksi = sales.filter((s) => !diganti.has(s.id)).map((s) => {
       let tunai = 0;
       let qris = 0;
       for (const p of s.payments) {
@@ -1142,9 +1156,8 @@ export class ShiftsService {
   }
 
   /// Ringkasan PENJUALAN satu shift untuk struk Check-Out — sengaja terpisah dari getShiftReport
-  /// (berorientasi stok, 9 query). Sale yang direvisi TIDAK berubah status (tetap PAID, atau VOIDED
-  /// kalau dibatalkan lebih dulu); penandanya hanya revisionOfId di versi barunya (pola yang sama
-  /// dengan SalesService.findAll), jadi versi lama dibuang dari penjualan maupun pembatalan.
+  /// (berorientasi stok, 9 query). Versi lama sale yang direvisi (saleYangDirevisi) dibuang dari
+  /// penjualan maupun pembatalan.
   /// Total per metode dari baris Payment, bukan Sale.paymentMethod, supaya sale Split masuk dua sisi.
   async getSalesSummary(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
@@ -1161,11 +1174,7 @@ export class ShiftsService {
       }),
     ]);
 
-    const revisiBaru = await this.prisma.sale.findMany({
-      where: { revisionOfId: { in: sales.map((s) => s.id) } },
-      select: { revisionOfId: true },
-    });
-    const diganti = new Set(revisiBaru.map((r) => r.revisionOfId));
+    const diganti = await this.saleYangDirevisi(sales.map((s) => s.id));
     const lunas = sales.filter((s) => s.status === SaleStatus.PAID && !diganti.has(s.id));
     const batal = sales.filter((s) => s.status === SaleStatus.VOIDED && !diganti.has(s.id));
 
