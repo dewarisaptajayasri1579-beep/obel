@@ -206,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse,
         {mode === "pengaturan" ? "Menu Pengaturan ditampilkan" : "Menu Utama ditampilkan"}
       </span>
 
-      <nav ref={navRef} className="relative flex-1 min-h-0 px-3 py-6 overflow-y-auto">
+      <nav ref={navRef} className="relative flex-1 min-h-0 px-3 py-6 overflow-y-auto sidebar-nav-scroll">
         {/* Tombol kembali — cuma di mode Pengaturan */}
         {mode === "pengaturan" && (
           <div className="mb-4">
