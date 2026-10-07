@@ -93,7 +93,7 @@ function NavBawah() {
 
   const riwayatAktif = menuju ? menuju === "riwayat" : RIWAYAT_MENU.some((m) => m.aktif(pathname));
   const gayaTab = (aktif: boolean) => ({
-    color: aktif ? PETUGAS_GREEN : "#A3ABA6",
+    color: aktif ? PETUGAS_GREEN : "#64748B",
     backgroundColor: aktif ? `${PETUGAS_GREEN}14` : "transparent",
   });
 
@@ -101,85 +101,89 @@ function NavBawah() {
     <>
       {menuBuka && <div className="fixed inset-0 z-20 bg-slate-900/30" onClick={() => setMenuBuka(false)} />}
 
-      <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-30">
-        {menuBuka && (
-          <div className="absolute bottom-full right-0 mb-3 w-72 max-w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)]">
-            {RIWAYAT_MENU.map((item) => {
+      {/* Latar warna halaman di belakang nav sampai tepi bawah (memudar ke atas): nav tetap terlihat
+          mengambang seperti mockup, tapi konten yang di-scroll tidak tampak di celah sekelilingnya. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 pt-6 pb-4 px-4 bg-linear-to-t from-[#F7F9F6] from-70% to-transparent pointer-events-none">
+        <nav className="relative max-w-md mx-auto pointer-events-auto">
+          {menuBuka && (
+            <div className="absolute bottom-full right-0 mb-3 w-72 max-w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_12px_32px_-8px_rgba(11,93,52,0.3)]">
+              {RIWAYAT_MENU.map((item) => {
+                const Icon = item.icon;
+                const sedangDibuka = item.aktif(pathname);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={sedangDibuka ? "page" : undefined}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 active:bg-slate-50"
+                    style={sedangDibuka ? { backgroundColor: `${PETUGAS_GREEN}14` } : undefined}
+                    onClick={() => {
+                      setMenuBuka(false);
+                      if (!sedangDibuka) setMenuju("riwayat");
+                    }}
+                  >
+                    <span
+                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `${PETUGAS_GREEN}14`, color: PETUGAS_GREEN }}
+                    >
+                      <Icon size={17} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold text-slate-800">{item.label}</span>
+                      <span className="block text-xs text-slate-400">{item.desc}</span>
+                    </span>
+                    {sedangDibuka && <Check size={16} strokeWidth={3} style={{ color: PETUGAS_GREEN }} />}
+                  </Link>
+                );
+              })}
+              {/* Panah ke tab Riwayat (kolom ke-3 dari 4: pusatnya 37,5% dari tepi kanan). */}
+              <span
+                aria-hidden
+                className="absolute -bottom-1.5 size-3 rotate-45 border-r border-b border-slate-100 bg-white"
+                style={{ right: "calc(37.5% - 0.375rem)" }}
+              />
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl shadow-[0_12px_32px_-8px_rgba(11,93,52,0.25)] border border-slate-100 grid grid-cols-4 gap-1 p-1.5">
+            {TABS.map((item) => {
               const Icon = item.icon;
-              const sedangDibuka = item.aktif(pathname);
+              if (item.type === "menu") {
+                const aktif = menuBuka || riwayatAktif;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    aria-expanded={menuBuka}
+                    onClick={() => setMenuBuka((v) => !v)}
+                    className="flex flex-col items-center justify-center gap-1 py-2 text-xs font-bold rounded-2xl transition"
+                    style={gayaTab(aktif)}
+                  >
+                    <Icon size={22} strokeWidth={aktif ? 2.4 : 2} />
+                    <span className="truncate max-w-full">{item.label}</span>
+                  </button>
+                );
+              }
+
+              const aktif = !menuBuka && !riwayatAktif && (menuju ? menuju === item.href : item.exact ? pathname === item.href : pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  aria-current={sedangDibuka ? "page" : undefined}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 active:bg-slate-50"
-                  style={sedangDibuka ? { backgroundColor: `${PETUGAS_GREEN}14` } : undefined}
                   onClick={() => {
-                    setMenuBuka(false);
-                    if (!sedangDibuka) setMenuju("riwayat");
+                    if (!(item.exact ? pathname === item.href : pathname.startsWith(item.href))) setMenuju(item.href);
                   }}
+                  className="flex flex-col items-center justify-center gap-1 py-2 text-xs font-bold rounded-2xl transition"
+                  style={gayaTab(aktif)}
                 >
-                  <span
-                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: `${PETUGAS_GREEN}14`, color: PETUGAS_GREEN }}
-                  >
-                    <Icon size={17} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-slate-800">{item.label}</span>
-                    <span className="block text-xs text-slate-400">{item.desc}</span>
-                  </span>
-                  {sedangDibuka && <Check size={16} strokeWidth={3} style={{ color: PETUGAS_GREEN }} />}
+                  <Icon size={22} strokeWidth={aktif ? 2.4 : 2} />
+                  <span className="truncate max-w-full">{item.label}</span>
                 </Link>
               );
             })}
-            {/* Panah ke tab Riwayat (kolom ke-3 dari 4: pusatnya 37,5% dari tepi kanan). */}
-            <span
-              aria-hidden
-              className="absolute -bottom-1.5 size-3 rotate-45 border-r border-b border-slate-100 bg-white"
-              style={{ right: "calc(37.5% - 0.375rem)" }}
-            />
           </div>
-        )}
-
-        <div className="max-w-md mx-auto bg-white rounded-full shadow-[0_12px_32px_-8px_rgba(11,93,52,0.25)] border border-slate-100 grid grid-cols-4 p-1.5">
-          {TABS.map((item) => {
-            const Icon = item.icon;
-            if (item.type === "menu") {
-              const aktif = menuBuka || riwayatAktif;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  aria-expanded={menuBuka}
-                  onClick={() => setMenuBuka((v) => !v)}
-                  className="flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold rounded-full transition"
-                  style={gayaTab(aktif)}
-                >
-                  <Icon size={19} strokeWidth={aktif ? 2.6 : 2} />
-                  <span className="truncate max-w-16">{item.label}</span>
-                </button>
-              );
-            }
-
-            const aktif = !menuBuka && !riwayatAktif && (menuju ? menuju === item.href : item.exact ? pathname === item.href : pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => {
-                  if (!(item.exact ? pathname === item.href : pathname.startsWith(item.href))) setMenuju(item.href);
-                }}
-                className="flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold rounded-full transition"
-                style={gayaTab(aktif)}
-              >
-                <Icon size={19} strokeWidth={aktif ? 2.6 : 2} />
-                <span className="truncate max-w-16">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+        </nav>
+      </div>
     </>
   );
 }
@@ -187,7 +191,7 @@ function NavBawah() {
 /// Shell mobile-first Web Petugas Booth — SENGAJA tidak memakai
 /// AppLayout/Sidebar/Header admin, biar tampilannya beda total sesuai
 /// docsV2/mockupv2-android/"PWA Beranda.png". Bottom nav mengambang
-/// (rounded-full, punya jarak dari tepi layar) sesuai mockup PWA itu —
+/// (sudut membulat, punya jarak dari tepi layar) sesuai mockup PWA itu —
 /// bukan bar penuh nempel ke tepi seperti gaya native Android biasa.
 export function PetugasShell({ children }: { children: React.ReactNode }) {
   const [hideCount, setHideCount] = useState(0);
