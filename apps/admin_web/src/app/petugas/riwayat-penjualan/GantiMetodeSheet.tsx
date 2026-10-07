@@ -12,11 +12,11 @@ import {
   KodeQrisBooth,
   PilihMetodeBayar,
   SplitBayarInput,
-  labelMetodeBayar,
   rencanaBayar,
   splitValid,
   type MetodeBayar,
 } from "../_components/PembayaranInput";
+import { labelMetodeBayar } from "@/lib/receipt";
 import { formatRupiah } from "../_lib/format";
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 

@@ -1,4 +1,4 @@
-/// Satu baris struk yang SUDAH disusun web (lihat admin_web/src/app/petugas/_lib/receipt.ts): teks sudah
+/// Satu baris struk yang SUDAH disusun web (lihat admin_web/src/lib/receipt.ts): teks sudah
 /// dibungkus dan dirata ke lebar kertas 58mm (32 karakter, atau 16 untuk [size] 2). Aplikasi ini sengaja
 /// tidak punya logika tata letak — hanya menerjemahkan baris ke ESC/POS — sehingga format struk bisa
 /// diubah dari web tanpa membangun ulang APK.

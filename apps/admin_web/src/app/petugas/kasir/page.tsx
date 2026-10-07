@@ -32,8 +32,8 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printStruk, isNativeBridgeAvailable } from "../_lib/native-bridge";
-import { buatStrukPenjualan, teksStruk } from "../_lib/receipt";
-import { usePerusahaan } from "../_lib/use-perusahaan";
+import { buatStrukPenjualan, labelMetodeBayar, teksStruk } from "@/lib/receipt";
+import { usePerusahaan } from "@/lib/use-perusahaan";
 import { PhotoCapture } from "../_components/PhotoCapture";
 import {
   KodeQrisBooth,
@@ -343,10 +343,6 @@ function KasirContent() {
     }
   }
 
-  function labelMetode(metode: SaleResult["paymentMethod"]): string {
-    return metode === "SPLIT" ? "Split" : metode === "CASH" ? "Tunai" : "QRIS";
-  }
-
   /// Satu susunan struk untuk semua keluaran (Bluetooth, WhatsApp, cetak browser) — lihat receipt.ts.
   function susunStruk(sale: SaleResult) {
     return buatStrukPenjualan({
@@ -359,7 +355,7 @@ function KasirContent() {
       subtotal: sale.subtotal,
       discount: sale.discount,
       total: sale.total,
-      metode: labelMetode(sale.paymentMethod),
+      metode: labelMetodeBayar(sale.paymentMethod),
     });
   }
 
@@ -386,7 +382,7 @@ function KasirContent() {
         time: result.paidAt ?? new Date().toISOString(),
         items: result.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice })),
         total: result.total,
-        paymentMethod: labelMetode(result.paymentMethod),
+        paymentMethod: labelMetodeBayar(result.paymentMethod),
         staffName: session?.profile.fullName,
       });
       toast.success("Struk terkirim ke printer.");
@@ -463,7 +459,7 @@ function KasirContent() {
           <div className="flex justify-between">
             <span className="text-slate-400">Metode Pembayaran</span>
             <span className="font-semibold">
-              {labelMetode(result.paymentMethod)}
+              {labelMetodeBayar(result.paymentMethod)}
             </span>
           </div>
           {result.payments.map((p, i) => (

@@ -15,7 +15,7 @@ import { AttendanceCapture, type LocationValue } from "../_components/Attendance
 import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "../_components/LokasiDitolak";
 import { formatRupiah, formatTanggalJakarta, formatJamJakarta, formatDurasi } from "../_lib/format";
 import { isNativeBridgeAvailable, printBaris, stopGpsTracking } from "../_lib/native-bridge";
-import { buatStrukRingkasanShift } from "../_lib/receipt";
+import { buatStrukRingkasanShift } from "@/lib/receipt";
 
 import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;

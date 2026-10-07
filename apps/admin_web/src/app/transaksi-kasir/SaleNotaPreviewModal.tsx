@@ -1,24 +1,39 @@
 "use client";
 
+import { useRef } from "react";
 import { Printer } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { SaleDetail } from "@/lib/api-client";
+import { LEBAR_STRUK, buatStrukPenjualan, labelMetodeBayar, type PrintLine } from "@/lib/receipt";
+import { usePerusahaan } from "@/lib/use-perusahaan";
 
-function formatRupiah(n: number) {
-  return `Rp${n.toLocaleString("id-ID")}`;
+/// Struk kertas 58mm: baris dari lib/receipt.ts (sama persis dengan yang dicetak Booth), font
+/// monospace selebar LEBAR_STRUK karakter; judul ukuran 2 ditampilkan dua kali lebih besar.
+/// Gaya ditulis inline supaya ikut terbawa saat disalin ke jendela cetak.
+function StrukKertas({ baris }: { baris: PrintLine[] }) {
+  return (
+    <div style={{ fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: 12, lineHeight: 1.35, width: `${LEBAR_STRUK}ch`, margin: "0 auto", color: "#000" }}>
+      {baris.map((b, i) => (
+        <div
+          key={i}
+          style={{
+            whiteSpace: "pre",
+            textAlign: b.align,
+            fontWeight: b.bold ? 700 : 400,
+            fontSize: b.size === 2 ? "2em" : undefined,
+            lineHeight: b.size === 2 ? 1.1 : undefined,
+          }}
+        >
+          {b.text || " "}
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function waktuJakarta(iso: string) {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(iso));
-}
-
-/// Pratinjau & cetak struk satu transaksi kasir — beda dari
-/// PenerimaanNotaPreviewModal.tsx (Tambah Stok Gudang) yang mengambil PDF
-/// jadi dari backend: struk di sini dirender langsung di klien lalu dicetak
-/// lewat window.print() pada jendela baru, karena tidak ada layout PDF
-/// khusus struk kasir di backend. Cukup buat Admin cetak dari browser
-/// desktop (printer biasa/"Save as PDF") — beda kasus dari cetak struk
-/// thermal Bluetooth di booth (lihat percakapan sebelumnya soal itu).
+/// Pratinjau & cetak struk satu transaksi kasir dari browser desktop Admin (printer biasa atau
+/// "Save as PDF"). Isinya disusun oleh buatStrukPenjualan yang sama dengan struk thermal Booth,
+/// ditandai REPRINT BILL karena struk aslinya sudah dicetak Barista saat pembayaran.
 export function SaleNotaPreviewModal({
   isOpen,
   onClose,
@@ -28,53 +43,32 @@ export function SaleNotaPreviewModal({
   onClose: () => void;
   sale: SaleDetail | null;
 }) {
+  const perusahaan = usePerusahaan();
+  const kertas = useRef<HTMLDivElement>(null);
+
+  const baris = sale
+    ? buatStrukPenjualan({
+        perusahaan,
+        boothName: sale.boothName,
+        saleNo: sale.saleNo,
+        waktuIso: sale.paidAt ?? sale.createdAt,
+        barista: sale.staffName,
+        items: sale.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+        subtotal: sale.subtotal,
+        discount: sale.discount,
+        total: sale.total,
+        metode: labelMetodeBayar(sale.paymentMethod),
+        cetakUlang: true,
+      })
+    : [];
+
   function cetak() {
-    if (!sale) return;
+    if (!sale || !kertas.current) return;
     const w = window.open("", "_blank", "width=380,height=600");
     if (!w) return;
-    const baris = sale.items
-      .map(
-        (i) =>
-          `<tr><td>${i.productName}</td><td style="text-align:right">${i.qty}x</td><td style="text-align:right">${formatRupiah(i.lineTotal)}</td></tr>`,
-      )
-      .join("");
-    w.document.write(`
-      <html>
-        <head>
-          <title>Struk ${sale.saleNo}</title>
-          <style>
-            body { font-family: monospace; font-size: 12px; width: 280px; margin: 0 auto; padding: 16px; }
-            h1 { font-size: 14px; text-align: center; margin: 0 0 4px; }
-            p { margin: 2px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-            td { padding: 2px 0; }
-            hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
-            .total { font-weight: bold; font-size: 13px; }
-            .center { text-align: center; }
-          </style>
-        </head>
-        <body>
-          <h1>Obbel Coffee &amp; Milk</h1>
-          <p class="center">${sale.boothName} — Shift ${sale.shiftLabel}</p>
-          <p class="center">${sale.paidAt ? waktuJakarta(sale.paidAt) : "-"}</p>
-          <hr />
-          <p>No. ${sale.saleNo}</p>
-          <p>Barista: ${sale.staffName}</p>
-          <hr />
-          <table>${baris}</table>
-          <hr />
-          <table>
-            <tr><td>Subtotal</td><td style="text-align:right">${formatRupiah(sale.subtotal)}</td></tr>
-            ${sale.discount > 0 ? `<tr><td>Diskon</td><td style="text-align:right">-${formatRupiah(sale.discount)}</td></tr>` : ""}
-            <tr class="total"><td>Total</td><td style="text-align:right">${formatRupiah(sale.total)}</td></tr>
-          </table>
-          <hr />
-          ${sale.payments.map((p) => `<p>${p.method}: ${formatRupiah(p.amount)}</p>`).join("")}
-          <hr />
-          <p class="center">Terima kasih!</p>
-        </body>
-      </html>
-    `);
+    w.document.write(
+      `<html><head><title>Struk ${sale.saleNo}</title><style>body{margin:0;padding:16px}@page{margin:8mm}</style></head><body>${kertas.current.innerHTML}</body></html>`,
+    );
     w.document.close();
     w.focus();
     w.print();
@@ -98,39 +92,8 @@ export function SaleNotaPreviewModal({
     >
       {sale && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-slate-200 dark:border-line bg-slate-50 dark:bg-surface-hover p-4 font-mono text-xs">
-            <p className="text-center font-bold text-sm">Obbel Coffee &amp; Milk</p>
-            <p className="text-center text-slate-500">
-              {sale.boothName} — Shift {sale.shiftLabel}
-            </p>
-            <p className="text-center text-slate-500 mb-2">{sale.paidAt ? waktuJakarta(sale.paidAt) : "-"}</p>
-            <div className="border-t border-dashed border-slate-300 dark:border-line my-2" />
-            <p>No. {sale.saleNo}</p>
-            <p>Barista: {sale.staffName}</p>
-            <div className="border-t border-dashed border-slate-300 dark:border-line my-2" />
-            {sale.items.map((i) => (
-              <div key={i.productId} className="flex justify-between">
-                <span>{i.productName}</span>
-                <span>
-                  {i.qty}x {formatRupiah(i.lineTotal)}
-                </span>
-              </div>
-            ))}
-            <div className="border-t border-dashed border-slate-300 dark:border-line my-2" />
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatRupiah(sale.subtotal)}</span>
-            </div>
-            {sale.discount > 0 && (
-              <div className="flex justify-between">
-                <span>Diskon</span>
-                <span>-{formatRupiah(sale.discount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-sm mt-1">
-              <span>Total</span>
-              <span>{formatRupiah(sale.total)}</span>
-            </div>
+          <div ref={kertas} className="rounded-xl border border-slate-200 dark:border-line bg-white p-4 overflow-x-auto">
+            <StrukKertas baris={baris} />
           </div>
 
           <div className="flex justify-end">

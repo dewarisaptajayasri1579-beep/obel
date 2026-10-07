@@ -1,7 +1,7 @@
 "use client";
 
 import { api, BASE_URL, getToken } from "@/lib/api-client";
-import type { PrintLine } from "./receipt";
+import type { PrintLine } from "@/lib/receipt";
 
 /// Jembatan ke shell native booth_pwa_flutter (lihat
 /// booth_pwa_flutter/lib/bridge/bridge_protocol.dart untuk kontrak

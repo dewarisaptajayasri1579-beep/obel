@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { labelMetodeBayar } from "@/lib/receipt";
 import { OBBEL, OBBEL_SCALE } from "../_lib/theme";
 
 const GREEN = OBBEL.primaryDark;
@@ -62,10 +63,6 @@ export function PilihMetodeBayar({ value, onChange }: { value: MetodeBayar; onCh
       </div>
     </div>
   );
-}
-
-export function labelMetodeBayar(m: MetodeBayar | null | undefined): string {
-  return m === "CASH" ? "Tunai" : m === "QRIS" ? "QRIS" : m === "SPLIT" ? "Split" : "-";
 }
 
 /// Kode QRIS Booth untuk dipindai pelanggan (QRIS & Split).

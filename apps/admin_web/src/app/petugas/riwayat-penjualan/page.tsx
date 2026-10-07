@@ -7,10 +7,9 @@ import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatRupiah, formatJamJakarta, formatTanggalJakarta } from "../_lib/format";
-import { labelMetodeBayar } from "../_components/PembayaranInput";
 import { isNativeBridgeAvailable, printBaris } from "../_lib/native-bridge";
-import { buatStrukPenjualan } from "../_lib/receipt";
-import { usePerusahaan } from "../_lib/use-perusahaan";
+import { buatStrukPenjualan, labelMetodeBayar } from "@/lib/receipt";
+import { usePerusahaan } from "@/lib/use-perusahaan";
 import { GantiMetodeSheet } from "./GantiMetodeSheet";
 
 import { OBBEL } from "../_lib/theme";

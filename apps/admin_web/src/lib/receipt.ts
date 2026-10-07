@@ -1,7 +1,8 @@
 /// Struk thermal 58mm dibangun DI SINI (web), bukan di aplikasi Flutter: web menyusun daftar baris yang
 /// sudah dibungkus dan dirata ke lebar kertas, aplikasi Android hanya menerjemahkannya ke ESC/POS.
-/// Satu susunan yang sama dipakai untuk cetak Bluetooth, teks WhatsApp dan cetak browser, dan mengubah
-/// tata letak cukup deploy web (tanpa membangun ulang APK).
+/// Satu susunan yang sama dipakai untuk cetak Bluetooth, teks WhatsApp, cetak browser dan Pratinjau Struk
+/// Admin (transaksi-kasir/SaleNotaPreviewModal), dan mengubah tata letak cukup deploy web (tanpa membangun
+/// ulang APK).
 
 /// Kertas 58mm memuat 32 karakter font normal; dengan lebar ganda (judul) tinggal 16.
 export const LEBAR_STRUK = 32;
@@ -22,6 +23,11 @@ export interface Perusahaan {
   nama: string;
   alamat?: string | null;
   telepon?: string | null;
+}
+
+/// Label cara bayar di struk (`Payment`) dan di layar Barista.
+export function labelMetodeBayar(m: "CASH" | "QRIS" | "SPLIT" | null | undefined): string {
+  return m === "CASH" ? "Tunai" : m === "QRIS" ? "QRIS" : m === "SPLIT" ? "Split" : "-";
 }
 
 export interface StrukPenjualanInput {
