@@ -121,3 +121,16 @@ export function formatJakartaDateLabel(dateIso: string) {
     timeZone: "Asia/Jakarta",
   }).format(parseJakartaDateIso(dateIso))
 }
+
+/** Waktu relatif untuk notifikasi: "baru saja", "5 mnt lalu", "3 jam lalu", "2 hari lalu"; lebih dari
+ *  seminggu jadi tanggal biasa ("23 Sep 2026") supaya tidak terbaca "40 hari lalu". */
+export function formatWaktuRelatif(iso: string, now: Date = new Date()) {
+  const menit = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000))
+  if (menit < 1) return "baru saja"
+  if (menit < 60) return `${menit} mnt lalu`
+  const jam = Math.floor(menit / 60)
+  if (jam < 24) return `${jam} jam lalu`
+  const hari = Math.floor(jam / 24)
+  if (hari <= 7) return `${hari} hari lalu`
+  return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(iso))
+}
