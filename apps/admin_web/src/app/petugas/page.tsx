@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { io, type Socket } from "socket.io-client";
 import {
   CreditCard,
   Truck,
@@ -18,19 +16,17 @@ import {
   Coffee,
   Leaf,
   BarChart3,
-  AlertTriangle,
-  Info,
-  X,
   MapPin,
   Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, BASE_URL, getToken, type ActiveShift, type NotificationItem, type PendingReturnShift, type SaleListItem } from "@/lib/api-client";
+import { api, ApiError, type ActiveShift, type PendingReturnShift, type SaleListItem } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatJamJakarta, formatRupiah, startOfTodayJakarta } from "./_lib/format";
 import { OBBEL, OBBEL_SCALE } from "./_lib/theme";
+import { gabungNotifikasiStok, useDibacaBarista, useNotifikasiBooth } from "./_lib/notifikasi";
 
 const GREEN = OBBEL.primaryDark;
 
@@ -75,15 +71,12 @@ const MENU = [
 
 function HomeContent() {
   const { session, logout, updateToken } = useAuth();
-  const router = useRouter();
   const toast = useToast();
   const [shift, setShift] = useState<ActiveShift | null>(null);
   const [noShift, setNoShift] = useState(false);
   // Shift yang sudah Check-Out tapi belum absen Kembali di Gudang (BR-042).
   const [menungguKembali, setMenungguKembali] = useState<PendingReturnShift | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [salesHariIni, setSalesHariIni] = useState<SaleListItem[]>([]);
 
   useEffect(() => {
@@ -115,25 +108,12 @@ function HomeContent() {
     })();
   }, []);
 
-  // Lonceng notifikasi + badge "Baru" di kartu Terima Stok — SATU sumber
-  // data live (WebSocket, backend/src/modules/notifications/notifications.gateway.ts,
-  // booth-scoped: cuma notifikasi Booth Petugas ini sendiri). Snapshot
-  // langsung dikirim server begitu konek, lalu di-refresh tiap ~5 detik —
-  // tidak perlu refresh halaman untuk lihat notifikasi baru (mis. stok baru
-  // dikirim Admin, sambil Beranda masih terbuka).
-  //
-  // Baru dibuka setelah `shift` terisi (bukan `[]` kosong) — gateway
-  // menolak koneksi kalau JWT belum punya boothId (lihat komentar di atas),
-  // jadi menunggu token yang benar tersimpan dulu mencegah socket konek
-  // pakai token basi lalu langsung di-disconnect diam-diam.
-  useEffect(() => {
-    if (!shift) return;
-    const socket: Socket = io(`${BASE_URL}/notifications`, { auth: { token: getToken() } });
-    socket.on("notifications:snapshot", (data: NotificationItem[]) => setNotifications(data));
-    return () => {
-      socket.disconnect();
-    };
-  }, [shift]);
+  // Bel notifikasi + badge "Baru" di kartu Terima Stok & kartu Stok — satu sumber data live
+  // (WebSocket booth-scoped, lihat useNotifikasiBooth). Dibuka setelah `shift` terisi supaya
+  // token yang dipakai sudah ber-boothId.
+  const notifications = useNotifikasiBooth(!!shift) ?? [];
+  const { sudahDibaca } = useDibacaBarista();
+  const belumDibaca = gabungNotifikasiStok(notifications).filter((n) => !sudahDibaca(n)).length;
 
   // Ringkasan Kasir (cup + omzet) di kartu menu Beranda — booth-scoped
   // otomatis oleh backend (JWT BOOTH_STAFF, sama seperti /petugas/riwayat-
@@ -174,19 +154,6 @@ function HomeContent() {
     Habis: OBBEL.accentRed,
     Kritis: OBBEL.accentOrange,
     Menipis: "#B45309",
-  };
-
-  const NOTIF_ICON: Record<NotificationItem["type"], typeof Info> = {
-    info: Info,
-    success: Info,
-    warning: AlertTriangle,
-    error: AlertTriangle,
-  };
-  const NOTIF_COLOR: Record<NotificationItem["type"], string> = {
-    info: "#1D63D8",
-    success: OBBEL.primaryDark,
-    warning: OBBEL.accentOrange,
-    error: OBBEL.accentRed,
   };
 
   if (loading) {
@@ -265,22 +232,21 @@ function HomeContent() {
           <p className="text-sm text-slate-400 font-medium mt-0.5">Semoga harimu menyenangkan!</p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowNotifPanel(true)}
+          <Link
+            href="/petugas/notifikasi"
             title="Notifikasi"
             className="relative w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center"
           >
             <Bell size={18} className="text-slate-700" />
-            {notifications.length > 0 && (
+            {belumDibaca > 0 && (
               <span
                 className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center rounded-full text-white text-[11px] font-bold"
                 style={{ backgroundColor: OBBEL.accentRed }}
               >
-                {notifications.length > 9 ? "9+" : notifications.length}
+                {belumDibaca > 9 ? "9+" : belumDibaca}
               </span>
             )}
-          </button>
+          </Link>
           <button
             type="button"
             onClick={logout}
@@ -415,57 +381,6 @@ function HomeContent() {
         </div>
       </div>
 
-      {showNotifPanel && (
-        <div className="fixed inset-0 bg-black/40 z-30 flex items-end" onClick={() => setShowNotifPanel(false)}>
-          <div
-            className="w-full max-w-md mx-auto bg-white rounded-t-2xl max-h-[75vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="font-extrabold text-slate-900">Notifikasi</p>
-              <button type="button" onClick={() => setShowNotifPanel(false)} className="text-slate-400">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
-              {notifications.length === 0 ? (
-                <p className="text-base text-slate-400 text-center py-10">Belum ada notifikasi.</p>
-              ) : (
-                notifications.map((n) => {
-                  const Icon = NOTIF_ICON[n.type];
-                  const warna = NOTIF_COLOR[n.type];
-                  const tujuan = n.id.startsWith("distribution:")
-                    ? "/petugas/terima-stok"
-                    : n.id.startsWith("restock-rejected:")
-                      ? "/petugas/stok?tab=restock"
-                      : null;
-                  const isi = (
-                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50">
-                      <span
-                        className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: `${warna}1A`, color: warna }}
-                      >
-                        <Icon size={16} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-base font-bold text-slate-900">{n.title}</p>
-                        <p className="text-sm text-slate-500 mt-0.5">{n.message}</p>
-                      </div>
-                    </div>
-                  );
-                  return tujuan ? (
-                    <Link key={n.id} href={tujuan} onClick={() => setShowNotifPanel(false)}>
-                      {isi}
-                    </Link>
-                  ) : (
-                    <div key={n.id}>{isi}</div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

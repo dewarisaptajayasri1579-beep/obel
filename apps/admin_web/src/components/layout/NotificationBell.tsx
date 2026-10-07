@@ -6,6 +6,7 @@ import { Bell, BellOff, PackageX, RefreshCw, ShieldAlert, Truck, Wallet, type Lu
 import { api, type NotificationItem } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { formatWaktuRelatif } from "@/lib/datetime"
+import { useStatusDibaca } from "@/lib/notifikasi"
 
 /// Jenis notifikasi Admin dikenali dari awalan `id` (lihat NotificationsService.getAll): label, ikon,
 /// dan halaman yang dibuka saat diklik.
@@ -27,50 +28,16 @@ const WARNA: Record<NotificationItem["type"], string> = {
 
 const INTERVAL_MS = 30_000
 
-/// Kunci "sudah dibaca". Notifikasi diturunkan dari kondisi saat ini (tidak ada status baca di server),
-/// jadi kuncinya ikut berubah saat kejadiannya berubah dan item muncul lagi sebagai belum dibaca:
-/// stok per Booth berubah kalau daftar produk Habis/Kritis-nya berubah (bukan setiap penjualan),
-/// item lain kalau ada kejadian yang lebih baru.
-const kunciBaca = (n: NotificationItem) => (n.id.startsWith("lowstock:") ? `${n.id}|${n.message}` : `${n.id}|${n.createdAt}`)
-
-function bacaTersimpan(storageKey: string): Set<string> {
-  try {
-    return new Set(JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as string[])
-  } catch {
-    return new Set()
-  }
-}
-
 export function NotificationBell({ iconButtonClass }: { iconButtonClass: string }) {
   const router = useRouter()
   const { session } = useAuth()
   const [items, setItems] = useState<NotificationItem[]>([])
   const [open, setOpen] = useState(false)
-  const [dibaca, setDibaca] = useState<Set<string>>(new Set())
   const [sekarang, setSekarang] = useState(() => new Date())
   const memuat = useRef(false)
   const wadah = useRef<HTMLDivElement>(null)
   // Status baca per akun (dua Admin bisa memakai browser yang sama).
-  const storageKey = `obbel-admin-notif-dibaca:${session?.profile.id ?? "-"}`
-
-  useEffect(() => {
-    setDibaca(bacaTersimpan(storageKey))
-  }, [storageKey])
-
-  /// Simpan hanya kunci item yang masih ada, supaya penyimpanan tidak terus membesar.
-  const simpan = useCallback(
-    (baru: Set<string>, daftar: NotificationItem[]) => {
-      const masihAda = new Set(daftar.map(kunciBaca))
-      const rapi = new Set([...baru].filter((k) => masihAda.has(k)))
-      setDibaca(rapi)
-      try {
-        window.localStorage.setItem(storageKey, JSON.stringify([...rapi]))
-      } catch {
-        // Penyimpanan diblokir: status baca hanya bertahan selama halaman terbuka.
-      }
-    },
-    [storageKey],
-  )
+  const { sudahDibaca, tandai } = useStatusDibaca(`obbel-admin-notif-dibaca:${session?.profile.id ?? "-"}`)
 
   const load = useCallback(async () => {
     if (memuat.current) return
@@ -109,10 +76,10 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
     return () => document.removeEventListener("mousedown", tutup)
   }, [open])
 
-  const belumDibaca = items.filter((n) => !dibaca.has(kunciBaca(n))).length
+  const belumDibaca = items.filter((n) => !sudahDibaca(n)).length
 
   function buka(n: NotificationItem) {
-    simpan(new Set(dibaca).add(kunciBaca(n)), items)
+    tandai([n], items)
     setOpen(false)
     const { href } = jenisDari(n)
     if (href) router.push(href)
@@ -143,7 +110,7 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
             {belumDibaca > 0 && (
               <button
                 type="button"
-                onClick={() => simpan(new Set(items.map(kunciBaca)), items)}
+                onClick={() => tandai(items, items)}
                 className="text-xs font-semibold text-brand-700 dark:text-brand-400 hover:underline cursor-pointer"
               >
                 Tandai dibaca
@@ -163,7 +130,7 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
               {items.map((n) => {
                 const jenis = jenisDari(n)
                 const Ikon = jenis.ikon
-                const baru = !dibaca.has(kunciBaca(n))
+                const baru = !sudahDibaca(n)
                 return (
                   <button
                     key={n.id}
