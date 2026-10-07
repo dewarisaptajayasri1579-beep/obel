@@ -888,12 +888,6 @@ export class ShiftsService {
     }));
   }
 
-  /// "Laporan Kembali" — ringkasan stok (dari StockMovement ber-shiftSessionId
-  /// ini) + kas Tunai/QRIS (dari Sale ber-shiftSessionId ini). Tidak ada
-  /// snapshot stok-awal eksplisit saat Check-In, jadi stokAwal DITURUNKAN:
-  /// qtyOnHand saat ini dikurangi net efek movement shift ini (restock masuk,
-  /// terjual/retur keluar, adjustment bertanda) mengembalikan nilai sebelum
-  /// shift dimulai.
   /// Id sale yang sudah digantikan revisinya. Sale yang direvisi TIDAK berubah status (tetap PAID,
   /// atau VOIDED kalau dibatalkan lebih dulu); penandanya hanya revisionOfId di versi barunya
   /// (pola yang sama dengan SalesService.findAll), jadi versi lama harus dibuang dari daftar penjualan.
@@ -905,6 +899,12 @@ export class ShiftsService {
     return new Set(revisiBaru.map((r) => r.revisionOfId as string));
   }
 
+  /// "Laporan Kembali" — ringkasan stok (dari StockMovement ber-shiftSessionId
+  /// ini) + kas Tunai/QRIS (dari Sale ber-shiftSessionId ini). Tidak ada
+  /// snapshot stok-awal eksplisit saat Check-In, jadi stokAwal DITURUNKAN:
+  /// qtyOnHand saat ini dikurangi net efek movement shift ini (restock masuk,
+  /// terjual/retur keluar, adjustment bertanda) mengembalikan nilai sebelum
+  /// shift dimulai.
   async getShiftReport(shiftSessionId: string, user: JwtPayload) {
     const shift = await this.loadOwnedShift(shiftSessionId, user);
     const [booth, shiftTemplate, staff, movements, boothStocks, sales, stockCount, stockReturn, cashDeposit] =
