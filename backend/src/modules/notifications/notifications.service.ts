@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DistributionStatus, ReturnStatus } from '@prisma/client';
+import { CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
@@ -22,69 +22,102 @@ export interface NotificationItem {
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /// Bel Admin/Owner. Peringatan stok hanya untuk Booth yang shift-nya sedang OPEN (Booth tanpa shift
+  /// stoknya memang 0 setelah Check-Out) dan digabung satu item per Booth. Antrian hanya berisi yang
+  /// masih perlu ditindak, jadi item hilang sendiri setelah diurus. Tiap item memakai waktu kejadian
+  /// aslinya dan daftar diurutkan terbaru di atas.
   async getAll(): Promise<NotificationItem[]> {
-    const now = new Date().toISOString();
     const items: NotificationItem[] = [];
 
-    const [boothStocks, thresholds, pendingDistributions, pendingRestock, pendingReturns, openCases, closedShiftsToday] =
+    const [boothStocks, thresholds, pendingDistributions, pendingRestock, openCases, menungguApprove] =
       await Promise.all([
-        this.prisma.boothStock.findMany({ where: BOOTH_STOCK_TERLIHAT, include: { booth: true, product: true } }),
+        this.prisma.boothStock.findMany({
+          where: { ...BOOTH_STOCK_TERLIHAT, booth: { shiftSessions: { some: { status: ShiftStatus.OPEN } } } },
+          include: { booth: true, product: true },
+          orderBy: { product: { name: 'asc' } },
+        }),
         this.prisma.boothStockThreshold.findMany(),
-        this.prisma.stockDistribution.count({ where: { status: DistributionStatus.SENT } }),
-        this.prisma.restockRequest.count({ where: { status: 'REQUESTED' } }),
-        this.prisma.stockReturn.count({ where: { status: ReturnStatus.SUBMITTED } }),
+        this.prisma.stockDistribution.findMany({
+          where: { status: DistributionStatus.SENT },
+          select: { sentAt: true, createdAt: true },
+        }),
+        this.prisma.restockRequest.findMany({ where: { status: 'REQUESTED' }, select: { createdAt: true } }),
         this.prisma.reconciliationCase.findMany({ where: { status: 'OPEN' }, orderBy: { createdAt: 'desc' } }),
+        // Return Booth hanya lahir dari Check-Out, dan Approve Stok Kembali & Setor Uang baru terbuka
+        // setelah Barista absen Kembali: yang bisa ditindak = shift CLOSED, sudah Kembali, dan return-nya
+        // masih SUBMITTED atau setorannya masih PENDING.
         this.prisma.shiftSession.findMany({
-          where: { status: 'CLOSED', businessDate: startOfTodayJakarta() },
-          include: { booth: true, staff: { select: { fullName: true } }, stockCount: { include: { items: true } } },
-          orderBy: { closedAt: 'desc' },
+          where: {
+            status: ShiftStatus.CLOSED,
+            returnedAt: { not: null },
+            OR: [{ stockReturns: { some: { status: ReturnStatus.SUBMITTED } } }, { cashDeposit: { status: CashDepositStatus.PENDING } }],
+          },
+          include: { booth: true, staff: { select: { fullName: true } } },
+          orderBy: { returnedAt: 'desc' },
         }),
       ]);
 
+    type StokBooth = { boothName: string; habis: string[]; kritis: string[]; terakhir: Date };
+    const perBooth = new Map<string, StokBooth>();
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));
     for (const s of boothStocks) {
       const th = thresholdByKey.get(`${s.boothId}:${s.productId}`);
       const status = resolveStockStatus(s.qtyOnHand, th?.minimumQty ?? s.product.minimumQty, th?.criticalQty ?? s.product.criticalQty);
-      if (status === 'Kritis' || status === 'Habis') {
-        items.push({
-          id: `lowstock:${s.boothId}:${s.productId}`,
-          title: status === 'Habis' ? 'Stok Habis' : 'Stok Kritis',
-          message: `${s.product.name} di ${s.booth.name} tersisa ${s.qtyOnHand}.`,
-          type: status === 'Habis' ? 'error' : 'warning',
-          readAt: null,
-          createdAt: now,
-        });
-      }
+      if (status !== 'Kritis' && status !== 'Habis') continue;
+      const booth = perBooth.get(s.boothId) ?? { boothName: s.booth.name, habis: [], kritis: [], terakhir: s.updatedAt };
+      (status === 'Habis' ? booth.habis : booth.kritis).push(s.product.name);
+      if (s.updatedAt > booth.terakhir) booth.terakhir = s.updatedAt;
+      perBooth.set(s.boothId, booth);
+    }
+    const daftar = (nama: string[]) => (nama.length > 3 ? `${nama.slice(0, 3).join(', ')} +${nama.length - 3} lainnya` : nama.join(', '));
+    for (const [boothId, b] of perBooth) {
+      const bagian = [
+        ...(b.habis.length ? [`${b.habis.length} produk habis (${daftar(b.habis)})`] : []),
+        ...(b.kritis.length ? [`${b.kritis.length} produk kritis (${daftar(b.kritis)})`] : []),
+      ];
+      items.push({
+        id: `lowstock:${boothId}`,
+        title: b.habis.length ? 'Stok Habis' : 'Stok Kritis',
+        message: `${b.boothName}: ${bagian.join(' dan ')}.`,
+        type: b.habis.length ? 'error' : 'warning',
+        readAt: null,
+        createdAt: b.terakhir.toISOString(),
+      });
     }
 
-    if (pendingDistributions > 0) {
+    const terbaru = (waktu: Date[]) => new Date(Math.max(...waktu.map((w) => w.getTime()))).toISOString();
+    if (pendingDistributions.length > 0) {
       items.push({
         id: 'pending:distributions',
         title: 'Distribusi Menunggu Diterima',
-        message: `${pendingDistributions} distribusi sedang dalam perjalanan ke Booth.`,
+        message: `${pendingDistributions.length} distribusi sedang dalam perjalanan ke Booth.`,
         type: 'info',
         readAt: null,
-        createdAt: now,
+        createdAt: terbaru(pendingDistributions.map((d) => d.sentAt ?? d.createdAt)),
       });
     }
-    if (pendingRestock > 0) {
+    if (pendingRestock.length > 0) {
       items.push({
         id: 'pending:restock',
         title: 'Restock Menunggu Persetujuan',
-        message: `${pendingRestock} permintaan restock belum diproses.`,
+        message: `${pendingRestock.length} permintaan restock belum diproses.`,
         type: 'info',
         readAt: null,
-        createdAt: now,
+        createdAt: terbaru(pendingRestock.map((r) => r.createdAt)),
       });
     }
-    if (pendingReturns > 0) {
+    if (menungguApprove.length > 0) {
+      const [baru] = menungguApprove;
       items.push({
-        id: 'pending:returns',
-        title: 'Return Menunggu Diterima Gudang',
-        message: `${pendingReturns} return Booth belum dikonfirmasi Gudang.`,
-        type: 'info',
+        id: 'pending:approve',
+        title: 'Menunggu Approve Stok Kembali & Setor Uang',
+        message:
+          menungguApprove.length === 1
+            ? `${baru.staff.fullName} (${baru.booth.name}) sudah Kembali di Gudang.`
+            : `${menungguApprove.length} shift sudah Kembali di Gudang, terbaru ${baru.staff.fullName} (${baru.booth.name}).`,
+        type: 'warning',
         readAt: null,
-        createdAt: now,
+        createdAt: baru.returnedAt!.toISOString(),
       });
     }
 
@@ -99,19 +132,7 @@ export class NotificationsService {
       });
     }
 
-    for (const s of closedShiftsToday) {
-      const adaSelisih = s.stockCount?.items.some((i) => i.discrepancyQty !== 0) ?? false;
-      items.push({
-        id: `checkout:${s.id}`,
-        title: adaSelisih ? 'Checkout Selesai · Ada Selisih' : 'Checkout Selesai',
-        message: `${s.staff.fullName} sudah Check Out dari ${s.booth.name}. Perlu Approve Stok Kembali & Setor Uang di Laporan Kembali.`,
-        type: adaSelisih ? 'warning' : 'info',
-        readAt: null,
-        createdAt: (s.closedAt ?? s.businessDate).toISOString(),
-      });
-    }
-
-    return items;
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   /// Notifikasi khusus Petugas Booth — hanya kondisi yang relevan untuk

@@ -6,15 +6,17 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
-import { bereskanShiftLama } from './support/shift';
+import { bereskanShiftLama, tutupShiftLengkap } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
 };
 
-/// Notifikasi Barista diturunkan dari kondisi saat ini, tapi waktunya harus waktu kejadian aslinya
-/// (stok berubah, kiriman dikirim, restock ditolak) dan daftarnya terbaru di atas.
-describe('Booth notifications (e2e)', () => {
+/// Notifikasi diturunkan dari kondisi saat ini, tapi waktunya harus waktu kejadian aslinya (stok
+/// berubah, kiriman dikirim, restock ditolak, Barista Kembali) dan daftarnya terbaru di atas. Bel Admin
+/// hanya berisi yang masih perlu ditindak: stok per Booth yang sedang buka shift, dan shift yang
+/// menunggu Approve Stok Kembali & Setor Uang.
+describe('Notifications (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let adminToken: string;
@@ -136,6 +138,69 @@ describe('Booth notifications (e2e)', () => {
 
     // Seluruh daftar terurut terbaru di atas.
     const urutan = notif.map((n) => n.createdAt);
+    expect(urutan).toEqual([...urutan].sort().reverse());
+  });
+
+  it('gives Admin one stock alert per open booth and one approval item that clears once approved', async () => {
+    type Notif = { id: string; title: string; message: string; createdAt: string };
+    const bacaAdmin = async () => (await request(server()).get('/notifications').set(admin()).expect(200)).body as Notif[];
+    /// Jumlah shift di item Menunggu Approve (0 kalau itemnya tidak ada).
+    const jumlahApprove = (notif: Notif[]) => {
+      const n = notif.find((x) => x.id === 'pending:approve');
+      if (!n) return 0;
+      const angka = /^(\d+) shift/.exec(n.message);
+      return angka ? Number(angka[1]) : 1;
+    };
+
+    staffToken = await bereskanShiftLama(app, adminToken, staffLoginToken);
+    const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${staffLoginToken}` }).send(CHECKIN).expect(201);
+    staffToken = checkIn.body.accessToken ?? staffLoginToken;
+    const sid = checkIn.body.shiftSessionId as string;
+    await request(server())
+      .post('/booth-stock-thresholds/bulk')
+      .set(admin())
+      .send({ boothId, items: [{ productId: produkA, minimumQty: 100000, criticalQty: 50000 }] })
+      .expect(201);
+    const kiriman = await kirim(produkA, 2);
+    await request(server()).post(`/distributions/${kiriman}/receive`).set(staff()).send({ items: [{ productId: produkA, actualQty: 2 }] }).expect(201);
+    const namaA = (await prisma.product.findUniqueOrThrow({ where: { id: produkA } })).name;
+
+    // Shift OPEN: satu item stok untuk Booth ini, berisi nama Booth dan produknya.
+    const buka = await bacaAdmin();
+    const stokBooth = buka.filter((n) => n.id === `lowstock:${boothId}`);
+    expect(stokBooth).toHaveLength(1);
+    expect(stokBooth[0].message.startsWith('E2E Notif Booth: ')).toBe(true);
+    expect(stokBooth[0].message).toContain(namaA);
+    expect(buka.some((n) => n.id.startsWith(`lowstock:${boothId}:`))).toBe(false);
+
+    // Check-Out + Kembali: stok Booth jadi 0 tapi tidak ada peringatan stok (shift tidak OPEN);
+    // shift ini kini menunggu approve dan jadi yang terbaru.
+    await tutupShiftLengkap(app, adminToken, staffToken, sid);
+    const kembali = await bacaAdmin();
+    expect(kembali.some((n) => n.id === `lowstock:${boothId}`)).toBe(false);
+    const approve = kembali.find((n) => n.id === 'pending:approve');
+    expect(approve).toBeDefined(); // gagal keras kalau itemnya tidak muncul
+    const shift = await prisma.shiftSession.findUniqueOrThrow({ where: { id: sid }, include: { cashDeposit: true } });
+    expect(approve!.createdAt).toBe(shift.returnedAt!.toISOString());
+    expect(approve!.message).toContain('E2E Notif Staff');
+    const sebelum = jumlahApprove(kembali);
+
+    // Approve Stok Kembali & Setor Uang: shift ini keluar dari hitungan.
+    const retur = await prisma.stockReturn.findFirstOrThrow({ where: { shiftSessionId: sid, status: 'SUBMITTED' }, include: { items: true } });
+    await request(server())
+      .post(`/returns/${retur.id}/receive`)
+      .set(admin())
+      .send({ items: retur.items.map((i) => ({ productId: i.productId, qtyReceived: i.qtySubmitted })) })
+      .expect(201);
+    await request(server())
+      .post(`/shifts/${sid}/cash-deposit/confirm`)
+      .set(admin())
+      .send({ depositedAmount: Number(shift.cashDeposit!.expectedAmount) })
+      .expect(201);
+    const sesudah = await bacaAdmin();
+    expect(jumlahApprove(sesudah)).toBe(sebelum - 1);
+
+    const urutan = sesudah.map((n) => n.createdAt);
     expect(urutan).toEqual([...urutan].sort().reverse());
   });
 });

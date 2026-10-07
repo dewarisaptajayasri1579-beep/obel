@@ -17,6 +17,14 @@ MVP:
 - badge realtime;
 - toast untuk event baru.
 
+Bel Admin/Owner (`NotificationsService.getAll`, `components/layout/NotificationBell.tsx`) juga diturunkan dari kondisi saat ini dan hanya berisi yang masih perlu ditindak, sehingga item hilang sendiri setelah diurus:
+- **Stok Booth**: satu item per Booth yang shift-nya sedang OPEN, berisi produk Habis/Kritis (Booth tanpa shift stoknya memang 0 setelah Check-Out, jadi tidak diperingatkan).
+- **Distribusi Menunggu Diterima**, **Restock Menunggu Persetujuan**: jumlah antrian.
+- **Menunggu Approve Stok Kembali & Setor Uang**: shift yang sudah absen Kembali dan return-nya masih SUBMITTED atau setorannya masih PENDING.
+- **Perlu Rekonsiliasi**: satu item per kasus OPEN.
+
+`createdAt` adalah waktu kejadian aslinya, daftar diurutkan terbaru di atas, dan klik membuka halaman terkait. Status "sudah dibaca" disimpan di browser (per akun); item muncul lagi sebagai belum dibaca kalau kejadiannya berubah (daftar produk Habis/Kritis berubah, atau ada antrian yang lebih baru). Polling 30 detik selama tab terlihat.
+
 Web Push dapat ditambahkan setelah permission flow dan HTTPS production siap.
 
 ## 3. Android native push
