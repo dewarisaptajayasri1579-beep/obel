@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, type Booth, type MyBoothShiftAssignment } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
+import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { AbsenScreen } from "../_components/AbsenScreen";
 import { formatRupiah } from "../_lib/format";
 import { startGpsTracking } from "../_lib/native-bridge";
@@ -16,7 +17,7 @@ const GREEN = OBBEL.primaryDark;
 
 /// Absen Berangkat di Gudang (titik 1 dari 4, BR-042) — membuka shift: Kasir &
 /// Terima Stok langsung bisa dipakai, uang jalan booth dicatat di shift (BR-043).
-export default function CheckInPage() {
+function CheckInContent() {
   const { session, loading: authLoading, updateToken } = useAuth();
   const router = useRouter();
   const toast = useToast();
@@ -160,5 +161,15 @@ export default function CheckInPage() {
         )}
       </div>
     </AbsenScreen>
+  );
+}
+
+/// Dibungkus RequirePetugasAuth seperti halaman petugas lain: AbsenScreen menyembunyikan bottom nav lewat
+/// konteks PetugasShell, dan tanpa shell-nya layar ini langsung error.
+export default function CheckInPage() {
+  return (
+    <RequirePetugasAuth>
+      <CheckInContent />
+    </RequirePetugasAuth>
   );
 }
