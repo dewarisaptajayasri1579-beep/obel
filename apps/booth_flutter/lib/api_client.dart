@@ -10,7 +10,7 @@ const _requestTimeout = Duration(seconds: 15);
 /// untuk mengarah ke backend lokal. Tanpa flag ini, default menuju backend
 /// production di Coolify (lihat docs/17-deployment-environment.md).
 const _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
-const _defaultProductionBaseUrl = 'https://obel-backend.apps.7smarts.id';
+const _defaultProductionBaseUrl = 'https://api-obbel-coffee.apps.7smarts.id';
 
 /// Error dari Backend API, mengikuti envelope {code, message, details} di
 /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
