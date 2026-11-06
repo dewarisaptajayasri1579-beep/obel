@@ -127,10 +127,10 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <Link
-          href="/dokumentasi"
+          href="/panduan"
           className={iconButtonClass}
-          aria-label="Dokumentasi"
-          title="Dokumentasi"
+          aria-label="Panduan Pengguna"
+          title="Panduan Pengguna"
         >
           <Info className="w-4 h-4" />
         </Link>

@@ -1,6 +1,6 @@
 /// Katalog menu admin web yang bisa diatur hak aksesnya per peran (BR-044) — SATU-SATUNYA sumber
 /// kunci & label menu. Admin web mengambilnya lewat `GET /access-roles/menus` (editor peran) dan
-/// `apps/admin_web/src/lib/nav-config.ts` merujuk kuncinya per item menu. "Tampilan" & "Dokumentasi"
+/// `apps/admin_web/src/lib/nav-config.ts` merujuk kuncinya per item menu. "Tampilan" & "Panduan Pengguna"
 /// sengaja tidak ada: tidak mengubah data, selalu terbuka. Menambah menu baru = tambah di sini; peran
 /// sistem (fullAccess) otomatis ikut, peran lain mulai dari "Tidak ada".
 export const MENUS = [

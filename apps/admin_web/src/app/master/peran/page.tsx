@@ -256,7 +256,7 @@ function PeranContent() {
               ))}
             </div>
             <p className="text-xs text-slate-500 dark:text-fg-muted">
-              Perubahan berlaku langsung untuk Admin yang memakai peran ini. Tampilan &amp; Dokumentasi selalu terbuka.
+              Perubahan berlaku langsung untuk Admin yang memakai peran ini. Tampilan &amp; Panduan Pengguna selalu terbuka.
             </p>
             <Button type="submit" fullWidth isLoading={saving}>
               Simpan Peran

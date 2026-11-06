@@ -35,7 +35,7 @@ export interface NavItem {
   bottomBar?: boolean;
   children?: NavItem[];
   /// Menu hak akses (BR-044) — item tampil kalau user punya minimal Lihat.
-  /// Tanpa `menu` & tanpa `ownerOnly` = selalu tampil (Tampilan, Dokumentasi).
+  /// Tanpa `menu` & tanpa `ownerOnly` = selalu tampil (Tampilan, Panduan Pengguna).
   menu?: MenuKey;
   /// Hanya untuk Owner (mis. Peran & Hak Akses).
   ownerOnly?: boolean;
@@ -239,8 +239,8 @@ export const SETTINGS_NAV: NavGroup[] = [
         ],
       },
       {
-        label: "Dokumentasi Sistem",
-        href: "/dokumentasi",
+        label: "Panduan Pengguna",
+        href: "/panduan",
         icon: BookOpen,
         bottomBar: false,
       },
@@ -251,7 +251,7 @@ export const SETTINGS_NAV: NavGroup[] = [
 /** Prefix URL yang otomatis membuka sidebar mode Pengaturan saat halaman
  *  di-refresh — tanpa ini, refresh di halaman master melempar sidebar balik
  *  ke Menu Utama persis ketika user sedang berada di dalamnya. */
-export const SETTINGS_PREFIXES = ["/pengaturan", "/master", "/dokumentasi"];
+export const SETTINGS_PREFIXES = ["/pengaturan", "/master", "/panduan"];
 
 /** Gabungan kedua mode — dipakai search bar / apa pun yang butuh daftar lengkap. */
 export const NAV_GROUPS: NavGroup[] = [...MAIN_NAV, ...SETTINGS_NAV];
