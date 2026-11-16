@@ -21,6 +21,7 @@ import {
   Power,
   Search,
   Boxes,
+  Tags,
   Trash2,
   X,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
   type RingkasStokProduk,
 } from "@/lib/api-client";
 import { ProdukReportPreviewModal } from "./ProdukReportPreviewModal";
+import { KelolaKategoriModal } from "./KelolaKategoriModal";
 import { NonaktifDiblokirModal, rincianNonaktifDiblokir, type RincianNonaktifDiblokir } from "./NonaktifDiblokirModal";
 
 function formatRupiah(n: number) {
@@ -98,6 +100,7 @@ export function TabMain({
   const [statusFilter, setStatusFilter] = useState("");
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [showReportPreview, setShowReportPreview] = useState(false);
+  const [kelolaKategori, setKelolaKategori] = useState(false);
   const [unduhExcel, setUnduhExcel] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
 
@@ -754,11 +757,16 @@ export function TabMain({
         </div>
 
         {bolehKelola && (
-          <Link href={linkBaru}>
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-              Tambah Produk <span className="ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" className="whitespace-nowrap" leftIcon={<Tags className="w-3.5 h-3.5" />} onClick={() => setKelolaKategori(true)}>
+              Kelola Kategori
             </Button>
-          </Link>
+            <Link href={linkBaru}>
+              <Button variant="primary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
+                Tambah Produk <span className="hidden sm:inline ml-1 text-[10px] font-mono opacity-80">(Ctrl+N)</span>
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 
@@ -1069,6 +1077,13 @@ export function TabMain({
         productName={diblokir?.nama ?? ""}
         rincian={diblokir?.rincian ?? null}
         onClose={() => setDiblokir(null)}
+      />
+
+      <KelolaKategoriModal
+        isOpen={kelolaKategori}
+        onClose={() => setKelolaKategori(false)}
+        categories={categories}
+        onReload={onReload}
       />
 
       <ProdukReportPreviewModal

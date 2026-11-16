@@ -244,6 +244,8 @@ export interface ProductCategory {
   id: string
   code: string
   name: string
+  /// Products using it, soft-deleted ones excluded. Only on GET /products/categories.
+  productCount: number
 }
 
 export interface Product {
@@ -1471,7 +1473,11 @@ export const api = {
   getTerlarisMine: () => request<{ productId: string; qty: number }[]>("/products/terlaris-mine"),
   getProductCategories: () => request<ProductCategory[]>("/products/categories"),
   createProductCategory: (input: { name: string }) =>
-    request<ProductCategory>("/products/categories", { method: "POST", body: input }),
+    request<Omit<ProductCategory, "productCount">>("/products/categories", { method: "POST", body: input }),
+  updateProductCategory: (id: string, input: { name: string }) =>
+    request<Omit<ProductCategory, "productCount">>(`/products/categories/${id}`, { method: "PATCH", body: input }),
+  deleteProductCategory: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/products/categories/${id}`, { method: "DELETE" }),
   getCompanyProfile: () => request<CompanyProfile>("/company-profile"),
   updateCompanyProfile: (input: { name: string; legalName?: string; address?: string; phone?: string; logoUrl?: string }) =>
     request<CompanyProfile>("/company-profile", { method: "PATCH", body: input }),
