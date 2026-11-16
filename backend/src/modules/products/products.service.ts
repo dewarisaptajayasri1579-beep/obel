@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
@@ -41,8 +41,79 @@ export class ProductsService {
     }));
   }
 
-  findCategories() {
-    return this.prisma.productCategory.findMany({ orderBy: { sortOrder: 'asc' } });
+  /// `productCount` counts only products that are not soft-deleted, the same
+  /// rows the Produk table shows, so the Kelola Kategori modal can tell which
+  /// categories are safe to delete.
+  async findCategories() {
+    const categories = await this.prisma.productCategory.findMany({
+      orderBy: { sortOrder: 'asc' },
+      include: { _count: { select: { products: { where: { deletedAt: null } } } } },
+    });
+    return categories.map(({ _count, ...c }) => ({ ...c, productCount: _count.products }));
+  }
+
+  /// Rename only: the code stays, it is an internal identifier. Reports group
+  /// by the current name, so old reports show the new name too, which is what
+  /// fixing a typo needs.
+  async updateCategory(id: string, dto: CreateProductCategoryDto, actorId: string, actorName: string) {
+    const name = dto.name.trim();
+    if (!name) {
+      throw new DomainError('VALIDATION_ERROR', 'Nama kategori wajib diisi.');
+    }
+    const existing = await this.prisma.productCategory.findUnique({ where: { id } });
+    if (!existing) {
+      throw new DomainError('NOT_FOUND', 'Kategori tidak ditemukan.');
+    }
+    const kembar = await this.prisma.productCategory.findFirst({
+      where: { id: { not: id }, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (kembar) {
+      throw new DomainError('CATEGORY_NAME_TAKEN', `Kategori "${kembar.name}" sudah ada.`, undefined, HttpStatus.CONFLICT);
+    }
+
+    const category = await this.prisma.productCategory.update({ where: { id }, data: { name } });
+    await this.activityLog.record(this.prisma, {
+      entityType: 'product_category',
+      entityId: id,
+      action: 'UPDATE',
+      actorId,
+      actorName,
+      note: `Kategori "${existing.name}" diubah menjadi "${name}".`,
+    });
+    return category;
+  }
+
+  /// Delete is allowed only when no visible product uses the category.
+  /// Soft-deleted products may still point at it (a product can only be
+  /// soft-deleted when it has no transaction history), so they are detached
+  /// in the same transaction instead of blocking the delete.
+  async removeCategory(id: string, actorId: string, actorName: string) {
+    const category = await this.prisma.productCategory.findUnique({ where: { id } });
+    if (!category) {
+      throw new DomainError('NOT_FOUND', 'Kategori tidak ditemukan.');
+    }
+    const dipakai = await this.prisma.product.count({ where: { categoryId: id, deletedAt: null } });
+    if (dipakai > 0) {
+      throw new DomainError(
+        'CATEGORY_IN_USE',
+        `Kategori "${category.name}" masih dipakai ${dipakai} produk. Pindahkan produknya ke kategori lain dulu.`,
+        { productCount: dipakai },
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.product.updateMany({ where: { categoryId: id, deletedAt: { not: null } }, data: { categoryId: null } });
+      await tx.productCategory.delete({ where: { id } });
+      await this.activityLog.record(tx, {
+        entityType: 'product_category',
+        entityId: id,
+        action: 'DELETE',
+        actorId,
+        actorName,
+        note: `Kategori "${category.name}" dihapus.`,
+      });
+    });
+    return { id, deleted: true };
   }
 
   /// Ranking "Terlaris" utk grid Kasir Petugas Booth — dihitung on-the-fly

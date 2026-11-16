@@ -73,6 +73,20 @@ export class ProductsController {
     return this.productsService.createCategory(dto);
   }
 
+  @Patch('categories/:id')
+  @Menu('PRODUK', AccessLevel.MANAGE)
+  @Roles(UserRole.ADMIN)
+  updateCategory(@Param('id') id: string, @Body() dto: CreateProductCategoryDto, @CurrentUser() user: JwtPayload) {
+    return this.productsService.updateCategory(id, dto, user.sub, user.username);
+  }
+
+  @Delete('categories/:id')
+  @Menu('PRODUK', AccessLevel.MANAGE)
+  @Roles(UserRole.ADMIN)
+  removeCategory(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.removeCategory(id, user.sub, user.username);
+  }
+
   @Post()
   @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
