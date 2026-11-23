@@ -353,14 +353,15 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
     peran: "admin",
     judul: "Peran & Hak Akses",
     ownerOnly: true,
-    ringkasan: "Mengatur menu yang boleh dibuka Admin: Tidak ada, Lihat, atau Kelola.",
+    ringkasan: "Mengatur menu yang boleh dibuka Admin: Tanpa akses, Lihat, atau Kelola.",
     gambar: [
-      { file: "admin-peran-1.webp", keterangan: "Daftar peran beserta jumlah Admin dan aksesnya." },
+      { file: "admin-peran-1.webp", keterangan: "Daftar peran beserta Admin yang memakainya dan ringkasan akses per grup." },
       { file: "admin-peran-2.webp", keterangan: "Form Tambah Peran dengan akses per menu." },
     ],
     langkah: [
       { judul: "Buat peran", isi: "Klik Tambah Peran, isi Nama Peran dan Keterangan." },
-      { judul: "Atur akses", isi: "Pilih Tidak ada, Lihat, atau Kelola untuk setiap menu, atau gunakan Semua Lihat dan Semua Kelola per grup. Klik Simpan Peran." },
+      { judul: "Atur akses", isi: "Buka grup menu, lalu pilih Tanpa akses, Lihat, atau Kelola untuk setiap menu, atau gunakan Atur semua per grup. Klik Simpan Peran." },
+      { judul: "Ubah peran", isi: "Klik ikon pensil pada peran. Jika peran dipakai Admin aktif, periksa daftar perubahan di Tinjau Perubahan lalu klik Ya, simpan." },
       { judul: "Pasang ke Admin", isi: "Pasang peran ke akun Admin di menu User, kolom Peran." },
     ],
     perhatian: [
