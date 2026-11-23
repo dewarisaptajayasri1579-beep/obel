@@ -1,15 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
 
 /// Font khas Web/App Petugas Booth — SAMA dengan apps/booth_flutter
 /// (`GoogleFonts.outfitTextTheme()` di theme.dart), sengaja beda dari
 /// Plus Jakarta Sans yang dipakai console Admin, supaya identitas visualnya
 /// konsisten dengan Android, bukan ikut font Admin.
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+///
+/// Self-hosted (Outfit v15 latin, variable 400-900, SIL OFL) instead of
+/// next/font/google: since 2026-11-23 Google Fonts answers the Coolify build
+/// server with a font URL next/font 15.5 cannot parse, which failed every build.
+const outfit = localFont({
+  src: "./fonts/outfit-latin.woff2",
+  weight: "400 900",
   variable: "--font-outfit",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
