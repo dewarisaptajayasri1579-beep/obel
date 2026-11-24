@@ -75,6 +75,7 @@ describe('Attendance four points (e2e)', () => {
       .set(admin())
       .send({ boothId, shiftTemplateId: templates.body[0].id, staffId, force: true })
       .expect(200);
+    rosterTemplateId = templates.body[0].id;
 
     // Sisa run gagal sebelumnya dibereskan SEBELUM koordinat diatur (helper absen di titik test umum).
     await prisma.booth.update({ where: { id: boothId }, data: { latitude: null, longitude: null } });
@@ -141,6 +142,8 @@ describe('Attendance four points (e2e)', () => {
     prisma.shiftSession.update({ where: { id: sid }, data: { scheduledEndAt: new Date(Date.now() + menitDariSekarang * 60_000) } });
 
   let sid1: string;
+  let sid2: string;
+  let rosterTemplateId: string;
 
   it('Berangkat outside the warehouse radius is rejected, an admin LOCATION permit lets it through once, and the cash float is copied', async () => {
     const ditolak = await berangkat(JAUH).expect(400);
@@ -211,8 +214,13 @@ describe('Attendance four points (e2e)', () => {
   });
 
   it('an admin EARLY_CHECKOUT permit allows leaving early once; admin history shows the four points', async () => {
+    // The Berangkat screen previews the shift it will open.
+    const pratinjau = (await request(server()).get('/shifts/next-template').set(staff()).expect(200)).body;
+    expect(pratinjau.id).toBe(await templateBerikutnya(sid1));
     const ok = await berangkat(GUDANG).expect(201);
-    const sid2 = ok.body.shiftSessionId as string;
+    sid2 = ok.body.shiftSessionId as string;
+    // Second Berangkat today after a returned shift = the next shift (B6), not the roster shift.
+    expect(await templateShift(sid2)).toBe(await templateBerikutnya(sid1));
     staffToken = ok.body.accessToken ?? loginToken;
     await tiba(sid2, BOOTH).expect(201);
     await aturJamSelesai(sid2, 120);
@@ -240,10 +248,20 @@ describe('Attendance four points (e2e)', () => {
     expect(riwayat.find((r) => r.id === sid2)!.izinPulangAwal?.reason).toBe('e2e izin');
   });
 
+  /// Shift aktif berikutnya (jam mulai) setelah shift ini, atau shift roster kalau tidak ada.
+  async function templateBerikutnya(sid: string) {
+    const s = await prisma.shiftSession.findUniqueOrThrow({ where: { id: sid }, include: { shiftTemplate: true } });
+    const next = await prisma.shiftTemplate.findFirst({ where: { active: true, startTime: { gt: s.shiftTemplate.startTime } }, orderBy: { startTime: 'asc' } });
+    return next?.id ?? rosterTemplateId;
+  }
+  const templateShift = async (sid: string) => (await prisma.shiftSession.findUniqueOrThrow({ where: { id: sid } })).shiftTemplateId;
+
   it('a missing reference coordinate does not block attendance', async () => {
     await request(server()).patch('/app-settings').set(admin()).send({ warehouseLatitude: null, warehouseLongitude: null }).expect(200);
     const ok = await berangkat(JAUH).expect(201);
     const sid3 = ok.body.shiftSessionId as string;
+    // Third Berangkat today: the next shift after sid2, or the roster shift when there is none.
+    expect(await templateShift(sid3)).toBe(await templateBerikutnya(sid2));
     staffToken = ok.body.accessToken ?? loginToken;
     await tiba(sid3, BOOTH).expect(201);
     await izin('EARLY_CHECKOUT');

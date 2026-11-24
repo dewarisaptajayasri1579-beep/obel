@@ -36,6 +36,13 @@ export class ShiftsController {
     return this.shiftsService.getMyPendingReturn(user);
   }
 
+  /// Shift yang akan dibuka Absen Berangkat (shift berikutnya kalau sudah selesai satu shift hari ini).
+  @Get('next-template')
+  @Roles(UserRole.BOOTH_STAFF)
+  getNextTemplate(@CurrentUser() user: JwtPayload) {
+    return this.shiftsService.getMyNextTemplate(user);
+  }
+
   @Get('active-assignments')
   @Menu(['SERAH_TERIMA_STOK', 'CHECKIN_CHECKOUT', 'BOOTH_AKTIF'], AccessLevel.VIEW)
   @Roles(UserRole.ADMIN, UserRole.OWNER)

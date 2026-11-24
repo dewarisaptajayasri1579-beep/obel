@@ -21,6 +21,8 @@ function CheckInContent() {
 
   const [loadingInit, setLoadingInit] = useState(true);
   const [assignment, setAssignment] = useState<MyBoothShiftAssignment | null>(null);
+  // Shift yang benar-benar akan dibuka: shift berikutnya kalau hari ini sudah selesai satu shift.
+  const [namaShift, setNamaShift] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading || !session) return;
@@ -44,7 +46,9 @@ function CheckInContent() {
           router.replace("/petugas/kembali");
           return;
         }
-        setAssignment(await api.getMyAssignment());
+        const [myAssignment, berikutnya] = await Promise.all([api.getMyAssignment(), api.getNextShiftTemplate()]);
+        setAssignment(myAssignment);
+        setNamaShift(berikutnya?.name ?? null);
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Absen Berangkat.");
       } finally {
@@ -100,7 +104,7 @@ function CheckInContent() {
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Shift</span>
-            <span className="font-semibold text-slate-800">{assignment.shiftTemplate.name}</span>
+            <span className="font-semibold text-slate-800">{namaShift ?? assignment.shiftTemplate.name}</span>
           </div>
           {uangJalan > 0 && (
             <div className="flex justify-between">

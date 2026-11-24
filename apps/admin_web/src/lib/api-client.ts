@@ -1902,6 +1902,8 @@ export const api = {
   /* ─── Petugas Booth ──────────────────────────────────────────────────── */
 
   getMyAssignment: () => request<MyBoothShiftAssignment | null>("/booth-shift-assignments/mine"),
+  /// Shift yang akan dibuka Absen Berangkat (shift berikutnya bila hari ini sudah selesai satu shift).
+  getNextShiftTemplate: () => request<Pick<ShiftTemplate, "id" | "name" | "startTime" | "endTime"> | null>("/shifts/next-template"),
   getActiveShift: () => request<ActiveShift>("/shifts/active"),
   checkIn: (input: { latitude: number; longitude: number; photoUrl: string }) =>
     request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
