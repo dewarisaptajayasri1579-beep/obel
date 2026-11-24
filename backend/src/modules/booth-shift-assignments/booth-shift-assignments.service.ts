@@ -29,12 +29,11 @@ export class BoothShiftAssignmentsService {
   /// per perubahan pilihan, bukan simpan massal. `staffId` null berarti
   /// "belum ditugaskan" (dikosongkan, bukan menghapus barisnya).
   async upsert(dto: UpsertBoothShiftAssignmentDto) {
-    /// Satu petugas cuma boleh dipegang SATU pasangan Booth+Shift total —
-    /// bukan cuma "tidak boleh shift yang sama di Booth lain", tapi benar-benar
-    /// satu slot saja di seluruh matriks (dijamin juga oleh `@unique` di
-    /// `staffId` pada schema — ini cuma supaya pesan errornya jelas, bukan
-    /// P2002 mentah dari Postgres). Sel yang sama (update ulang) dikecualikan
-    /// lewat `NOT { boothId, shiftTemplateId }` sekaligus, bukan boothId saja.
+    /// Satu petugas cuma boleh dipegang SATU pasangan Booth+Shift total (`@unique` di
+    /// `staffId`). Barista yang sudah di slot lain boleh dipindah setelah Admin
+    /// mengonfirmasi (`reassign`): slot lamanya dikosongkan di transaksi yang sama.
+    /// Sel yang sama (update ulang) dikecualikan lewat `NOT { boothId, shiftTemplateId }`.
+    let slotLama: { id: string } | null = null;
     if (dto.staffId) {
       const bentrok = await this.prisma.boothShiftAssignment.findFirst({
         where: {
@@ -43,12 +42,14 @@ export class BoothShiftAssignmentsService {
         },
         include: { booth: true, shiftTemplate: true, staff: { select: SAFE_PROFILE_SELECT } },
       });
-      if (bentrok) {
+      if (bentrok && !dto.reassign) {
         throw new DomainError(
           'STAFF_ALREADY_ASSIGNED',
-          `${bentrok.staff?.fullName ?? 'Barista ini'} sudah ditugaskan di Booth "${bentrok.booth.name}" / Shift "${bentrok.shiftTemplate.name}". Satu petugas cuma boleh satu Booth dan satu Shift — kosongkan penugasan itu dulu.`,
+          `${bentrok.staff?.fullName ?? 'Barista ini'} sudah ditugaskan di ${bentrok.booth.name} · ${bentrok.shiftTemplate.name}. Pindahkan? Penugasan lamanya dilepas.`,
+          { staffName: bentrok.staff?.fullName ?? null, boothName: bentrok.booth.name, shiftName: bentrok.shiftTemplate.name },
         );
       }
+      slotLama = bentrok;
     }
 
     /// Slot ini lagi dipegang siapa SEBELUM perubahan — kalau petugas itu mau
@@ -77,11 +78,15 @@ export class BoothShiftAssignmentsService {
       }
     }
 
-    return this.prisma.boothShiftAssignment.upsert({
-      where: { boothId_shiftTemplateId: { boothId: dto.boothId, shiftTemplateId: dto.shiftTemplateId } },
-      create: { boothId: dto.boothId, shiftTemplateId: dto.shiftTemplateId, staffId: dto.staffId ?? null },
-      update: { staffId: dto.staffId ?? null },
-      include: { staff: { select: SAFE_PROFILE_SELECT } },
+    return this.prisma.$transaction(async (tx) => {
+      // Lepas dulu slot lama: staffId unik, slot baru tidak bisa diisi selama yang lama masih memegangnya.
+      if (slotLama) await tx.boothShiftAssignment.update({ where: { id: slotLama.id }, data: { staffId: null } });
+      return tx.boothShiftAssignment.upsert({
+        where: { boothId_shiftTemplateId: { boothId: dto.boothId, shiftTemplateId: dto.shiftTemplateId } },
+        create: { boothId: dto.boothId, shiftTemplateId: dto.shiftTemplateId, staffId: dto.staffId ?? null },
+        update: { staffId: dto.staffId ?? null },
+        include: { staff: { select: SAFE_PROFILE_SELECT } },
+      });
     });
   }
 }

@@ -1765,7 +1765,8 @@ export const api = {
     request<{ id: string; deleted: boolean }>(`/shift-templates/${id}`, { method: "DELETE" }),
 
   getBoothShiftAssignments: () => request<BoothShiftAssignment[]>("/booth-shift-assignments"),
-  upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null; force?: boolean }) =>
+  /// `reassign`: pindahkan Barista yang sudah di slot lain (slot lamanya dilepas).
+  upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null; force?: boolean; reassign?: boolean }) =>
     request<BoothShiftAssignment>("/booth-shift-assignments", { method: "PUT", body: input }),
 
   getBoothStockThresholds: (boothId: string) =>

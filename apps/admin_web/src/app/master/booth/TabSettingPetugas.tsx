@@ -39,7 +39,18 @@ interface PeringatanShiftAktif {
   boothId: string;
   shiftTemplateId: string;
   staffIdBaru: string;
+  reassign: boolean;
   pesan: string;
+}
+
+/// Barista yang dipilih sudah ditugaskan di slot lain: konfirmasi dulu sebelum dipindah.
+interface KonfirmasiPindah {
+  boothId: string;
+  shiftTemplateId: string;
+  staffId: string;
+  nama: string;
+  slotLama: string;
+  slotBaru: string;
 }
 
 export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
@@ -51,6 +62,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [peringatan, setPeringatan] = useState<PeringatanShiftAktif | null>(null);
   const [memproseskanPaksa, setMemproseskanPaksa] = useState(false);
+  const [pindah, setPindah] = useState<KonfirmasiPindah | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -82,12 +94,9 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
     return map;
   }, [assignments]);
 
-  /// Petugas yang sudah dipegang slot LAIN (Booth+Shift apa pun, bukan cuma
-  /// shift yang sama) — dipakai nonaktifkan opsinya di Select. Backend jadi
-  /// penjamin utama lewat STAFF_ALREADY_ASSIGNED (+ unique constraint di DB),
-  /// ini cuma mencegah percobaan yang jelas gagal duluan di UI. Satu petugas
-  /// cuma boleh SATU Booth dan SATU Shift total, tidak per-shift seperti
-  /// sebelumnya — lihat BoothShiftAssignmentsService.upsert.
+  /// Petugas yang sudah dipegang slot LAIN (Booth+Shift apa pun). Satu petugas cuma
+  /// boleh SATU Booth dan SATU Shift total; memilihnya di slot lain meminta konfirmasi
+  /// lalu memindahkannya (BoothShiftAssignmentsService.upsert, `reassign`).
   const dipegangDiSlotLain = useMemo(() => {
     const map = new Map<string, string>(); // staffId -> "Booth · Shift"
     for (const a of assignments ?? []) {
@@ -109,13 +118,31 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
         return {
           value: p.id,
           label: dipakaiSlotLain ? `${p.fullName} (sudah di ${dipakaiDi})` : p.fullName,
-          disabled: !!dipakaiSlotLain,
         };
       }),
     ];
   }
 
-  async function pilihPetugas(boothId: string, shiftTemplateId: string, staffId: string, force = false) {
+  /// Pilihan dari Select: Barista yang sudah di slot lain dikonfirmasi dulu.
+  function pilihDariSelect(boothId: string, shiftTemplateId: string, staffId: string) {
+    const slotLama = staffId ? dipegangDiSlotLain.get(staffId) : undefined;
+    if (slotLama && assignmentByKey.get(kunci(boothId, shiftTemplateId)) !== staffId) {
+      const booth = booths.find((b) => b.id === boothId);
+      const shift = shiftTemplates.find((t) => t.id === shiftTemplateId);
+      setPindah({
+        boothId,
+        shiftTemplateId,
+        staffId,
+        nama: petugas.find((p) => p.id === staffId)?.fullName ?? "Barista ini",
+        slotLama,
+        slotBaru: `${booth?.name ?? "Booth"} · ${shift?.name ?? "Shift"}`,
+      });
+      return;
+    }
+    pilihPetugas(boothId, shiftTemplateId, staffId);
+  }
+
+  async function pilihPetugas(boothId: string, shiftTemplateId: string, staffId: string, force = false, reassign = false) {
     const key = kunci(boothId, shiftTemplateId);
     setSavingKey(key);
     // Optimistic — biar Select langsung menampilkan pilihan tanpa menunggu round-trip.
@@ -135,15 +162,19 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
     });
 
     try {
-      const saved = await api.upsertBoothShiftAssignment({ boothId, shiftTemplateId, staffId: staffId || null, force });
-      setAssignments((prev) => [
-        ...(prev ?? []).filter((a) => !(a.boothId === boothId && a.shiftTemplateId === shiftTemplateId)),
-        saved,
-      ]);
+      const saved = await api.upsertBoothShiftAssignment({ boothId, shiftTemplateId, staffId: staffId || null, force, reassign });
+      if (reassign) {
+        await load(); // slot lama ikut dikosongkan di server
+      } else {
+        setAssignments((prev) => [
+          ...(prev ?? []).filter((a) => !(a.boothId === boothId && a.shiftTemplateId === shiftTemplateId)),
+          saved,
+        ]);
+      }
     } catch (err) {
       await load(); // gagal — tarik ulang state sungguhan, batalkan optimistic update.
       if (err instanceof ApiError && err.code === "STAFF_SHIFT_ACTIVE") {
-        setPeringatan({ boothId, shiftTemplateId, staffIdBaru: staffId, pesan: err.message });
+        setPeringatan({ boothId, shiftTemplateId, staffIdBaru: staffId, reassign, pesan: err.message });
       } else {
         toast.error(err instanceof ApiError ? err.message : "Gagal menyimpan penugasan.");
       }
@@ -156,7 +187,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
     if (!peringatan) return;
     setMemproseskanPaksa(true);
     try {
-      await pilihPetugas(peringatan.boothId, peringatan.shiftTemplateId, peringatan.staffIdBaru, true);
+      await pilihPetugas(peringatan.boothId, peringatan.shiftTemplateId, peringatan.staffIdBaru, true, peringatan.reassign);
       setPeringatan(null);
     } finally {
       setMemproseskanPaksa(false);
@@ -166,8 +197,8 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500 dark:text-fg-muted">
-        Barista default per Booth &amp; shift — pilih langsung tersimpan, tanpa tombol Simpan. Satu barista cuma
-        boleh satu Booth dan satu Shift.
+        Barista default per Booth &amp; shift. Pilihan langsung tersimpan, tanpa tombol Simpan. Satu barista hanya
+        satu Booth dan satu Shift; memilih barista dari slot lain akan memindahkannya.
       </p>
 
       <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white dark:bg-surface shadow-2xs p-4">
@@ -224,7 +255,7 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
                               <Select
                                 options={opsiPetugasUntuk(b.id, t.id)}
                                 value={assignmentByKey.get(key) ?? ""}
-                                onChange={(v) => pilihPetugas(b.id, t.id, v)}
+                                onChange={(v) => pilihDariSelect(b.id, t.id, v)}
                                 disabled={!canManage("BOOTH")}
                                 placeholder="Belum ditugaskan"
                                 sizeVariant="sm"
@@ -245,6 +276,30 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
           </div>
         )}
       </div>
+
+      <Modal isOpen={!!pindah} onClose={() => setPindah(null)} title="Pindahkan Barista?" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 dark:text-fg-secondary">
+            {pindah?.nama} sudah ditugaskan di {pindah?.slotLama}. Pindahkan ke {pindah?.slotBaru}? Penugasan lamanya dilepas.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPindah(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                const p = pindah!;
+                setPindah(null);
+                pilihPetugas(p.boothId, p.shiftTemplateId, p.staffId, false, true);
+              }}
+            >
+              Pindahkan
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={!!peringatan} onClose={() => setPeringatan(null)} title="Barista Masih Aktif Shift" size="sm">
         <div className="space-y-4">

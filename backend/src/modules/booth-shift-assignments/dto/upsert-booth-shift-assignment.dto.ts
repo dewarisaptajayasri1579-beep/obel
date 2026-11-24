@@ -20,4 +20,10 @@ export class UpsertBoothShiftAssignmentDto {
   @IsOptional()
   @IsBoolean()
   force?: boolean;
+
+  /// Konfirmasi Admin untuk MEMINDAHKAN Barista yang sudah ditugaskan di slot lain (B8):
+  /// penugasan lamanya dilepas. Tanpa ini ditolak STAFF_ALREADY_ASSIGNED berisi slot lamanya.
+  @IsOptional()
+  @IsBoolean()
+  reassign?: boolean;
 }

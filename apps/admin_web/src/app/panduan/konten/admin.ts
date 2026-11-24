@@ -248,7 +248,7 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
     langkah: [
       { judul: "Tambah Booth", isi: "Klik Tambah Booth, isi Kode Booth, Nama Booth, lokasi, Latitude, Longitude, Uang Jalan per Shift, dan Kode QRIS Booth, lalu klik Simpan." },
       { judul: "Ubah atau nonaktifkan", isi: "Gunakan menu titik tiga: Edit Booth, Nonaktifkan, atau Aktifkan." },
-      { judul: "Tugaskan Barista", isi: "Buka tab Setting Barista, lalu pilih Barista untuk setiap Booth dan shift. Pilihan langsung tersimpan." },
+      { judul: "Tugaskan Barista", isi: "Buka tab Setting Barista, lalu pilih Barista untuk setiap Booth dan shift. Pilihan langsung tersimpan. Barista yang sudah ditugaskan di tempat lain ditandai sudah di, dan memilihnya akan memindahkan Barista itu setelah Anda klik Pindahkan." },
       { judul: "Lihat riwayat", isi: "Tab Mutasi Stok, Mutasi Penjualan, dan Riwayat Penjualan menampilkan pergerakan per Booth." },
     ],
     perhatian: [
