@@ -3,7 +3,7 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"
 
 /// Error dari Backend API mengikuti envelope {code, message, details} di
-/// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
+/// docs/spec/09-api-rpc-contract.md §15.
 export class ApiError extends Error {
   code: string
   details?: Record<string, unknown>
@@ -1040,7 +1040,7 @@ export type ReasonCode =
   | "OTHER"
   | "EXPIRED"
 
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §10.
+/// docs/spec/24-data-consistency-correction-reversal.md §10.
 export const REASON_CODE_OPTIONS: { value: ReasonCode; label: string }[] = [
   { value: "WRONG_PRODUCT", label: "Salah Produk" },
   { value: "WRONG_QTY", label: "Salah Qty" },

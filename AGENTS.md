@@ -3,13 +3,12 @@
 Dokumen ini adalah instruksi utama untuk AI Coding Agent. Baca seluruh berkas dokumentasi sebelum mengubah kode.
 
 ## Tujuan
-Bangun satu ekosistem aplikasi untuk operasional booth keliling Obbel Coffee & Milk dengan tiga client:
+Bangun satu ekosistem aplikasi untuk operasional booth keliling Obbel Coffee & Milk:
 
-1. **Android Petugas Booth** — Flutter Android native, fokus transaksi, stok, penerimaan stok, restock, dan closing shift.
-2. **Web PWA Admin Pusat** — Next.js + TypeScript + Tailwind CSS, fokus distribusi stok, restock, return, monitoring, dan laporan.
-3. **Android Owner** — Flutter Android native, read-only monitoring eksekutif.
+1. **Web Admin & Owner** (`apps/admin_web`) — Next.js + TypeScript + Tailwind CSS, fokus distribusi stok, restock, return, monitoring, dan laporan. Owner memakai web yang sama secara read-only.
+2. **PWA Petugas Booth (Barista)** (`apps/admin_web/src/app/petugas`) — transaksi, stok, penerimaan stok, check-in/out, dan closing shift, dibungkus shell Android `apps/booth_pwa_flutter` (GPS, printer Bluetooth, kamera).
 
-Ketiganya memakai **satu backend dan satu database**.
+Semuanya memakai **satu backend dan satu database**. Rencana awal memakai app Flutter native terpisah untuk Petugas Booth dan Owner (masih tergambar di `docs/spec/` dan urutan di bawah); keduanya sudah digantikan PWA dan dihapus.
 
 ## Keputusan arsitektur baseline
 Gunakan **backend API custom (Node.js/NestJS) + PostgreSQL self-hosted di Coolify** sebagai baseline:

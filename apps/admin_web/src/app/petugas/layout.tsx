@@ -2,10 +2,9 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
 
-/// Font khas Web/App Petugas Booth — SAMA dengan apps/booth_flutter
-/// (`GoogleFonts.outfitTextTheme()` di theme.dart), sengaja beda dari
-/// Plus Jakarta Sans yang dipakai console Admin, supaya identitas visualnya
-/// konsisten dengan Android, bukan ikut font Admin.
+/// Font khas Web/App Petugas Booth (Outfit), sengaja beda dari Plus Jakarta
+/// Sans yang dipakai console Admin, supaya sisi Barista punya identitas
+/// visualnya sendiri, bukan ikut font Admin.
 ///
 /// Self-hosted (Outfit v15 latin, variable 400-900, SIL OFL) instead of
 /// next/font/google: since 2026-11-23 Google Fonts answers the Coolify build

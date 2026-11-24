@@ -4,7 +4,7 @@
 ///   npm run stock:reconcile           laporan selisih saja, tidak menulis apa pun
 ///   npm run stock:reconcile -- --fix  tulis movement penyeimbang saldo awal
 ///
-/// Ini gerbang G0 di docsV2/08-rencana-penyesuaian.md. Dijalankan SEBELUM
+/// Ini gerbang G0 di docs/stock-v2/08-rencana-penyesuaian.md. Dijalankan SEBELUM
 /// perubahan skema apa pun, dan tetap dipakai sesudahnya sebagai pemeriksaan
 /// berkala — "konsisten dan valid" harus sesuatu yang bisa dijalankan, bukan
 /// diharapkan.

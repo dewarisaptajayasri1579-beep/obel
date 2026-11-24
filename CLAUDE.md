@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile coffee-cart operation. One backend + one PostgreSQL database serve three clients:
+Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile coffee-cart operation. One backend + one PostgreSQL database serve every client:
 
-- `apps/booth_flutter` — Flutter Android app for booth staff (POS, stock receipt, restock request, shift closing).
-- `apps/admin_web` — Next.js (App Router) + TypeScript + Tailwind PWA for central admin/warehouse (distribution, restock, returns, monitoring, reports).
-- `apps/owner_flutter` — Flutter Android app, read-only executive monitoring.
-- `backend` — NestJS + Prisma + PostgreSQL API that all three clients consume. This is the single source of truth for stock, permissions, and pricing; no client is allowed to mutate stock directly.
-- `packages/domain_contracts` — placeholder for shared domain/schema contracts (currently empty).
-- `docs/obbel-coffee-ai-docs/` — the full functional/technical spec, numbered 00–25. Read the relevant numbered doc before implementing a feature in that area; `AGENTS.md` at the repo root is the condensed must-read summary.
+- `apps/admin_web` — Next.js (App Router) + TypeScript + Tailwind. The Admin/Owner console (distribution, stock, monitoring, reports; Owner is read-only) and, under `src/app/petugas`, the Barista PWA (POS, check-in/out, stock receipt, shift closing).
+- `apps/booth_pwa_flutter` — Android shell that wraps the Barista PWA in a WebView and bridges GPS, Bluetooth receipt printing and the camera (see its README). No business logic.
+- `backend` — NestJS + Prisma + PostgreSQL API. The single source of truth for stock, permissions, and pricing; no client is allowed to mutate stock directly. Coolify builds it from `/backend`, so it stays at the root.
+- `docs/spec/` — the original functional/technical spec, numbered 00–26. Read the relevant numbered doc before implementing a feature in that area; `AGENTS.md` at the repo root is the condensed must-read summary. The spec still describes the first native Flutter apps (`booth_flutter`, `owner_flutter`); both were replaced by the PWA and removed.
+- `docs/stock-v2/` — the stock-recording redesign (ledger, monthly balance, shift-held stock) that the current stock code follows; `docs/assets/` (logo, mockups), `docs/notes/`.
+- `scripts/` — root dev tooling (`dev.js`, `check-ports.js`).
 
 ## Commands
 
@@ -38,12 +38,12 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 - `npm run lint` — ESLint.
 - Requires `NEXT_PUBLIC_API_URL` pointing at the backend (see `.env.example`).
 
-### Flutter apps (`apps/booth_flutter/`, `apps/owner_flutter/`)
-- `flutter pub get`, `flutter run`, `flutter test`, `flutter analyze` — standard Flutter workflow, run from within each app directory.
+### Android shell (`apps/booth_pwa_flutter/`)
+- `flutter pub get`, `flutter run`, `flutter analyze` — standard Flutter workflow, run from that directory. The PWA URL comes from `--dart-define=PWA_URL=...` (default: live). Against a local dev server: `adb reverse tcp:3000 tcp:3000` and `tcp:4000 tcp:4000`, then `PWA_URL=http://localhost:3000/petugas/login` (localhost keeps the secure context that GPS and the camera need).
 
 ## Architecture
 
-### Non-negotiable domain rules (see `AGENTS.md` and `docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md` before touching any mutation)
+### Non-negotiable domain rules (see `AGENTS.md` and `docs/spec/24-data-consistency-correction-reversal.md` before touching any mutation)
 - **Data consistency is P0.** Posted transactions are never hard-deleted or directly edited. Every mutable transaction type has an explicit correction/reversal/revision path (e.g. `reviseSale()`, `voidSale()`, `correctDistributionReceipt()`, `confirmStockOpname()`, `reverseAdjustment()`) — do not add generic CRUD update/delete for posted transactions.
 - Stock only changes through backend domain services that write an append-only `StockMovement` row inside a DB transaction. `WarehouseStock`/`BoothStock` rows are projections that must stay reconcilable from the ledger — never `UPDATE` a stock quantity directly from a client or controller.
 - Money is stored as integer Rupiah (no floats). Cup quantities are integer. Timestamps are stored UTC (`timestamptz`) and rendered in `Asia/Jakarta` in UI.
@@ -60,11 +60,9 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 - Transaction boundaries that must be a single DB transaction: receiving a distribution, creating a sale (with stock deduction), receiving a restock, receiving a return, stock adjustment, and shift closing when it produces a discrepancy record.
 
 ### Client architecture
-- Both Flutter apps and the admin web follow a repository-abstraction pattern: UI/screens never call the backend or manipulate stock directly, they go through a repository/service layer (e.g. `SalesRepository.createSale(...)`, `StockRepository.receiveDistribution(...)`). Critical stock mutations are always server-side calls, not local state edits.
-- Flutter layering: Presentation/Screens → State Management → Use Cases/Application Services → Repository Interfaces → Backend API Repository (HTTP) → local cache/printer adapter. `booth_flutter` additionally has a Bluetooth thermal receipt printer adapter under `lib/printing/`.
-- `owner_flutter` mirrors the same architecture but repositories are read/export-only (no mutation endpoints).
+- Screens never call the backend or manipulate stock directly: they go through `lib/api-client`. Critical stock mutations are always server-side calls, not local state edits.
 - `admin_web` uses Next.js App Router; conventional layout is `app/ (routes)`, `components/`, `features/`, `services`/`repositories`, `lib/api-client`, `schemas`.
-- Domain naming must stay consistent by name across TypeScript and Dart even though there's no shared source (Flutter and the backend don't share code — `packages/domain_contracts` is the intended place for shared schema/contract docs).
+- `booth_pwa_flutter` only exposes device features to the PWA through a JS bridge (`lib/bridge/bridge_protocol.dart` ↔ `apps/admin_web/src/app/petugas/_lib/native-bridge.ts`); keep the two sides of that contract in sync.
 
 ### Formatting conventions used across clients
 - Rupiah: `Rp24.560.000`. Quantity: `10 cup`. Date/time: `23 Agu 2026, 15.40` (Asia/Jakarta).
@@ -72,5 +70,5 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 
 ## Where to look for feature specs
 
-`docs/obbel-coffee-ai-docs/` is numbered by concern — check the relevant one before implementing:
+`docs/spec/` is numbered by concern — check the relevant one before implementing:
 `03` roles/permissions, `05` feature spec, `07` database schema, `08` business rules, `09` API/RPC contract, `10` state machines, `12` reporting/dashboard KPIs, `13` security/audit, `24` correction/reversal rules (read before any mutation work), `25` per-transaction cancel/revise impact matrix.

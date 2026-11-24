@@ -9,7 +9,7 @@ import { Response } from 'express';
 
 /// Normalizes every thrown HttpException (including DomainError) into the
 /// {code, message, details} envelope from
-/// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15.
+/// docs/spec/09-api-rpc-contract.md §15.
 @Catch(HttpException)
 export class DomainExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {

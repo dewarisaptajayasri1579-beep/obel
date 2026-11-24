@@ -19,7 +19,7 @@ export const DISTRIBUTION_PREFIX = 'dist_';
 
 /// "Serah Terima Stok" — 1 transaksi gabungan di layar Admin, dibangun DI
 /// ATAS RestockRequest + StockDistribution yang sudah ada apa adanya (lihat
-/// docsV2 & plan sesi ini): tidak ada migrasi skema, murni penyatuan
+/// docs/stock-v2 & plan sesi ini): tidak ada migrasi skema, murni penyatuan
 /// tampilan/API supaya Admin cuma lihat 1 daftar dengan status
 /// Diajukan → Diproses → Diterima (+ Ditolak/Dibatalkan).
 @Injectable()

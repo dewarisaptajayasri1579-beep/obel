@@ -157,7 +157,7 @@ export const MAIN_NAV: NavGroup[] = [
   },
   {
     // Submenu lama (Monitor Stok Booth, Stok Gudang, Stok Opname, Adjustment)
-    // sedang disusun ulang mengikuti docsV2/06-data-operasional.md. Halamannya
+    // sedang disusun ulang mengikuti docs/stock-v2/06-data-operasional.md. Halamannya
     // TIDAK dihapus dan masih bisa dibuka lewat URL langsung — yang dilepas
     // hanya tautannya, sampai penggantinya siap.
     group: "DATA",

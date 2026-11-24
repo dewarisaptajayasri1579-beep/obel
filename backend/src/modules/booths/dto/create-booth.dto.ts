@@ -18,7 +18,7 @@ export class CreateBoothDto {
   address?: string;
 
   /// Titik tetap Booth untuk peta Monitoring — lihat
-  /// docs/obbel-coffee-ai-docs/26-monitoring-realtime.md §4.2/§5. Opsional:
+  /// docs/spec/26-monitoring-realtime.md §4.2/§5. Opsional:
   /// Booth boleh dibuat tanpa titik lokasi dan diisi belakangan.
   @IsOptional()
   @IsLatitude()

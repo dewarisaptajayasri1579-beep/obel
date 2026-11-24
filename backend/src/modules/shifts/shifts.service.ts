@@ -69,7 +69,7 @@ export class ShiftsService {
   ) {}
 
   /// Mirrors get_my_active_shift() from
-  /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md.
+  /// docs/spec/09-api-rpc-contract.md.
   async getMyActiveShift(user: JwtPayload) {
     const shift = await this.prisma.shiftSession.findFirst({
       where: {
@@ -1269,7 +1269,7 @@ export class ShiftsService {
   /// TX-07 — Shift Correction (Admin-only). Salah Petugas/shift template
   /// boleh dikoreksi kapan saja (tidak mempengaruhi ledger stok). Salah
   /// Booth hanya boleh dikoreksi selama belum ada transaksi terikat
-  /// (docs/24-data-consistency-correction-reversal.md §7 TX-07).
+  /// (docs/spec/24-data-consistency-correction-reversal.md §7 TX-07).
   async correctShift(shiftSessionId: string, dto: CorrectShiftDto, user: JwtPayload) {
     const existing = await this.corrections.findExistingByIdempotencyKey(dto.idempotencyKey);
     if (existing) {

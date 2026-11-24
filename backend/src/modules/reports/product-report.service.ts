@@ -21,9 +21,9 @@ interface BarisLaporan {
   active: boolean;
 }
 
-/// Hijau Obbel — sama dengan `AppTheme.primaryDark` di aplikasi Android
-/// (apps/booth_flutter/lib/theme.dart). Berkas cetak dan aplikasinya harus
-/// bicara dengan satu bahasa warna.
+/// Hijau Obbel — sama dengan `OBBEL.primaryDark` di
+/// apps/admin_web/src/app/petugas/_lib/theme.ts. Berkas cetak dan aplikasinya
+/// harus bicara dengan satu bahasa warna.
 const HIJAU = '0B5D34';
 const HIJAU_HEX = '#0B5D34';
 

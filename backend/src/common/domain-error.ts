@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
-/// Error envelope per docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §15:
+/// Error envelope per docs/spec/09-api-rpc-contract.md §15:
 /// { code, message, details }. Use this instead of throwing generic
 /// HttpExceptions for business-rule violations so the client gets a stable
 /// machine-readable `code` (SHIFT_NOT_OPEN, INSUFFICIENT_STOCK, dst).

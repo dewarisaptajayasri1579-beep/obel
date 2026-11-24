@@ -119,7 +119,7 @@ enum ReturnStatus {
 }
 
 /// Reason code wajib untuk semua correction posted, per
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §10.
+/// docs/spec/24-data-consistency-correction-reversal.md §10.
 enum ReasonCode {
   WRONG_PRODUCT
   WRONG_QTY
@@ -160,7 +160,7 @@ enum CorrectionStatus {
   @@map("correction_status")
 }
 
-/// docs/24-data-consistency-correction-reversal.md §13 "payments additions".
+/// docs/spec/24-data-consistency-correction-reversal.md §13 "payments additions".
 enum PaymentStatus {
   POSTED
   REVERSED
@@ -216,7 +216,7 @@ model Booth {
   name         String
   locationName String?     @map("location_name")
   address      String?
-  // Titik tetap Booth untuk peta Monitoring (docs/obbel-coffee-ai-docs/26-monitoring-realtime.md
+  // Titik tetap Booth untuk peta Monitoring (docs/spec/26-monitoring-realtime.md
   // §4.2) — dipakai sebagai fallback kalau belum ada transaksi hari ini yang membawa
   // koordinat GPS-nya sendiri (lihat Sale.latitude/longitude di bawah).
   latitude     Decimal?    @db.Decimal(9, 6)
@@ -647,7 +647,7 @@ model Sale {
   paidAt             DateTime?      @map("paid_at")
   voidedAt           DateTime?      @map("voided_at")
   voidReason         String?        @map("void_reason")
-  // Lineage fields per docs/24-data-consistency-correction-reversal.md (DC-003/DC-005).
+  // Lineage fields per docs/spec/24-data-consistency-correction-reversal.md (DC-003/DC-005).
   // Correction/reversal endpoints are a later phase; columns exist now so Sale rows
   // are forward-compatible without a breaking migration later.
   transactionGroupId String         @default(uuid()) @map("transaction_group_id")
@@ -695,7 +695,7 @@ model Payment {
   method             PaymentMethod
   amount             BigInt
   paidAt             DateTime      @default(now()) @map("paid_at")
-  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  // Lineage per docs/spec/24-data-consistency-correction-reversal.md §13.
   status             PaymentStatus @default(POSTED)
   transactionGroupId String        @default(uuid()) @map("transaction_group_id")
   versionNo          Int           @default(1) @map("version_no")
@@ -798,7 +798,7 @@ model StockDistribution {
   note               String?
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
-  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  // Lineage per docs/spec/24-data-consistency-correction-reversal.md §13.
   transactionGroupId String             @default(uuid()) @map("transaction_group_id")
   versionNo          Int                @default(1) @map("version_no")
   revisionOfId       String?            @map("revision_of_id")
@@ -929,7 +929,7 @@ model StockReturn {
   shiftSession       ShiftSession? @relation(fields: [shiftSessionId], references: [id])
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
-  // Lineage per docs/24-data-consistency-correction-reversal.md §13.
+  // Lineage per docs/spec/24-data-consistency-correction-reversal.md §13.
   transactionGroupId String        @default(uuid()) @map("transaction_group_id")
   versionNo          Int           @default(1) @map("version_no")
   revisionOfId       String?       @map("revision_of_id")
@@ -995,7 +995,7 @@ model StockReturnItem {
 }
 
 /// Ledger correction generik lintas entity, per
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §13.
+/// docs/spec/24-data-consistency-correction-reversal.md §13.
 /// Setiap void/revise/recount/adjustment domain-specific menulis satu baris
 /// ke sini di dalam transaction atomik yang sama dengan efek domainnya.
 model TransactionCorrection {
@@ -1023,7 +1023,7 @@ model TransactionCorrection {
   @@map("transaction_corrections")
 }
 
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §12.
+/// docs/spec/24-data-consistency-correction-reversal.md §12.
 model ReconciliationCase {
   id               String                 @id @default(uuid())
   caseNo           String                 @unique @map("case_no")

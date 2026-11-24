@@ -23,7 +23,7 @@ export interface RecordCorrectionInput {
 }
 
 /// Writer generik untuk `transaction_corrections`, per
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md §13.
+/// docs/spec/24-data-consistency-correction-reversal.md §13.
 /// Setiap domain correction (void/revise sale, cancel/revise distribution,
 /// dst.) memanggil `record()` di dalam `$transaction` yang sama dengan efek
 /// domainnya sendiri, sehingga audit row dan efek bisnis selalu atomik.

@@ -85,7 +85,7 @@ export class SalesService {
   }
 
   /// Mirrors create_paid_sale from
-  /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §3 and enforces
+  /// docs/spec/09-api-rpc-contract.md §3 and enforces
   /// BR-002 (no negative stock), BR-004 (sale preconditions), BR-005 (price
   /// authority), BR-017 (idempotency).
   async createPaidSale(user: JwtPayload, dto: CreateSaleDto) {
@@ -561,7 +561,7 @@ export class SalesService {
   /// menampilkan versi efektif (terbaru) per transaction_group_id — versi
   /// lama yang sudah direvisi disembunyikan dari list ini (tetap terlihat
   /// di Riwayat & Koreksi Data), sesuai "effective sale versions"
-  /// (docs/24-data-consistency-correction-reversal.md §14).
+  /// (docs/spec/24-data-consistency-correction-reversal.md §14).
   /// List Transaksi Booth - Kasir, dipaginasi di server (bukan ambil semua
   /// lalu difilter di klien — lihat percakapan soal performa saat data
   /// banyak). Sale yang sudah direvisi TIDAK pernah statusnya berubah jadi
@@ -678,7 +678,7 @@ export class SalesService {
   /// (opsional disaring ke satu Booth) plus Rekap Harian per shift. Berbeda
   /// dari `findAll()` (list global, dibatasi 200 baris terbaru tanpa filter
   /// periode): endpoint ini justru dibangun untuk analisa "shift Pagi vs
-  /// Malam" (lihat docs/obbel-coffee-ai-docs/26-monitoring-realtime.md),
+  /// Malam" (lihat docs/spec/26-monitoring-realtime.md),
   /// jadi filternya per bulan dan tiap baris membawa nama shift-nya.
   async riwayatBooth(params: { boothId?: string; bulan: number; tahun: number }) {
     const { boothId, bulan, tahun } = params;

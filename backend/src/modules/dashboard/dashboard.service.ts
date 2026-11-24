@@ -37,7 +37,7 @@ export class DashboardService {
   ) {}
 
   /// Mirrors get_admin_dashboard(period) dari
-  /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md — untuk sekarang
+  /// docs/spec/09-api-rpc-contract.md — untuk sekarang
   /// selalu period "hari ini" (Asia/Jakarta).
   async getAdminDashboard() {
     const todayStart = startOfTodayJakarta();
@@ -67,7 +67,7 @@ export class DashboardService {
 
     // Hanya versi efektif (terbaru) per transaction_group_id yang dihitung —
     // versi lama yang sudah direvisi tidak boleh ikut menyumbang omzet/cup
-    // (docs/24-data-consistency-correction-reversal.md §14).
+    // (docs/spec/24-data-consistency-correction-reversal.md §14).
     const salesToday = effectiveByGroup(salesTodayRaw);
 
     const thresholdByKey = new Map(thresholds.map((t) => [`${t.boothId}:${t.productId}`, t]));

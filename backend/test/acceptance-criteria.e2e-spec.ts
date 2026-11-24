@@ -14,7 +14,7 @@ import { isiUlangGudang } from './support/warehouse';
 };
 
 /// Menjalankan acceptance criteria AC-01..AC-25 dari
-/// docs/obbel-coffee-ai-docs/15-testing-acceptance-criteria.md yang belum
+/// docs/spec/15-testing-acceptance-criteria.md yang belum
 /// pernah punya test otomatis sama sekali (hanya alur koreksi/TX-xx yang
 /// sudah dicover di correction-flows*.e2e-spec.ts).
 ///

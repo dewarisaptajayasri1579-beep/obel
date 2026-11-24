@@ -1,7 +1,7 @@
 /// Setiap transaksi bervarian (Sale, StockDistribution, StockReturn, Payment,
 /// StockOpname) menyimpan SEMUA versi historisnya (DC-002/DC-003). Laporan
 /// wajib membaca hanya versi efektif (terbaru) per transaction_group_id —
-/// lihat docs/24-data-consistency-correction-reversal.md §14.
+/// lihat docs/spec/24-data-consistency-correction-reversal.md §14.
 export function effectiveByGroup<T extends { transactionGroupId: string; versionNo: number }>(
   rows: T[],
 ): T[] {

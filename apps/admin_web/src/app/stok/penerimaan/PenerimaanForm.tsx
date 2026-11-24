@@ -45,8 +45,7 @@ interface BarisProduk {
 ///
 /// Tabel SELALU berisi baris untuk SEMUA produk aktif (bukan grid dinamis
 /// tambah-baris) — pola diambil dari OpnameForm.tsx jsBerkah, bukan dari
-/// SerahTerimaBarangForm.tsx yang menambah baris satu-satu (lihat
-/// example_jsberkah/opname/README.md untuk perbandingannya).
+/// SerahTerimaBarangForm.tsx yang menambah baris satu-satu.
 export function PenerimaanForm({
   products,
   initial,

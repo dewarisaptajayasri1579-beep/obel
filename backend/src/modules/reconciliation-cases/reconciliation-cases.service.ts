@@ -7,7 +7,7 @@ import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { ResolveReconciliationCaseDto } from './dto/resolve-case.dto';
 
-/// docs/24-data-consistency-correction-reversal.md §12 — Reconciliation
+/// docs/spec/24-data-consistency-correction-reversal.md §12 — Reconciliation
 /// Engine. Case dibuat ketika correction TIDAK bisa diselesaikan otomatis
 /// tanpa keputusan fisik/manual Admin (mis. chain dependency conflict).
 @Injectable()

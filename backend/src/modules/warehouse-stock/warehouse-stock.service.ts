@@ -24,7 +24,7 @@ export class WarehouseStockService {
   }
 
   /// Adjustment berbasis target qty (server menghitung delta) sesuai pola
-  /// adjust_stock di docs/obbel-coffee-ai-docs/09-api-rpc-contract.md §12.
+  /// adjust_stock di docs/spec/09-api-rpc-contract.md §12.
   /// Ini bukan sistem koreksi penuh (lihat 24-data-consistency...md) — cukup
   /// untuk mengisi/mengoreksi stok Gudang di tahap awal.
   async adjust(dto: AdjustWarehouseStockDto, actorId: string) {

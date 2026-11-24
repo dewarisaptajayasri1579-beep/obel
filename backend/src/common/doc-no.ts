@@ -5,7 +5,7 @@ import { DomainError } from './domain-error';
 /// dari nomor TERBESAR yang sudah ada (bukan dari jumlah baris) supaya
 /// nomor tidak pernah terulang walau ada dokumen yang lebih dulu dibuat lalu
 /// dihapus dari rentang pencarian. Satu pola untuk semua jenis nobukti
-/// (lihat docs/obbel-coffee-ai-docs/08-business-rules.md §"Penomoran Nomor
+/// (lihat docs/spec/08-business-rules.md §"Penomoran Nomor
 /// Bukti") — kode SKU Produk (`OBL-0001`) di products.service.ts memakai
 /// pola yang sama.
 function nomorTertinggi(nomorYangSudahAda: string[], prefix: string, digit: number): number {

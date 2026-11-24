@@ -20,7 +20,7 @@ export class ReportsService {
       include: { booth: true, items: { include: { product: true } }, refunds: true },
     });
     // Effective versions only — revisi lama tidak boleh dihitung dua kali
-    // (docs/24-data-consistency-correction-reversal.md §14).
+    // (docs/spec/24-data-consistency-correction-reversal.md §14).
     const sales = effectiveByGroup(salesRaw);
 
     const trendByDate = new Map<string, { omzet: number; cup: number }>();

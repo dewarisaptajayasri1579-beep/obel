@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// Verifikasi POST /shifts/check-in (Absen Berangkat — self-service open
-/// shift, lihat docsV2/09-checkin-checkout-petugas.md). Sengaja TIDAK
+/// shift, lihat docs/stock-v2/09-checkin-checkout-petugas.md). Sengaja TIDAK
 /// memakai booth01 seed (sudah punya ShiftSession aktif) — bikin akun
 /// BOOTH_STAFF baru tiap run lewat POST /users supaya nggak nyentuh state
 /// seed/booth01 yang dipakai test/manual lain di DB yang sama.

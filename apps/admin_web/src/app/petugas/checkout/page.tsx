@@ -75,7 +75,7 @@ function LayarPenghalang({
 /// ClosingItem (expectedQty/actualQty) per produk — dua sumber data yang
 /// sebelumnya dua LAYAR terpisah ("Laporan" lalu "Hitung Stok"), sekarang
 /// digabung jadi SATU tabel di layar Laporan Kembali sesuai mockup
-/// docsV2/mockupv2-android/3. Riwayat Absen.png (kolom 2). `sisaSistem` dari
+/// docs/stock-v2/mockupv2-android/3. Riwayat Absen.png (kolom 2). `sisaSistem` dari
 /// report dan `expectedQty` dari closing itu angka yang SAMA (keduanya baca
 /// BoothStock.qtyOnHand di saat yang hampir bersamaan), jadi aman disatukan.
 interface BarisClosing {

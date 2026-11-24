@@ -190,7 +190,7 @@ function NavBawah() {
 
 /// Shell mobile-first Web Petugas Booth — SENGAJA tidak memakai
 /// AppLayout/Sidebar/Header admin, biar tampilannya beda total sesuai
-/// docsV2/mockupv2-android/"PWA Beranda.png". Bottom nav mengambang
+/// docs/stock-v2/mockupv2-android/"PWA Beranda.png". Bottom nav mengambang
 /// (sudut membulat, punya jarak dari tepi layar) sesuai mockup PWA itu —
 /// bukan bar penuh nempel ke tepi seperti gaya native Android biasa.
 export function PetugasShell({ children }: { children: React.ReactNode }) {

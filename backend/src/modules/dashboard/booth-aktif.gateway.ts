@@ -17,7 +17,7 @@ import { DashboardService } from './dashboard.service';
 const PUSH_INTERVAL_MS = 5_000;
 
 /// Push kartu Booth Aktif ke Admin Web tanpa client perlu polling
-/// (docs/obbel-coffee-ai-docs/26-monitoring-realtime.md §6.2 sudah
+/// (docs/spec/26-monitoring-realtime.md §6.2 sudah
 /// merencanakan WebSocket untuk kelas fitur ini). Beda dari desain penuh di
 /// dok 26 (invalidate-and-refetch dipicu tiap mutasi Sale/StockMovement/
 /// ShiftSession — butuh hook di 9+ service penulis StockMovement): gateway

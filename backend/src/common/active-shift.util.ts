@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 /// Cari ShiftSession OPEN milik satu Petugas di satu Booth, dipakai untuk
 /// menandai `StockMovement.shiftSessionId` saat Petugas melakukan aksi non-sale
 /// di Booth (terima distribusi, adjustment, return) — lihat
-/// docs/obbel-coffee-ai-docs/26-monitoring-realtime.md soal kebutuhan analisa
+/// docs/spec/26-monitoring-realtime.md soal kebutuhan analisa
 /// per-shift. `SALE` sudah mengisi ini lewat shift yang dipakai checkout
 /// (sales.service.ts); helper ini menutup jenis movement lain yang sebelumnya
 /// tidak pernah menandai shift-nya sama sekali.

@@ -24,7 +24,7 @@ const TIDAK_MENYENTUH: DampakMutasi = { delta: 0, perluVerifikasi: false };
 /// fromBoothId/toBoothId + referenceType.
 ///
 /// Sengaja diisolasi di satu file. Saat skema baru punya kolom `qty_change`
-/// bertanda (docsV2/02-mutasi-stok.md), file ini dihapus utuh dan tidak ada
+/// bertanda (docs/stock-v2/02-mutasi-stok.md), file ini dihapus utuh dan tidak ada
 /// sisa logika penyimpulan yang tertinggal tersebar di service lain.
 export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi {
   const diGudang = lokasi === WAREHOUSE;
@@ -50,7 +50,7 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
 
     // Masuk ke Gudang. Pengurangan di sisi booth TIDAK punya baris movement
     // (stok booth dikurangi saat return diajukan, bukan saat diterima) — itu
-    // celah di ledger lama yang baru tertutup di docsV2 dok 05.
+    // celah di ledger lama yang baru tertutup di docs/stock-v2 dok 05.
     case StockMovementType.RETURN_TO_WAREHOUSE:
       if (diGudang) return { delta: qty, perluVerifikasi: false };
       return TIDAK_MENYENTUH;
@@ -79,14 +79,14 @@ export function dampakMutasi(m: StockMovement, lokasi: LokasiStok): DampakMutasi
       if (m.fromBoothId) return !diGudang && m.fromBoothId === lokasi ? { delta: -qty, perluVerifikasi: false } : TIDAK_MENYENTUH;
       return diGudang ? adjustmentGudang(m, qty) : TIDAK_MENYENTUH;
 
-    // Tidak pernah ditulis kode mana pun (lihat docsV2/04-migrasi.md §1) — kalau
+    // Tidak pernah ditulis kode mana pun (lihat docs/stock-v2/04-migrasi.md §1) — kalau
     // suatu saat ada kode baru yang mulai menulisnya, wajib gagal keras di sini
     // dulu (bukan diam-diam dianggap TIDAK_MENYENTUH) supaya ringkas tidak
     // diam-diam salah hitung begitu ada baris yang lolos tanpa penanganan.
     case StockMovementType.RESTOCK:
       throw new Error(
         `StockMovement ${m.id} pakai movementType RESTOCK, yang belum ada logika dampak ke saldo di ` +
-          `dampakMutasi() (tipe ini sengaja tidak pernah ditulis kode mana pun — lihat docsV2/04-migrasi.md §1). ` +
+          `dampakMutasi() (tipe ini sengaja tidak pernah ditulis kode mana pun — lihat docs/stock-v2/04-migrasi.md §1). ` +
           `Kalau ada kode baru yang mulai menulis RESTOCK, tambahkan dulu case-nya di sini sebelum dipakai.`,
       );
 

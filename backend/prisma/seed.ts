@@ -8,7 +8,7 @@ function docNo(prefix: string): string {
   return `${prefix}-SEED-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-// Data referensi dari docs/obbel-coffee-ai-docs/16-seed-dummy-data.md.
+// Data referensi dari docs/spec/16-seed-dummy-data.md.
 // Untuk development/dev only — production harus diinput ulang oleh Admin.
 async function main() {
   const categories = await Promise.all(

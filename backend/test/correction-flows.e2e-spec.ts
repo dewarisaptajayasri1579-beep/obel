@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// Menjalankan acceptance case COR-01/02/03/12 dari
-/// docs/obbel-coffee-ai-docs/24-data-consistency-correction-reversal.md
+/// docs/spec/24-data-consistency-correction-reversal.md
 /// §17 langsung terhadap Backend API asli (bukan mock), memakai kredensial
 /// seed (admin/booth01, password obbel123) dan Booth/produk seed.
 describe('Sale correction flows (e2e)', () => {

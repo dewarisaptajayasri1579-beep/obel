@@ -62,7 +62,7 @@ export interface BarisRinciMutasi {
 ///
 /// READ-ONLY sepenuhnya — tidak ada satu pun tulisan di service ini. Rekap masih
 /// dihitung on-the-fly dari ledger, bukan dari tabel cache: untuk volume Obbel
-/// sekarang masih murah, dan tabel `rekap_stok` (docsV2 dok 03) nanti menggantikan
+/// sekarang masih murah, dan tabel `rekap_stok` (docs/stock-v2 dok 03) nanti menggantikan
 /// isinya tanpa mengubah bentuk response ini.
 ///
 /// Seluruh periode dihitung dari `businessDate` (tanggal bisnis), BUKAN

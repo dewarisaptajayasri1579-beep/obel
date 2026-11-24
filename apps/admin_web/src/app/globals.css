@@ -12,7 +12,7 @@ html {
   /* ---- Skala Brand (Aksen) — 10 langkah, dipilih SENGAJA lebih redup &
      kurang jenuh daripada skala emerald bawaan Tailwind, supaya tombol,
      sorotan menu, dan cincin fokus tidak menyala/neon (keluhan "silau").
-     700/800 mengunci ke identitas Obbel di apps/booth_flutter/lib/theme.dart
+     700/800 mengunci ke identitas Obbel di app/petugas/_lib/theme.ts
      (#0B5D34 / #074526); langkah lainnya diturunkan darinya.
 
      Ini PALET BAWAAN ("Hijau Obbel"). Palet lain tinggal mendefinisikan

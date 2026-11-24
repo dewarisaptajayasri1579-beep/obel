@@ -1,7 +1,6 @@
-/// Palet warna Web Petugas Booth — HARUS sama persis dengan
-/// apps/booth_flutter/lib/theme.dart (`ObbelTheme`), bukan warna ad-hoc.
-/// Android & Web Petugas Booth adalah client yang sama secara identitas
-/// visual, jadi warnanya tidak boleh beda meski kodenya terpisah.
+/// Palet warna Web Petugas Booth — sumber identitas warna Obbel untuk sisi
+/// Barista (app Android booth_pwa_flutter hanya membungkus PWA ini), dan
+/// juga dipakai berkas cetak backend. Pakai nilai di sini, bukan warna ad-hoc.
 export const OBBEL = {
   primaryDark: "#0B5D34", // Hijau Obbel utama
   primaryMedium: "#138E4E", // Hijau terang
@@ -16,7 +15,7 @@ export const OBBEL = {
 /// bawaan "Hijau Obbel") di apps/admin_web/src/app/globals.css, supaya kartu,
 /// badge, dan latar bernuansa hijau di Web Petugas Booth tidak punya ronanya
 /// sendiri yang ad-hoc dan meleset dari identitas admin. 700/800 mengunci ke
-/// OBBEL.primaryDark/booth_flutter di atas; langkah lain ikut skala admin.
+/// OBBEL.primaryDark di atas; langkah lain ikut skala admin.
 export const OBBEL_SCALE = {
   50: "#EAF6EF",
   100: "#D2ECDC",

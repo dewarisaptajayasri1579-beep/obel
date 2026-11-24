@@ -7,7 +7,7 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   /// Mirrors get_booth_pos_catalog(booth_id) from
-  /// docs/obbel-coffee-ai-docs/09-api-rpc-contract.md.
+  /// docs/spec/09-api-rpc-contract.md.
   async getBoothCatalog(boothId: string) {
     const products = await this.prisma.product.findMany({
       where: { active: true },
