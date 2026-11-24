@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, BellOff, PackageX, RefreshCw, ShieldAlert, Truck, Wallet, type LucideIcon } from "lucide-react"
+import { Bell, BellOff, DoorOpen, PackageX, RefreshCw, ShieldAlert, Truck, Wallet, type LucideIcon } from "lucide-react"
 import { api, type NotificationItem } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { formatWaktuRelatif } from "@/lib/datetime"
@@ -15,6 +15,7 @@ const JENIS: { awalan: string; label: string; ikon: LucideIcon; href: string }[]
   { awalan: "pending:distributions", label: "Serah Terima", ikon: Truck, href: "/serah-terima-stok" },
   { awalan: "pending:restock", label: "Restock", ikon: RefreshCw, href: "/serah-terima-stok" },
   { awalan: "pending:approve", label: "Setor & Pengembalian", ikon: Wallet, href: "/transaksi-laporan-kembali" },
+  { awalan: "pending:early-checkout", label: "Pulang Cepat", ikon: DoorOpen, href: "/transaksi-checkin-checkout" },
   { awalan: "reconciliation:", label: "Rekonsiliasi", ikon: ShieldAlert, href: "/koreksi" },
 ]
 const jenisDari = (n: NotificationItem) => JENIS.find((j) => n.id.startsWith(j.awalan)) ?? { label: "Info", ikon: Bell, href: null }

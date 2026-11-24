@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
+import { AttendancePermitStatus, CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
 import { startOfTodayJakarta } from '../../common/jakarta-date';
@@ -29,7 +29,7 @@ export class NotificationsService {
   async getAll(): Promise<NotificationItem[]> {
     const items: NotificationItem[] = [];
 
-    const [boothStocks, thresholds, pendingDistributions, pendingRestock, openCases, menungguApprove] =
+    const [boothStocks, thresholds, pendingDistributions, pendingRestock, openCases, menungguApprove, pengajuanPulangCepat] =
       await Promise.all([
         this.prisma.boothStock.findMany({
           where: { ...BOOTH_STOCK_TERLIHAT, booth: { shiftSessions: { some: { status: ShiftStatus.OPEN } } } },
@@ -54,6 +54,12 @@ export class NotificationsService {
           },
           include: { booth: true, staff: { select: { fullName: true } } },
           orderBy: { returnedAt: 'desc' },
+        }),
+        // Pengajuan pulang cepat Barista hari ini yang menunggu keputusan Admin (B4).
+        this.prisma.attendancePermit.findMany({
+          where: { status: AttendancePermitStatus.REQUESTED, businessDate: startOfTodayJakarta() },
+          include: { staff: { select: { fullName: true } } },
+          orderBy: { grantedAt: 'desc' },
         }),
       ]);
 
@@ -94,6 +100,16 @@ export class NotificationsService {
         type: 'info',
         readAt: null,
         createdAt: terbaru(pendingDistributions.map((d) => d.sentAt ?? d.createdAt)),
+      });
+    }
+    if (pengajuanPulangCepat.length > 0) {
+      items.push({
+        id: 'pending:early-checkout',
+        title: 'Pengajuan Pulang Cepat',
+        message: `${pengajuanPulangCepat.map((p) => p.staff.fullName).join(', ')} mengajukan Check-Out sebelum jam selesai.`,
+        type: 'warning',
+        readAt: null,
+        createdAt: terbaru(pengajuanPulangCepat.map((p) => p.grantedAt)),
       });
     }
     if (pendingRestock.length > 0) {

@@ -1172,8 +1172,14 @@ export interface AttendancePermit {
   type: "LOCATION" | "EARLY_CHECKOUT"
   point: AttendancePoint | null
   reason: string
-  grantedBy: { id: string; fullName: string }
+  /// REQUESTED = pengajuan pulang cepat Barista menunggu Admin; GRANTED = berlaku; REJECTED = ditolak.
+  status: "REQUESTED" | "GRANTED" | "REJECTED"
+  /// Admin yang memberi izin atau memutuskan pengajuan (null selama menunggu).
+  grantedBy: { id: string; fullName: string } | null
+  /// Waktu izin diberikan, atau waktu Barista mengajukan.
   grantedAt: string
+  decidedAt: string | null
+  rejectReason: string | null
   usedAt: string | null
 }
 
@@ -1916,6 +1922,14 @@ export const api = {
     request<{ shiftSessionId: string; returnedAt: string }>(`/shifts/${shiftSessionId}/return`, { method: "POST", body: input }),
   getPendingReturn: () => request<PendingReturnShift | null>("/shifts/pending-return"),
   getAttendancePermits: (date?: string) => request<AttendancePermit[]>(`/attendance-permits${date ? `?date=${date}` : ""}`),
+  approveEarlyCheckout: (id: string) => request<AttendancePermit>(`/attendance-permits/${id}/approve`, { method: "POST" }),
+  rejectEarlyCheckout: (id: string, reason: string) =>
+    request<AttendancePermit>(`/attendance-permits/${id}/reject`, { method: "POST", body: { reason } }),
+  /// Barista: ajukan pulang cepat & lihat statusnya hari ini (B4).
+  requestEarlyCheckout: (reason: string) =>
+    request<AttendancePermit>("/attendance-permits/early-checkout-request", { method: "POST", body: { reason } }),
+  getMyEarlyCheckoutRequest: () =>
+    request<Omit<AttendancePermit, "staff" | "grantedBy"> | null>("/attendance-permits/early-checkout-request/mine"),
   grantAttendancePermit: (input: { staffId: string; type: "LOCATION" | "EARLY_CHECKOUT"; point?: AttendancePoint; reason: string }) =>
     request<AttendancePermit>("/attendance-permits", { method: "POST", body: input }),
   /// Foto bukti bayar QRIS — URL hasilnya dikirim sebagai `qrisProofPhotoUrl`.

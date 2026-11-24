@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AttendancePermitType, AttendancePoint, Prisma, UserRole } from '@prisma/client';
+import { AttendancePermitStatus, AttendancePermitType, AttendancePoint, Prisma, ShiftStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { DomainError } from '../../common/domain-error';
@@ -63,11 +63,102 @@ export class AttendancePermitsService {
     });
   }
 
-  /// Izin hari ini yang belum terpakai untuk absen ini (paling lama dulu).
+  /// Izin hari ini yang berlaku (GRANTED) dan belum terpakai untuk absen ini (paling lama dulu).
   cariIzin(staffId: string, type: AttendancePermitType, point: AttendancePoint | null) {
     return this.prisma.attendancePermit.findFirst({
-      where: { staffId, type, point, businessDate: startOfTodayJakarta(), usedAt: null },
+      where: { staffId, type, point, businessDate: startOfTodayJakarta(), usedAt: null, status: AttendancePermitStatus.GRANTED },
       orderBy: { grantedAt: 'asc' },
+    });
+  }
+
+  /// Barista mengajukan pulang cepat dari layar Check-Out (B4). Idempotent: pengajuan yang masih
+  /// menunggu atau izin yang belum terpakai hari ini dikembalikan apa adanya.
+  async requestEarlyCheckout(user: JwtPayload, reason: string) {
+    const shift = await this.prisma.shiftSession.findFirst({ where: { staffId: user.sub, status: ShiftStatus.OPEN } });
+    if (!shift) {
+      throw new DomainError('SHIFT_NOT_OPEN', 'Pengajuan pulang cepat hanya untuk shift yang sedang berjalan.');
+    }
+    const businessDate = startOfTodayJakarta();
+    const ada = await this.prisma.attendancePermit.findFirst({
+      where: {
+        staffId: user.sub,
+        type: AttendancePermitType.EARLY_CHECKOUT,
+        businessDate,
+        usedAt: null,
+        status: { in: [AttendancePermitStatus.REQUESTED, AttendancePermitStatus.GRANTED] },
+      },
+    });
+    if (ada) return ada;
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const permit = await tx.attendancePermit.create({
+          data: {
+            staffId: user.sub,
+            type: AttendancePermitType.EARLY_CHECKOUT,
+            reason: reason.trim(),
+            status: AttendancePermitStatus.REQUESTED,
+            businessDate,
+          },
+        });
+        await this.activityLog.record(tx, {
+          entityType: 'attendance_permit',
+          entityId: permit.id,
+          action: 'EARLY_CHECKOUT_REQUESTED',
+          actorId: user.sub,
+          actorName: user.username,
+          note: `Mengajukan Check-Out sebelum jam selesai. Alasan: ${permit.reason}`,
+        });
+        return permit;
+      });
+    } catch (err) {
+      // Tap ganda: index unik parsial (satu pengajuan menunggu per Barista per hari).
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err;
+      return this.prisma.attendancePermit.findFirstOrThrow({
+        where: { staffId: user.sub, businessDate, status: AttendancePermitStatus.REQUESTED },
+      });
+    }
+  }
+
+  /// Pengajuan pulang cepat Barista hari ini yang terakhir (null kalau belum pernah mengajukan).
+  findMyEarlyCheckout(user: JwtPayload) {
+    return this.prisma.attendancePermit.findFirst({
+      where: { staffId: user.sub, type: AttendancePermitType.EARLY_CHECKOUT, businessDate: startOfTodayJakarta(), usedAt: null },
+      orderBy: { grantedAt: 'desc' },
+    });
+  }
+
+  /// Admin menyetujui atau menolak pengajuan pulang cepat. Hanya pengajuan yang masih menunggu;
+  /// dua Admin yang memutuskan bersamaan tidak saling menimpa.
+  async decideEarlyCheckout(id: string, approve: boolean, user: JwtPayload, rejectReason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const permit = await tx.attendancePermit.findUnique({ where: { id }, include: { staff: { select: { fullName: true } } } });
+      if (!permit || permit.type !== AttendancePermitType.EARLY_CHECKOUT) {
+        throw new DomainError('NOT_FOUND', 'Pengajuan tidak ditemukan.');
+      }
+      const diputuskan = await tx.attendancePermit.updateMany({
+        where: { id, status: AttendancePermitStatus.REQUESTED },
+        data: {
+          status: approve ? AttendancePermitStatus.GRANTED : AttendancePermitStatus.REJECTED,
+          grantedById: user.sub,
+          decidedAt: new Date(),
+          rejectReason: approve ? null : rejectReason?.trim(),
+        },
+      });
+      if (diputuskan.count !== 1) {
+        throw new DomainError('PERMIT_ALREADY_DECIDED', 'Pengajuan ini sudah diputuskan.');
+      }
+      await this.activityLog.record(tx, {
+        entityType: 'attendance_permit',
+        entityId: id,
+        action: approve ? 'EARLY_CHECKOUT_APPROVED' : 'EARLY_CHECKOUT_REJECTED',
+        actorId: user.sub,
+        actorName: user.username,
+        note: approve
+          ? `Menyetujui pulang cepat ${permit.staff.fullName}.`
+          : `Menolak pulang cepat ${permit.staff.fullName}. Alasan: ${rejectReason?.trim()}`,
+      });
+      return tx.attendancePermit.findUniqueOrThrow({ where: { id } });
     });
   }
 

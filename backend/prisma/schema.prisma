@@ -1134,6 +1134,15 @@ model AppSettings {
   @@map("app_settings")
 }
 
+/// REQUESTED = diajukan Barista (pulang cepat), menunggu Admin; GRANTED = berlaku; REJECTED = ditolak.
+enum AttendancePermitStatus {
+  REQUESTED
+  GRANTED
+  REJECTED
+
+  @@map("attendance_permit_status")
+}
+
 enum AttendancePermitType {
   LOCATION
   EARLY_CHECKOUT
@@ -1160,9 +1169,15 @@ model AttendancePermit {
   type               AttendancePermitType
   point              AttendancePoint?
   reason             String
-  grantedById        String               @map("granted_by")
-  grantedBy          Profile              @relation("AttendancePermitGrantedBy", fields: [grantedById], references: [id])
+  status             AttendancePermitStatus @default(GRANTED)
+  /// Admin yang memberi izin, atau yang memutuskan pengajuan Barista (null selama REQUESTED).
+  grantedById        String?              @map("granted_by")
+  grantedBy          Profile?             @relation("AttendancePermitGrantedBy", fields: [grantedById], references: [id])
+  /// Waktu baris dibuat: saat Admin memberi izin, atau saat Barista mengajukan.
   grantedAt          DateTime             @default(now()) @map("granted_at")
+  /// Waktu Admin menyetujui/menolak pengajuan Barista.
+  decidedAt          DateTime?            @map("decided_at")
+  rejectReason       String?              @map("reject_reason")
   businessDate       DateTime             @map("business_date") @db.Date
   usedAt             DateTime?            @map("used_at")
   usedShiftSessionId String?              @map("used_shift_session_id")

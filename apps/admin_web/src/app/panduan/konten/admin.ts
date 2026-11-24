@@ -123,6 +123,7 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
       { judul: "Saring data", isi: "Pilih Booth, Barista, periode, atau tab Aktif dan Selesai." },
       { judul: "Periksa absen", isi: "Setiap titik menampilkan foto, jam, dan jarak dari lokasi. Klik foto untuk melihat detail dan peta." },
       { judul: "Beri izin", isi: "Bila GPS Barista meleset atau perlu pulang awal, klik Beri Izin Absen, pilih Barista, Jenis Izin, Titik Absen, isi Alasan, lalu klik Beri Izin." },
+      { judul: "Putuskan pengajuan pulang cepat", isi: "Pengajuan dari Barista muncul di panel Pengajuan Pulang Cepat dan di notifikasi. Klik Setujui, atau Tolak lalu isi alasan penolakan." },
     ],
     perhatian: [
       { teks: "Izin berlaku hari ini untuk satu kali absen. Barista lalu mengulang absennya.", tingkat: "info" },

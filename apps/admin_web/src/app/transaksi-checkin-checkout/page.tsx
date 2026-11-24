@@ -205,6 +205,11 @@ function TransaksiCheckinCheckoutContent() {
   const [izinTitik, setIzinTitik] = useState<AttendancePoint>("DEPART");
   const [izinAlasan, setIzinAlasan] = useState("");
   const [memberiIzin, setMemberiIzin] = useState(false);
+  // Pengajuan pulang cepat dari Barista (B4): diputuskan di panel atas halaman.
+  const pengajuan = izinHariIni.filter((p) => p.type === "EARLY_CHECKOUT" && p.status === "REQUESTED");
+  const [memutuskan, setMemutuskan] = useState<string | null>(null);
+  const [menolak, setMenolak] = useState<AttendancePermit | null>(null);
+  const [alasanTolak, setAlasanTolak] = useState("");
 
   function muatIzin() {
     api.getAttendancePermits().then(setIzinHariIni).catch(() => {});
@@ -217,6 +222,35 @@ function TransaksiCheckinCheckoutContent() {
     setIzinAlasan("");
     setIzinOpen(true);
     muatIzin();
+  }
+
+  async function setujui(p: AttendancePermit) {
+    setMemutuskan(p.id);
+    try {
+      await api.approveEarlyCheckout(p.id);
+      toast.success(`Pulang cepat ${p.staff.fullName} disetujui.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal menyetujui pengajuan.");
+    } finally {
+      setMemutuskan(null);
+      muatIzin();
+    }
+  }
+
+  async function tolak() {
+    if (!menolak || alasanTolak.trim().length < 3) return;
+    setMemutuskan(menolak.id);
+    try {
+      await api.rejectEarlyCheckout(menolak.id, alasanTolak.trim());
+      toast.success(`Pengajuan ${menolak.staff.fullName} ditolak.`);
+      setMenolak(null);
+      setAlasanTolak("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Gagal menolak pengajuan.");
+    } finally {
+      setMemutuskan(null);
+      muatIzin();
+    }
   }
 
   async function beriIzin() {
@@ -240,6 +274,7 @@ function TransaksiCheckinCheckoutContent() {
 
   useEffect(() => {
     api.getBooths().then(setBooths).catch(() => {});
+    muatIzin();
     api
       .getUsers()
       .then((users) => setStaffList(users.filter((u) => u.role === "BOOTH_STAFF")))
@@ -311,6 +346,30 @@ function TransaksiCheckinCheckoutContent() {
           </Button>
         )}
       </div>
+
+      {pengajuan.length > 0 && (
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/10 p-3.5 space-y-2.5">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Pengajuan Pulang Cepat ({pengajuan.length})</p>
+          {pengajuan.map((p) => (
+            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-lg bg-white/80 dark:bg-surface border border-amber-100 dark:border-line px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800 dark:text-fg">{p.staff.fullName}</p>
+                <p className="text-xs text-slate-500 dark:text-fg-muted wrap-break-word">{p.reason}</p>
+              </div>
+              {canManage("CHECKIN_CHECKOUT") && (
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="secondary" size="sm" disabled={memutuskan !== null} onClick={() => setMenolak(p)}>
+                    Tolak
+                  </Button>
+                  <Button variant="primary" size="sm" isLoading={memutuskan === p.id} disabled={memutuskan !== null} onClick={() => setujui(p)}>
+                    Setujui
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="rounded-xl border border-slate-200/80 dark:border-line bg-white/80 dark:bg-surface p-3.5 shadow-2xs flex items-center gap-3">
@@ -640,15 +699,32 @@ function TransaksiCheckinCheckoutContent() {
                   <li key={p.id} className="text-xs text-slate-600 dark:text-fg-secondary flex justify-between gap-3">
                     <span>
                       <span className="font-semibold text-slate-800 dark:text-fg">{p.staff.fullName}</span> ·{" "}
-                      {p.type === "EARLY_CHECKOUT" ? "Pulang awal" : LABEL_TITIK[p.point!]} — {p.reason}
+                      {p.type === "EARLY_CHECKOUT" ? "Pulang awal" : LABEL_TITIK[p.point!]}: {p.reason}
                     </span>
-                    <span className={`shrink-0 font-semibold ${p.usedAt ? "text-slate-400 dark:text-fg-muted" : "text-amber-600 dark:text-amber-400"}`}>
-                      {p.usedAt ? "Terpakai" : "Belum dipakai"}
+                    <span className={`shrink-0 font-semibold ${p.usedAt || p.status === "REJECTED" ? "text-slate-400 dark:text-fg-muted" : "text-amber-600 dark:text-amber-400"}`}>
+                      {p.usedAt ? "Terpakai" : p.status === "REQUESTED" ? "Menunggu" : p.status === "REJECTED" ? "Ditolak" : "Belum dipakai"}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={menolak !== null} onClose={() => setMenolak(null)} title="Tolak Pengajuan Pulang Cepat" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-fg-secondary">
+            {menolak?.staff.fullName}: {menolak?.reason}
+          </p>
+          <Textarea label="Alasan penolakan" value={alasanTolak} onChange={(e) => setAlasanTolak(e.target.value)} placeholder="Mis. booth sedang ramai, tunggu pengganti" />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setMenolak(null)}>
+              Batal
+            </Button>
+            <Button variant="danger" isLoading={memutuskan !== null} disabled={alasanTolak.trim().length < 3} onClick={tolak}>
+              Tolak
+            </Button>
           </div>
         </div>
       </Modal>

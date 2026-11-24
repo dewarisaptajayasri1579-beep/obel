@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
+import { PengajuanPulangCepat } from "./PengajuanPulangCepat";
 import { QtyStepper } from "../_components/QtyStepper";
 import { AttendanceCapture, type LocationValue } from "../_components/AttendanceCapture";
 import { PanelLokasiDitolak, penolakanDariError, type PenolakanLokasi } from "../_components/LokasiDitolak";
@@ -277,7 +278,17 @@ function CheckoutContent() {
   }
 
   if (belumWaktunya) {
-    return <LayarPenghalang icon={Clock} judul="Belum Waktunya Check-Out" pesan={belumWaktunya} href="/petugas" label="Kembali ke Beranda" />;
+    return (
+      <LayarPenghalang icon={Clock} judul="Belum Waktunya Check-Out" pesan={belumWaktunya} href="/petugas" label="Kembali ke Beranda">
+        <PengajuanPulangCepat
+          onDisetujui={() => {
+            setBelumWaktunya(null);
+            setLoading(true);
+            muatData();
+          }}
+        />
+      </LayarPenghalang>
+    );
   }
 
   if (loading || !shift || !report) {

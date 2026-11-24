@@ -228,8 +228,8 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     perhatian: [
       { teks: "Bila Stok Fisik berbeda dari sistem, Alasan Selisih Stok wajib diisi.", tingkat: "penting" },
       { teks: "Draft transaksi di Kasir harus dibayar atau dihapus sebelum Check-Out.", tingkat: "penting" },
-      // ShiftsService: EARLY_CHECKOUT kecuali ada izin EARLY_CHECKOUT dari Admin.
-      { teks: "Check-Out sebelum jam shift berakhir hanya bisa dengan izin pulang awal dari Admin.", tingkat: "info" },
+      // ShiftsService: EARLY_CHECKOUT kecuali ada izin EARLY_CHECKOUT (diberi Admin atau pengajuan Barista yang disetujui).
+      { teks: "Check-Out sebelum jam shift berakhir butuh izin Admin. Di layar Belum Waktunya Check-Out, isi alasan lalu ketuk Ajukan Pulang Cepat. Layar terbuka sendiri begitu Admin menyetujui.", tingkat: "info" },
       { teks: "Setelah Check-Out, bawa stok dan uang ke Gudang lalu lakukan Absen Kembali.", tingkat: "info" },
     ],
   },

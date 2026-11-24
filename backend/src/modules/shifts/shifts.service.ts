@@ -545,7 +545,7 @@ export class ShiftsService {
     if (izin) return izin;
     throw new DomainError(
       'EARLY_CHECKOUT',
-      `Check-Out baru bisa mulai pukul ${formatJamJakarta(bolehMulai)}. Kalau harus pulang lebih awal, minta izin Admin.`,
+      `Check-Out baru bisa mulai pukul ${formatJamJakarta(bolehMulai)}. Kalau harus pulang lebih awal, ajukan pulang cepat ke Admin.`,
       { allowedFrom: bolehMulai },
     );
   }
@@ -919,7 +919,7 @@ export class ShiftsService {
         longitude: lng == null ? null : Number(lng),
         distanceMeters: lat == null || lng == null || !acuan ? null : Math.round(distanceMeters({ lat: Number(lat), lng: Number(lng) }, acuan)),
         acuanKosong: !acuan,
-        izin: izin ? { reason: izin.reason, grantedBy: izin.grantedBy.fullName } : null,
+        izin: izin ? { reason: izin.reason, grantedBy: izin.grantedBy?.fullName ?? '-' } : null,
       };
     };
 
@@ -944,7 +944,7 @@ export class ShiftsService {
       },
       izinPulangAwal: (() => {
         const izin = izinDipakai.find((p) => p.usedShiftSessionId === s.id && p.type === AttendancePermitType.EARLY_CHECKOUT);
-        return izin ? { reason: izin.reason, grantedBy: izin.grantedBy.fullName } : null;
+        return izin ? { reason: izin.reason, grantedBy: izin.grantedBy?.fullName ?? '-' } : null;
       })(),
       totalJualCup: cupByShiftId.get(s.id) ?? 0,
       adaSelisih: s.stockCount?.items.some((i) => i.discrepancyQty !== 0) ?? false,
