@@ -1,5 +1,5 @@
 name: booth_pwa_flutter
-description: "A new Flutter project."
+description: "Android shell for the Obbel Barista PWA: WebView plus GPS, Bluetooth printing and camera bridges."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -33,8 +33,6 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-
   # Shell: WebView yang nampilin PWA petugas + bridge ke kemampuan native.
   webview_flutter: ^4.13.0
   # Import langsung (bukan cuma transitive) — dipakai untuk
@@ -49,7 +47,6 @@ dependencies:
   permission_handler: ^11.3.1
   http: ^1.6.0
   shared_preferences: ^2.5.5
-  uuid: ^4.6.0
   # Printer thermal Bluetooth — dependency sama seperti booth_flutter supaya
   # perilaku cetak konsisten (lib/printing/ di app ini adalah salinan pola
   # yang sama, dipicu dari JS bridge alih-alih layar checkout native).
@@ -84,7 +81,7 @@ dev_dependencies:
 # ganti file ini buat regenerate mipmap/AppIcon.
 flutter_launcher_icons:
   android: "ic_launcher"
-  ios: true
+  ios: false
   image_path: "assets/icon/icon.png"
   adaptive_icon_background: "#0B5D34"
   adaptive_icon_foreground: "assets/icon/icon.png"

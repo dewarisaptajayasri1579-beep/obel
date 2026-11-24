@@ -19,7 +19,7 @@ class BoothPwaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Barista Obbel',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F6B4F))),
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B5D34))),
       home: const WebViewScreen(),
     );
   }
