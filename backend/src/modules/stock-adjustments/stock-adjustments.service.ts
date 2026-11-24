@@ -63,6 +63,7 @@ export class StockAdjustmentsService {
       before: currentQty,
       delta: -dto.qty,
       user,
+      referenceType: 'stock_write_off_out',
     });
   }
 
@@ -79,6 +80,8 @@ export class StockAdjustmentsService {
     before: number;
     delta: number;
     user: JwtPayload;
+    /// Override label mutasi (mis. Pemusnahan); sufiks arah `_in`/`_out` tetap wajib untuk Gudang.
+    referenceType?: string;
   }) {
     const adjustmentId = randomUUID();
     const now = new Date();
@@ -129,11 +132,12 @@ export class StockAdjustmentsService {
             fromBoothId: p.locationType === OpnameLocationType.BOOTH && p.delta < 0 ? p.boothId : null,
             // Sufiks arah wajib khusus Gudang — lihat arah.util.ts adjustmentGudang().
             referenceType:
-              p.locationType === OpnameLocationType.WAREHOUSE
+              p.referenceType ??
+              (p.locationType === OpnameLocationType.WAREHOUSE
                 ? p.delta > 0
                   ? 'stock_adjustment_in'
                   : 'stock_adjustment_out'
-                : 'stock_adjustment',
+                : 'stock_adjustment'),
             referenceId: adjustmentId,
             businessDate: businessDateOf(now),
             occurredAt: now,

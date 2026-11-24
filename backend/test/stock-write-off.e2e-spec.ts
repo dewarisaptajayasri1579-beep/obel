@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
+import { keteranganMutasi } from '../src/modules/stock-movements/arah.util';
 
 /// BR-041 — Pemusnahan Stok Gudang: Admin mengeluarkan produk expired dari Gudang
 /// dengan foto bukti wajib. Stok berkurang lewat ledger (ADJUSTMENT keluar Gudang),
@@ -92,7 +93,8 @@ describe('Stock write-off (e2e)', () => {
 
     const movs = await prisma.stockMovement.findMany({ where: { referenceId: doc.entityId } });
     expect(movs).toHaveLength(1);
-    expect(movs[0]).toMatchObject({ movementType: 'ADJUSTMENT', referenceType: 'stock_adjustment_out', qty: 3, productId });
+    expect(movs[0]).toMatchObject({ movementType: 'ADJUSTMENT', referenceType: 'stock_write_off_out', qty: 3, productId });
+    expect(keteranganMutasi(movs[0])).toBe('Pemusnahan reject');
 
     // Salah input → dibatalkan lewat reverse: stok kembali, tidak bisa dua kali.
     const batal = () =>
