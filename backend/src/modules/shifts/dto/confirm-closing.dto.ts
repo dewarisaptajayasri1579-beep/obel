@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsInt,
   IsLatitude,
@@ -30,9 +29,9 @@ export class ConfirmClosingItemDto {
   reasonNote?: string;
 }
 
+/// `items` boleh kosong: Barista yang tidak memegang stok sama sekali (booth tanpa stok) tetap bisa Check-Out.
 export class ConfirmClosingDto {
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ConfirmClosingItemDto)
   items!: ConfirmClosingItemDto[];
