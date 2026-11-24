@@ -67,27 +67,6 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
     ],
   },
   {
-    kode: "admin-pemusnahan",
-    peran: "admin",
-    judul: "Pemusnahan Stok",
-    menu: "PEMUSNAHAN_STOK",
-    ringkasan: "Mengeluarkan produk expired atau tidak layak jual dari Gudang Pusat dengan foto bukti.",
-    gambar: [
-      { file: "admin-pemusnahan-1.webp", keterangan: "Daftar pemusnahan dengan stok Gudang sebelum dan sesudah." },
-      { file: "admin-pemusnahan-2.webp", keterangan: "Form Musnahkan Stok Gudang." },
-    ],
-    langkah: [
-      { judul: "Buka form", isi: "Klik Musnahkan Stok." },
-      { judul: "Isi data", isi: "Pilih Produk, isi Qty Dimusnahkan, unggah Foto Bukti, dan isi Catatan bila perlu." },
-      { judul: "Konfirmasi", isi: "Klik Musnahkan. Stok Gudang berkurang dan tercatat di Mutasi Stok." },
-      { judul: "Batalkan bila keliru", isi: "Klik Batalkan pada baris, isi Alasan pembatalan, lalu klik Batalkan Pemusnahan." },
-    ],
-    perhatian: [
-      { teks: "Foto bukti wajib diunggah, dan jumlah tidak boleh melebihi stok Gudang.", tingkat: "penting" },
-      { teks: "Pembatalan mengembalikan stok ke Gudang. Dokumen aslinya tetap tercatat.", tingkat: "info" },
-    ],
-  },
-  {
     kode: "admin-serah-terima-stok",
     peran: "admin",
     judul: "Serah Terima Stok",
@@ -107,6 +86,27 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
       { teks: "Stok Booth baru bertambah setelah Barista mengonfirmasi penerimaan di aplikasi.", tingkat: "info" },
       { teks: "Dokumen Diproses dapat dibatalkan atau direvisi. Dokumen Diterima dikoreksi lewat Koreksi Penerimaan dengan Tindak Lanjut untuk setiap selisih.", tingkat: "penting" },
       { teks: "Panel Stok Sedang Diproses (In-Transit) menampilkan kiriman yang belum diterima Barista.", tingkat: "info" },
+    ],
+  },
+  {
+    kode: "admin-pemusnahan",
+    peran: "admin",
+    judul: "Pemusnahan Stok",
+    menu: "PEMUSNAHAN_STOK",
+    ringkasan: "Mengeluarkan produk expired atau tidak layak jual dari Gudang Pusat dengan foto bukti.",
+    gambar: [
+      { file: "admin-pemusnahan-1.webp", keterangan: "Daftar pemusnahan dengan stok Gudang sebelum dan sesudah." },
+      { file: "admin-pemusnahan-2.webp", keterangan: "Form Musnahkan Stok Gudang." },
+    ],
+    langkah: [
+      { judul: "Buka form", isi: "Klik Musnahkan Stok." },
+      { judul: "Isi data", isi: "Pilih Produk, isi Qty Dimusnahkan, unggah Foto Bukti, dan isi Catatan bila perlu." },
+      { judul: "Konfirmasi", isi: "Klik Musnahkan. Stok Gudang berkurang dan tercatat di Mutasi Stok." },
+      { judul: "Batalkan bila keliru", isi: "Klik Batalkan pada baris, isi Alasan pembatalan, lalu klik Batalkan Pemusnahan." },
+    ],
+    perhatian: [
+      { teks: "Foto bukti wajib diunggah, dan jumlah tidak boleh melebihi stok Gudang.", tingkat: "penting" },
+      { teks: "Pembatalan mengembalikan stok ke Gudang. Dokumen aslinya tetap tercatat.", tingkat: "info" },
     ],
   },
   {

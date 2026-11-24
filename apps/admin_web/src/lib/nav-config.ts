@@ -91,17 +91,17 @@ export const MAIN_NAV: NavGroup[] = [
             bottomBar: true,
           },
           {
-            label: "Pemusnahan Stok",
-            href: "/stok/pemusnahan",
-            menu: "PEMUSNAHAN_STOK",
-            icon: PackageX,
-          },
-          {
             label: "Serah Terima Stok",
             href: "/serah-terima-stok",
             menu: "SERAH_TERIMA_STOK",
             icon: Truck,
             bottomBar: true,
+          },
+          {
+            label: "Pemusnahan Stok",
+            href: "/stok/pemusnahan",
+            menu: "PEMUSNAHAN_STOK",
+            icon: PackageX,
           },
         ],
       },
