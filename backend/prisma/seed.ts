@@ -103,10 +103,13 @@ async function main() {
     },
   });
 
+  // The access-roles migration only assigned the system role to ADMINs that existed at
+  // migration time; on a fresh database the seed runs afterwards, so attach it here.
+  const fullAccessRole = await prisma.accessRole.findFirstOrThrow({ where: { fullAccess: true } });
   await prisma.profile.upsert({
     where: { username: 'admin' },
-    update: {},
-    create: { username: 'admin', passwordHash, fullName: 'Admin Pusat', role: 'ADMIN' },
+    update: { accessRoleId: fullAccessRole.id },
+    create: { username: 'admin', passwordHash, fullName: 'Admin Obbel', role: 'ADMIN', accessRoleId: fullAccessRole.id },
   });
 
   await prisma.profile.upsert({
