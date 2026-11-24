@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from '../src/app.module';
+import { absenTiba } from './support/shift';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// AC-41 / BR-038 — foto bukti bayar QRIS wajib untuk petugas booth, disimpan
@@ -41,6 +42,7 @@ describe('QRIS payment proof (e2e)', () => {
       .body.accessToken;
     shiftSessionId = (await request(server()).get('/shifts/active').set('Authorization', `Bearer ${boothToken}`).expect(200))
       .body.shiftSessionId;
+    await absenTiba(app, boothToken, shiftSessionId);
 
     const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
     const target = catalog.body.find((p: { qtyOnHand: number }) => p.qtyOnHand >= 12);

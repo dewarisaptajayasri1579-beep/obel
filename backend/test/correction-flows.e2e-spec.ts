@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
+import { absenTiba } from './support/shift';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// Menjalankan acceptance case COR-01/02/03/12 dari
@@ -43,6 +44,7 @@ describe('Sale correction flows (e2e)', () => {
       .set('Authorization', `Bearer ${boothToken}`)
       .expect(200);
     shiftSessionId = activeShift.body.shiftSessionId;
+    await absenTiba(app, boothToken, shiftSessionId);
 
     const catalog = await request(app.getHttpServer())
       .get('/catalog')

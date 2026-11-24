@@ -88,6 +88,14 @@ export class SalesService {
   /// docs/spec/09-api-rpc-contract.md §3 and enforces
   /// BR-002 (no negative stock), BR-004 (sale preconditions), BR-005 (price
   /// authority), BR-017 (idempotency).
+  /// Barista berjualan hanya setelah Absen Tiba: booth bisa diganti saat Tiba (stok yang dibawa ikut
+  /// pindah), jadi sebelum itu booth-nya belum pasti. Admin yang mencatat penjualan tidak terkena.
+  private pastikanSudahTiba(user: JwtPayload, shift: { arrivedAt: Date | null }) {
+    if (user.role === UserRole.BOOTH_STAFF && !shift.arrivedAt) {
+      throw new DomainError('ARRIVAL_REQUIRED', 'Absen Tiba di Booth dulu sebelum berjualan.');
+    }
+  }
+
   async createPaidSale(user: JwtPayload, dto: CreateSaleDto) {
     const existing = await this.prisma.sale.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
@@ -110,6 +118,7 @@ export class SalesService {
         'Shift ini bukan milik user yang login.',
       );
     }
+    this.pastikanSudahTiba(user, shift);
 
     this.pastikanBuktiQris(user, dto);
 
@@ -330,6 +339,7 @@ export class SalesService {
     if (user.role === UserRole.BOOTH_STAFF && shift.staffId !== user.sub) {
       throw new DomainError('UNAUTHORIZED_BOOTH', 'Shift ini bukan milik user yang login.');
     }
+    this.pastikanSudahTiba(user, shift);
 
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });

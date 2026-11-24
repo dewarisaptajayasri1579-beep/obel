@@ -293,10 +293,12 @@ function HomeContent() {
           {MENU.map((item) => {
             const Icon = item.icon;
             const Watermark = item.watermark;
+            // Kasir baru bisa dipakai setelah Absen Tiba (booth bisa diganti saat Tiba).
+            const kasirMenungguTiba = item.href === "/petugas/kasir" && !shift.arrivedAt;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={kasirMenungguTiba ? "/petugas/tiba" : item.href}
                 className="rounded-[22px] p-4 flex flex-col gap-3 relative overflow-hidden shadow-[0_8px_20px_-10px_rgba(0,0,0,0.15)] active:scale-[0.98] transition"
                 style={{ backgroundColor: item.bg }}
               >
@@ -336,6 +338,8 @@ function HomeContent() {
                         .filter(Boolean)
                         .join(", ")}
                     </p>
+                  ) : kasirMenungguTiba ? (
+                    <p className="text-sm text-slate-500 mt-0.5 font-medium">Absen Tiba dulu untuk mulai berjualan</p>
                   ) : item.href === "/petugas/kasir" && cupTerjualHariIni > 0 ? (
                     <p className="text-sm mt-0.5 font-bold" style={{ color: GREEN }}>
                       {cupTerjualHariIni} cup · {formatRupiah(omzetHariIni)}

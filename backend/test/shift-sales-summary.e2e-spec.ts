@@ -8,7 +8,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
-import { bereskanShiftLama } from './support/shift';
+import { absenTiba, bereskanShiftLama } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
@@ -95,6 +95,7 @@ describe('Shift sales summary (e2e)', () => {
     staffToken = await bereskanShiftLama(app, adminToken, staffLoginToken);
     const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${staffLoginToken}` }).send(CHECKIN).expect(201);
     staffToken = checkIn.body.accessToken ?? staffLoginToken;
+    await absenTiba(app, staffToken, checkIn.body.shiftSessionId);
     return checkIn.body.shiftSessionId;
   }
 

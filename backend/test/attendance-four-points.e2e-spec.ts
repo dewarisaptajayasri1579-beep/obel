@@ -159,8 +159,12 @@ describe('Attendance four points (e2e)', () => {
     expect(permit.usedShiftSessionId).toBe(sid1);
   });
 
-  it('Check-Out needs Tiba first; Tiba is checked against the booth', async () => {
+  it('Check-Out and Kasir need Tiba first; Tiba is checked against the booth', async () => {
     expect((await mulaiCheckOut(sid1).expect(400)).body.code).toBe('ARRIVAL_REQUIRED');
+    const jualSebelumTiba = { idempotencyKey: randomUUID(), shiftSessionId: sid1, paymentMethod: 'CASH', items: [{ productId, qty: 1 }] };
+    expect((await request(server()).post('/sales').set(staff()).send(jualSebelumTiba).expect(400)).body.code).toBe('ARRIVAL_REQUIRED');
+    const draftSebelumTiba = { idempotencyKey: randomUUID(), shiftSessionId: sid1, items: [{ productId, qty: 1 }] };
+    expect((await request(server()).post('/sales/draft').set(staff()).send(draftSebelumTiba).expect(400)).body.code).toBe('ARRIVAL_REQUIRED');
     expect((await tiba(sid1, JAUH).expect(400)).body.code).toBe('OUTSIDE_ATTENDANCE_RADIUS');
     await tiba(sid1, BOOTH).expect(201);
     expect((await tiba(sid1, BOOTH).expect(201)).body.arrivedAt).toBeTruthy(); // idempotent

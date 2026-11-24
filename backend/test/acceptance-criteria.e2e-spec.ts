@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
+import { absenTiba } from './support/shift';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { isiUlangGudang } from './support/warehouse';
 
@@ -83,6 +84,7 @@ describe('Acceptance criteria AC-01..AC-25 (e2e)', () => {
       .expect(200);
     boothId = activeShift.body.booth.id;
     shiftSessionId = activeShift.body.shiftSessionId;
+    await absenTiba(app, boothToken, shiftSessionId);
 
     const booths = await request(app.getHttpServer())
       .get('/booths')

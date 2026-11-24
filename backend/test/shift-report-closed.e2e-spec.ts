@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
-import { bereskanShiftLama, tutupShiftLengkap } from './support/shift';
+import { absenTiba, bereskanShiftLama, tutupShiftLengkap } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
@@ -86,6 +86,7 @@ describe('Shift report after closing (e2e)', () => {
     for (let i = 0; i < 2; i++) {
       const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${staffLoginToken}` }).send(CHECKIN).expect(201);
       staffToken = checkIn.body.accessToken ?? staffLoginToken;
+      await absenTiba(app, staffToken, checkIn.body.shiftSessionId);
       const sisa = await prisma.boothStock.aggregate({ where: { boothId }, _sum: { qtyOnHand: true } });
       if ((sisa._sum.qtyOnHand ?? 0) === 0) return checkIn.body.shiftSessionId;
       await tutupShift(checkIn.body.shiftSessionId);

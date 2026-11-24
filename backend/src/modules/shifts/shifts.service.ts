@@ -203,7 +203,7 @@ export class ShiftsService {
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
   }
 
-  /// Absen Tiba di Booth (BR-042) — wajib sebelum Check-Out; Kasir tidak menunggu ini.
+  /// Absen Tiba di Booth (BR-042) — wajib sebelum Kasir dan Check-Out.
   /// Idempotent: kalau sudah tiba, kembalikan shift apa adanya.
   async arrive(user: JwtPayload, shiftSessionId: string, dto: AttendanceDto) {
     const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include: { booth: true, shiftTemplate: true } });

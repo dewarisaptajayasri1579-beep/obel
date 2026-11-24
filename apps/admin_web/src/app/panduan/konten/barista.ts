@@ -72,8 +72,8 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     ],
     perhatian: [
       { teks: "Absen hanya bisa dilakukan dalam radius Booth.", tingkat: "penting" },
-      // ShiftsService.arrive: "Kasir tidak menunggu ini".
-      { teks: "Kasir tetap bisa dipakai sebelum Absen Tiba, tetapi Check-Out tidak.", tingkat: "info" },
+      // ShiftsService.arrive + SalesService.pastikanSudahTiba: Kasir menunggu Absen Tiba.
+      { teks: "Kasir dan Check-Out baru bisa dipakai setelah Absen Tiba.", tingkat: "info" },
     ],
   },
   {

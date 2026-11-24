@@ -832,11 +832,23 @@ function KasirContent() {
   );
 }
 
+/// Kasir baru bisa dipakai setelah Absen Tiba: booth bisa diganti saat Tiba, jadi sebelum itu
+/// booth tempat berjualan belum pasti (backend juga menolak dengan ARRIVAL_REQUIRED).
+function KasirSetelahTiba() {
+  const router = useRouter();
+  const shift = useActiveShift();
+  const sudahTiba = Boolean(shift.arrivedAt);
+  useEffect(() => {
+    if (!sudahTiba) router.replace("/petugas/tiba");
+  }, [sudahTiba, router]);
+  return sudahTiba ? <KasirContent /> : null;
+}
+
 export default function KasirPage() {
   return (
     <RequirePetugasAuth>
       <RequireActiveShift title="Kasir">
-        <KasirContent />
+        <KasirSetelahTiba />
       </RequireActiveShift>
     </RequirePetugasAuth>
   );

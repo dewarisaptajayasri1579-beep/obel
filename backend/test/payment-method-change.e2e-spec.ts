@@ -8,7 +8,7 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { isiUlangGudang } from './support/warehouse';
-import { bereskanShiftLama, tutupShiftLengkap } from './support/shift';
+import { absenTiba, bereskanShiftLama, tutupShiftLengkap } from './support/shift';
 
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
   return Number(this);
@@ -83,6 +83,7 @@ describe('Payment method change (e2e)', () => {
     const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${login.body.accessToken}` }).send(CHECKIN).expect(201);
     staffToken = checkIn.body.accessToken ?? login.body.accessToken;
     shiftSessionId = checkIn.body.shiftSessionId;
+    await absenTiba(app, staffToken, shiftSessionId);
 
     const dist = (await request(server()).post('/distributions').set(admin()).send({ idempotencyKey: randomUUID(), boothId, items: [{ productId, qty: 10 }] }).expect(201)).body;
     await request(server()).post(`/distributions/${dist.id}/receive`).set(staff()).send({ items: [{ productId, actualQty: 10 }] }).expect(201);
