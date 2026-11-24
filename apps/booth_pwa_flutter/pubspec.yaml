@@ -42,7 +42,7 @@ dependencies:
   # GPS berjalan di foreground service Android (TaskHandler terpisah dari
   # WebView) supaya tetap kirim lokasi walau layar terkunci — lihat
   # lib/location/location_task_handler.dart.
-  flutter_foreground_task: ^9.1.0
+  flutter_foreground_task: ^11.0.3
   geolocator: ^14.0.3
   permission_handler: ^11.3.1
   http: ^1.6.0
