@@ -1346,18 +1346,6 @@ export interface MyBoothShiftAssignment {
   updatedAt: string
 }
 
-export interface MyStockMovement {
-  id: string
-  movementNo: string
-  movementType: "OPENING" | "WAREHOUSE_TO_BOOTH" | "SALE" | "RESTOCK" | "RETURN_TO_WAREHOUSE" | "ADJUSTMENT" | "VOID_REVERSAL"
-  productId: string
-  productName: string
-  qty: number
-  direction: "IN" | "OUT"
-  occurredAt: string
-  note: string | null
-}
-
 export interface StockLedgerRow {
   id: string
   tanggal: string
@@ -1566,29 +1554,6 @@ export const api = {
     }),
 
   getDistributions: () => request<Distribution[]>("/distributions"),
-  createDistribution: (input: {
-    idempotencyKey: string
-    boothId: string
-    items: { productId: string; qty: number }[]
-    note?: string
-  }) => request<Distribution>("/distributions", { method: "POST", body: input }),
-  cancelDistribution: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
-    request<Distribution>(`/distributions/${id}/cancel`, { method: "POST", body: input }),
-  reviseDistribution: (
-    id: string,
-    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
-  ) => request<Distribution>(`/distributions/${id}/revise`, { method: "POST", body: input }),
-  correctDistributionReceipt: (
-    id: string,
-    input: { idempotencyKey: string; items: { productId: string; qty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
-  ) => request<Distribution>(`/distributions/${id}/correct-receipt`, { method: "POST", body: input }),
-
-  getRestockRequests: () => request<RestockRequest[]>("/restock-requests"),
-  approveRestockRequest: (id: string, items: { productId: string; qtyApproved: number }[]) =>
-    request<RestockRequest>(`/restock-requests/${id}/approve`, { method: "POST", body: { items } }),
-  rejectRestockRequest: (id: string, reason: string) =>
-    request<RestockRequest>(`/restock-requests/${id}/reject`, { method: "POST", body: { reason } }),
-
   getStockHandovers: (params?: {
     page?: number
     limit?: number
@@ -1606,8 +1571,6 @@ export const api = {
     request<RestockRequest>(`/stock-handovers/${id}/approve`, { method: "POST", body: { items } }),
   rejectStockHandover: (id: string, reason: string) =>
     request<RestockRequest>(`/stock-handovers/${id}/reject`, { method: "POST", body: { reason } }),
-  receiveStockHandover: (id: string, items: { productId: string; actualQty: number }[]) =>
-    request<Distribution>(`/stock-handovers/${id}/receive`, { method: "POST", body: { items } }),
   cancelStockHandover: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request<Distribution>(`/stock-handovers/${id}/cancel`, { method: "POST", body: input }),
   reviseStockHandover: (
@@ -1711,7 +1674,6 @@ export const api = {
     request<SalesReport>(`/dashboard/sales-report?start=${start}&end=${end}`),
   getStockNeglectReport: (start: string, end: string) =>
     request<StockNeglectRow[]>(`/dashboard/stock-neglect-report?start=${start}&end=${end}`),
-  getBoothAktif: () => request<BoothAktifCard[]>("/dashboard/booth-aktif"),
   getReportsSummary: () => request<ReportsSummary>("/reports/summary"),
   exportReportsCsv: () => fetchCsvBlob("/reports/export"),
   getBoothStock: (params?: { boothId?: string }) => request<BoothStockRow[]>(`/booth-stock${toQueryString(params ?? {})}`),
@@ -1812,18 +1774,12 @@ export const api = {
     }),
 
   getStockOpnames: () => request<StockOpname[]>("/stock-opname"),
-  getStockOpname: (id: string) => request<StockOpname>(`/stock-opname/${id}`),
   startStockOpname: (input: { locationType: "WAREHOUSE" | "BOOTH"; boothId?: string }) =>
     request<StockOpname>("/stock-opname", { method: "POST", body: input }),
   confirmStockOpname: (
     id: string,
     input: { idempotencyKey: string; items: { productId: string; actualQty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
   ) => request<StockOpname>(`/stock-opname/${id}/confirm`, { method: "POST", body: input }),
-  recountStockOpname: (
-    id: string,
-    input: { idempotencyKey: string; items: { productId: string; actualQty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
-  ) => request<StockOpname>(`/stock-opname/${id}/recount`, { method: "POST", body: input }),
-
   getStockAdjustments: () => request<StockAdjustmentRecord[]>("/stock-adjustments"),
   createStockAdjustment: (input: {
     idempotencyKey: string
@@ -1983,7 +1939,6 @@ export const api = {
       body: input,
     }),
 
-  getPendingDistributions: () => request<Distribution[]>("/distributions/pending"),
   getMyDistributions: () => request<Distribution[]>("/distributions/mine"),
   receiveDistribution: (
     id: string,
@@ -2022,13 +1977,6 @@ export const api = {
   getMyRestockRequests: () => request<RestockRequest[]>("/restock-requests/mine"),
 
   getMyBoothStock: () => request<BoothStockRow[]>("/booth-stock/mine"),
-  getMyStockMovements: (params?: { from?: string; to?: string }) => {
-    const qs = new URLSearchParams()
-    if (params?.from) qs.set("from", params.from)
-    if (params?.to) qs.set("to", params.to)
-    const suffix = qs.toString()
-    return request<MyStockMovement[]>(`/stock-movements/mine${suffix ? `?${suffix}` : ""}`)
-  },
   /// Ledger satu produk + saldo berjalan, dikunci ke Booth staff yg login —
   /// dipakai tab "Riwayat Stok".
   getMyStockLedger: (params: { productId: string; from: string; to: string }) =>

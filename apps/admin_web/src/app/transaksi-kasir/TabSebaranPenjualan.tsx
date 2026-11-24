@@ -129,7 +129,6 @@ export function TabSebaranPenjualan() {
     : [];
 
   const KELAS_SEL = "py-2.5 px-3 text-center tabular-nums whitespace-nowrap";
-  const KELAS_HEAD_SEL = "py-3 px-3 text-center whitespace-nowrap";
 
   return (
     <div className="space-y-4">

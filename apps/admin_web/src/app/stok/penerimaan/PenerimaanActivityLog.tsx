@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { History } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { api, ApiError, type ActivityLogEntry } from "@/lib/api-client";
+import { api, type ActivityLogEntry } from "@/lib/api-client";
 
 const AKSI_LABEL: Record<string, string> = {
   CREATE: "Draft dibuat",

@@ -109,7 +109,6 @@ export function TabSebaranStok() {
             : (data?.booths.find((b) => b.boothId === urutBerdasarkan)?.boothName ?? "");
 
   const KELAS_SEL = "py-2.5 px-3 text-center tabular-nums whitespace-nowrap";
-  const KELAS_HEAD_SEL = "py-3 px-3 text-center whitespace-nowrap";
 
   function HeaderUrut({ kunci, label }: { kunci: string; label: string }) {
     const aktif = urutBerdasarkan === kunci;

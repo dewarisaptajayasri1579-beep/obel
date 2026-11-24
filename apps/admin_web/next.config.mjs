@@ -8,10 +8,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Repo ini punya package-lock.json di root DAN di apps/admin_web (monorepo
-  // tanpa workspaces terpadu) — tanpa ini Next.js salah menebak root-nya jadi
-  // root repo, bukan folder app ini, dan build manifest-nya (.next/server/...)
-  // berakhir di lokasi yang tidak konsisten antar restart dev server.
+  // Monorepo tanpa workspaces: kalau ada lockfile di folder induk (dulu ada di
+  // root repo), Next.js menebak root-nya ke sana, bukan folder app ini, dan
+  // build manifest-nya (.next/server/...) berakhir di lokasi yang tidak
+  // konsisten antar restart dev server. Dikunci ke folder ini.
   outputFileTracingRoot: __dirname,
   // `lucide-react` mengekspor tiap ikon dari satu barrel file raksasa — tanpa
   // ini, webpack dev server menaruh SEMUANYA di satu vendor chunk, dan compile

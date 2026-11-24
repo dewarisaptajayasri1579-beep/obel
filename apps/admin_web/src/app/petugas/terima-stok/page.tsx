@@ -118,7 +118,6 @@ function TerimaStokContent() {
   const produkSelisih = selected
     ? selected.items.filter((i) => (actualQty[i.productId] ?? i.qtySent) !== i.qtySent)
     : [];
-  const adaSelisih = produkSelisih.length > 0;
   const semuaDicentang = selected ? selected.items.every((i) => checklist[i.productId]) : false;
   const semuaAlasanTerisi = produkSelisih.every((i) => {
     const alasan = alasanSelisih[i.productId];
