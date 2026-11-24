@@ -31,6 +31,7 @@ import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
+import { stokUntukCheckOut } from './shift-stock';
 
 const UNIQUE_VIOLATION = 'P2002';
 
@@ -506,10 +507,9 @@ export class ShiftsService {
     await this.pastikanBolehCheckOut(shift);
     await this.pastikanTidakAdaDraft(shiftSessionId);
 
-    const boothStocks = await this.prisma.boothStock.findMany({
-      where: { boothId: shift.boothId },
-      include: { product: true },
-    });
+    // Hanya stok shift ini: Barista lain yang OPEN di booth yang sama (mis. Shift 2 yang sudah
+    // menerima stoknya) tidak boleh ikut terhitung atau ikut dikembalikan ke Gudang.
+    const boothStocks = await stokUntukCheckOut(this.prisma, shift);
 
     // Layar Check-Out bisa memanggil ini dua kali hampir bersamaan (tap ganda, efek ganda React di dev):
     // dua pengisian ulang yang bertabrakan melanggar unique snapshot/item. Yang kalah cukup membaca
@@ -621,7 +621,7 @@ export class ShiftsService {
     // Stok Booth harus masih sama dengan snapshot yang Petugas lihat di layar
     // (mis. Admin mengirim stok atau ada penjualan setelah layar dibuka) —
     // kalau tidak, selisih yang dihitung dari angka basi akan salah tercatat.
-    const stokSekarang = await this.prisma.boothStock.findMany({ where: { boothId: shift.boothId } });
+    const stokSekarang = await stokUntukCheckOut(this.prisma, shift);
     const qtySekarang = new Map(stokSekarang.map((b) => [b.productId, b.qtyOnHand]));
     const snapshot = new Map(count.items.map((i) => [i.productId, i.expectedQty]));
     const berubah = [
@@ -701,10 +701,14 @@ export class ShiftsService {
     // fisik, supaya selisihnya kelihatan & wajib Tindak Lanjut Admin saat
     // approve Stok Kembali (lihat ReturnsService.create dgn
     // shiftSessionIdOverride yang menandai asal-usulnya).
-    const sisaStok = await this.prisma.boothStock.count({ where: { boothId: shift.boothId, qtyOnHand: { gt: 0 } } });
-    if (sisaStok > 0) {
+    // Hanya stok milik shift ini (lihat stokUntukCheckOut), bukan seluruh stok booth.
+    const sisaStok = (await stokUntukCheckOut(this.prisma, shift)).filter((s) => s.qtyOnHand > 0);
+    if (sisaStok.length > 0) {
       await this.returnsService.create(
-        { note: 'Otomatis diajukan saat Check-Out.' },
+        {
+          note: 'Otomatis diajukan saat Check-Out.',
+          items: sisaStok.map((s) => ({ productId: s.productId, qty: s.qtyOnHand })),
+        },
         shift.boothId,
         user.sub,
         shiftSessionId,
@@ -916,7 +920,7 @@ export class ShiftsService {
           where: { shiftSessionId, ...(shift.closedAt ? { occurredAt: { lte: shift.closedAt } } : {}) },
           include: { product: true },
         }),
-        this.prisma.boothStock.findMany({ where: { boothId: shift.boothId } }),
+        stokUntukCheckOut(this.prisma, shift),
         this.prisma.sale.findMany({
           where: { shiftSessionId, status: 'PAID' },
           include: { payments: { where: { status: 'POSTED' } }, items: true },
