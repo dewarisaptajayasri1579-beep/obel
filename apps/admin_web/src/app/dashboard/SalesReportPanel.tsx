@@ -189,7 +189,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
 
               {showRumus && (
                 <div className="mt-3.5 rounded-xl bg-slate-50 dark:bg-surface-hover/60 border border-slate-200/80 dark:border-line p-4 text-xs text-slate-600 dark:text-fg-secondary space-y-2.5">
-                  <p className="font-bold text-slate-800 dark:text-fg">Rumus "Diam" (4 syarat, semua harus terpenuhi):</p>
+                  <p className="font-bold text-slate-800 dark:text-fg">Rumus &ldquo;Diam&rdquo; (4 syarat, semua harus terpenuhi):</p>
                   <ol className="list-decimal list-inside space-y-1.5">
                     <li>
                       <b>Stok masuk status Menipis/Kritis/Habis</b> — dihitung dari saldo stok Booth vs ambang batas Booth itu
@@ -237,7 +237,7 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                   {(neglect ?? []).length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-slate-500 dark:text-fg-muted py-8">
-                        Tidak ada insiden "diam" pada periode ini — semua Barista responsif.
+                        Tidak ada insiden &ldquo;diam&rdquo; pada periode ini. Semua Barista responsif.
                       </td>
                     </tr>
                   )}

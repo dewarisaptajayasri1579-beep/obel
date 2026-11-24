@@ -181,7 +181,7 @@ function SettingContent() {
               </div>
             ) : printers.length === 0 && !izinDitolakPermanen ? (
               <p className="text-sm text-slate-400 text-center py-4">
-                Belum ada printer ter-pairing. Pairing dulu lewat pengaturan Bluetooth HP, lalu tekan "Muat ulang".
+                Belum ada printer ter-pairing. Pairing dulu lewat pengaturan Bluetooth HP, lalu tekan &ldquo;Muat ulang&rdquo;.
               </p>
             ) : (
               <div className="flex flex-col gap-2">
