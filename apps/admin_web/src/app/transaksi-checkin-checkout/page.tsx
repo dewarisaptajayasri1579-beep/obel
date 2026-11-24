@@ -229,9 +229,8 @@ function TransaksiCheckinCheckoutContent() {
         point: izinJenis === "LOCATION" ? izinTitik : undefined,
         reason: izinAlasan.trim(),
       });
-      toast.success("Izin absen diberikan — minta Barista mengulang absennya.");
-      setIzinAlasan("");
-      muatIzin();
+      toast.success("Izin absen diberikan. Minta Barista mengulang absennya.");
+      setIzinOpen(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memberi izin absen.");
     } finally {
