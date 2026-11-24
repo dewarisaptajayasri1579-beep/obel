@@ -10,15 +10,12 @@ import {
   StockMovementType,
   UserRole,
 } from '@prisma/client';
-import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
-import { nomorMovementBerikutnya } from '../../common/doc-no';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { pastikanBaristaSudahKembali } from '../../common/shift-return-guard';
 import {
   batasBulanJakarta,
-  businessDateOf,
   combineJakartaDateAndTime,
   formatJamJakarta,
   startOfTodayJakarta,
@@ -653,7 +650,6 @@ export class ShiftsService {
     }
 
     const closedAt = new Date();
-    const businessDate = businessDateOf(closedAt);
 
     await this.prisma.$transaction(async (tx) => {
       for (const item of count.items) {
