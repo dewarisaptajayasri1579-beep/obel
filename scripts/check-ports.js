@@ -3,7 +3,7 @@
 // backend dies with EADDRINUSE and the web then talks to an old backend).
 //
 // Checks by connecting, not binding, so it works the same on Windows, macOS and Linux and has no
-// dependencies (the root package has none besides concurrently).
+// dependencies (the root package has none).
 const net = require('node:net');
 
 // Defaults of the two apps (backend PORT in backend/.env.example, `next dev`).
