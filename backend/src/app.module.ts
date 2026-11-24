@@ -22,7 +22,6 @@ import { ShiftTemplatesModule } from './modules/shift-templates/shift-templates.
 import { StockOpnameModule } from './modules/stock-opname/stock-opname.module';
 import { StockAdjustmentsModule } from './modules/stock-adjustments/stock-adjustments.module';
 import { ReconciliationCasesModule } from './modules/reconciliation-cases/reconciliation-cases.module';
-import { OwnerModule } from './modules/owner/owner.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CompanyProfileModule } from './modules/company-profile/company-profile.module';
 import { BoothShiftAssignmentsModule } from './modules/booth-shift-assignments/booth-shift-assignments.module';
@@ -56,7 +55,6 @@ import { AccessRolesModule } from './modules/access-roles/access-roles.module';
     StockOpnameModule,
     StockAdjustmentsModule,
     ReconciliationCasesModule,
-    OwnerModule,
     NotificationsModule,
     CompanyProfileModule,
     AppSettingsModule,
