@@ -24,12 +24,13 @@ Obbel Coffee & Milk — stock, sales, and booth-monitoring platform for a mobile
 - `npm run start:dev` — run API with ts-node-dev (hot reload).
 - `npm run build` / `npm run start` — compile to `dist` and run.
 - `npm run prisma:generate` — regenerate Prisma client after schema changes.
-- `npm run prisma:migrate` — `prisma migrate dev`. **Do not run it against the shared dev database**: `obel-db` on Coolify is also used by production, and `migrate dev` may ask to reset it on drift. Write the migration SQL by hand in `prisma/migrations/<timestamp>_<name>/migration.sql` and apply it with `npm run prisma:deploy`.
-- `npm run prisma:deploy` — apply pending migrations (the only way to apply migrations to the shared database). Never delete an applied migration folder, even one that is reverted by a later migration; Prisma treats a missing folder as drift.
+- `npm run prisma:migrate` — `prisma migrate dev`. **Local database only.** `obbel-db` on Coolify is production (client data): never point a local `.env` at it, and never run `migrate dev` there (it may ask to reset on drift). Migrations reach production only through `prisma migrate deploy`, which the backend Dockerfile runs on every Coolify deploy.
+- `npm run prisma:deploy` — apply pending migrations (use it for `obbel_test`). Never delete an applied migration folder, even one that is reverted by a later migration; Prisma treats a missing folder as drift.
 - `npm run prisma:seed` — run `prisma/seed.ts`.
 - `npm test` — unit tests (`jest --config jest.config.json`).
 - `npm run test:e2e` — e2e tests (`jest --config test/jest-e2e.json --runInBand`); run a single e2e file with `npm run test:e2e -- test/correction-flows.e2e-spec.ts`.
 - Requires `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT` (see `.env.example`); default `PORT=4000`.
+- Local databases (PostgreSQL 18): `obbel_dev` for `npm run dev` (`.env`) and `obbel_test` for e2e (`.env.test`, loaded by `test/jest-e2e.setup.ts`). Create each with `CREATE DATABASE <name> ENCODING 'UTF8' TEMPLATE template0;`, then `npm run prisma:deploy` and `npm run prisma:seed` (dummy logins `admin`, `owner`, `booth01`, password `obbel123`; e2e depends on them).
 
 ### Admin web (`apps/admin_web/`)
 - `npm run dev` — Next.js dev server.
