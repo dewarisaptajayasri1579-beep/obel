@@ -3,11 +3,8 @@ import {
   BadRequestException,
   Controller,
   Delete,
-  FileTypeValidator,
   Get,
-  MaxFileSizeValidator,
   Param,
-  ParseFilePipe,
   Patch,
   Post,
   Req,
@@ -16,10 +13,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { randomUUID } from 'crypto';
-import { diskStorage } from 'multer';
-import { mkdirSync } from 'fs';
-import { extname, join } from 'path';
 import type { Request } from 'express';
 import { UserRole, AccessLevel } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -32,9 +25,7 @@ import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 import { Menu, Lookup } from '../../common/access/menu-access.decorator';
-
-const productUploadDir = join(process.cwd(), 'uploads', 'products');
-mkdirSync(productUploadDir, { recursive: true });
+import { imageFilePipe, imageUploadOptions, publicUploadUrl } from '../../common/image-upload';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -97,41 +88,9 @@ export class ProductsController {
   @Post('upload-image')
   @Menu('PRODUK', AccessLevel.MANAGE)
   @Roles(UserRole.ADMIN)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: productUploadDir,
-        filename: (_request, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
-        },
-      }),
-      limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_request, file, callback) => {
-        if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
-          callback(new BadRequestException('Foto produk harus berupa JPG, PNG, WEBP, atau GIF.'), false);
-          return;
-        }
-        callback(null, true);
-      },
-    }),
-  )
-  uploadImage(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({
-            fileType: /^image\/(jpeg|png|webp|gif)$/,
-            skipMagicNumbersValidation: true,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
-    @Req() request: Request,
-  ) {
-    const publicBaseUrl = (process.env.PUBLIC_API_URL ?? `${request.protocol}://${request.get('host')}`).replace(/\/$/, '');
-    return { imageUrl: `${publicBaseUrl}/uploads/products/${file.filename}` };
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions('products', 'Foto produk')))
+  uploadImage(@UploadedFile(imageFilePipe()) file: Express.Multer.File, @Req() request: Request) {
+    return { imageUrl: publicUploadUrl(request, 'products', file.filename) };
   }
 
   @Patch(':id')

@@ -7,12 +7,22 @@ import { extname, join } from 'path';
 import type { Request } from 'express';
 
 const MAKS_UKURAN = 5 * 1024 * 1024;
-const TIPE_GAMBAR = /^image\/(jpeg|png|webp|gif)$/;
 
-/// Foto yang diunggah petugas dari HP (selfie absen, bukti bayar QRIS).
+export interface ImageTypes {
+  pattern: RegExp;
+  label: string;
+}
+const TIPE_GAMBAR: ImageTypes = { pattern: /^image\/(jpeg|png|webp|gif)$/, label: 'JPG, PNG, WEBP, atau GIF' };
+/// pdfkit & ExcelJS (kop dokumen cetak di *-report.service.ts) tidak mendukung WEBP/GIF.
+export const TIPE_GAMBAR_CETAK: ImageTypes = {
+  pattern: /^image\/(jpeg|png)$/,
+  label: 'JPG atau PNG (dipakai di dokumen cetak, WEBP/GIF tidak didukung)',
+};
+
+/// Gambar yang diunggah (selfie absen, bukti bayar, foto produk, QRIS booth, logo).
 /// Disimpan di `uploads/<subdir>/<uuid>.<ext>` — folder `uploads` di-serve
 /// statis oleh main.ts dan di production berupa persistent volume.
-export function imageUploadOptions(subdir: string, label: string): MulterOptions {
+export function imageUploadOptions(subdir: string, label: string, types = TIPE_GAMBAR): MulterOptions {
   const dir = join(process.cwd(), 'uploads', subdir);
   mkdirSync(dir, { recursive: true });
   return {
@@ -24,8 +34,8 @@ export function imageUploadOptions(subdir: string, label: string): MulterOptions
     }),
     limits: { fileSize: MAKS_UKURAN },
     fileFilter: (_request, file, callback) => {
-      if (!TIPE_GAMBAR.test(file.mimetype)) {
-        callback(new BadRequestException(`${label} harus berupa JPG, PNG, WEBP, atau GIF.`), false);
+      if (!types.pattern.test(file.mimetype)) {
+        callback(new BadRequestException(`${label} harus berupa ${types.label}.`), false);
         return;
       }
       callback(null, true);
@@ -33,11 +43,11 @@ export function imageUploadOptions(subdir: string, label: string): MulterOptions
   };
 }
 
-export const imageFilePipe = () =>
+export const imageFilePipe = (types = TIPE_GAMBAR) =>
   new ParseFilePipe({
     validators: [
       new MaxFileSizeValidator({ maxSize: MAKS_UKURAN }),
-      new FileTypeValidator({ fileType: TIPE_GAMBAR, skipMagicNumbersValidation: true }),
+      new FileTypeValidator({ fileType: types.pattern, skipMagicNumbersValidation: true }),
     ],
   });
 
