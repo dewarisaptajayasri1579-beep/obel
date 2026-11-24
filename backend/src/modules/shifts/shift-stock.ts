@@ -1,4 +1,7 @@
 import { Prisma, PrismaClient, ShiftStatus, StockMovementType } from '@prisma/client';
+import { nomorMovementBerikutnya } from '../../common/doc-no';
+import { DomainError } from '../../common/domain-error';
+import { businessDateOf } from '../../common/jakarta-date';
 import { dampakMutasi } from '../stock-movements/arah.util';
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -63,4 +66,50 @@ export async function stokUntukCheckOut(
     productId: s.productId,
     qtyOnHand: Math.max(0, s.qtyOnHand - (milikLain.get(s.productId) ?? 0)),
   }));
+}
+
+/// Absen Tiba di booth lain dari roster: stok yang dibawa Barista dari Gudang (diterima setelah
+/// Berangkat, tercatat di booth lama) ikut pindah ke booth baru. Ditulis sebagai dua ADJUSTMENT
+/// (keluar dari booth lama, masuk ke booth baru) ber-shiftSessionId, supaya buku besar kedua booth
+/// tetap bisa direkonsiliasi dan laporan shift menghitungnya sebagai Stok Awal. Dipanggil di dalam
+/// transaksi Absen Tiba, SEBELUM boothId shift diganti.
+export async function pindahkanStokShift(
+  tx: Prisma.TransactionClient,
+  shift: { id: string; boothId: string },
+  boothBaruId: string,
+  actorId: string,
+  now: Date,
+) {
+  const stok = await stokMilikShift(tx, shift);
+  for (const [productId, qty] of stok) {
+    if (qty <= 0) continue;
+    const turun = await tx.boothStock.updateMany({
+      where: { boothId: shift.boothId, productId, qtyOnHand: { gte: qty } },
+      data: { qtyOnHand: { decrement: qty }, version: { increment: 1 } },
+    });
+    if (turun.count !== 1) {
+      throw new DomainError('INSUFFICIENT_STOCK', 'Stok booth asal tidak cocok dengan stok yang Anda terima. Hubungi Admin.', { productId });
+    }
+    await tx.boothStock.upsert({
+      where: { boothId_productId: { boothId: boothBaruId, productId } },
+      create: { boothId: boothBaruId, productId, qtyOnHand: qty },
+      update: { qtyOnHand: { increment: qty }, version: { increment: 1 } },
+    });
+    const bersama = {
+      movementType: StockMovementType.ADJUSTMENT,
+      productId,
+      qty,
+      referenceId: shift.id,
+      businessDate: businessDateOf(now),
+      occurredAt: now,
+      createdBy: actorId,
+      shiftSessionId: shift.id,
+    };
+    await tx.stockMovement.create({
+      data: { ...bersama, movementNo: await nomorMovementBerikutnya(tx, 'MOV'), fromBoothId: shift.boothId, referenceType: 'shift_booth_move_out' },
+    });
+    await tx.stockMovement.create({
+      data: { ...bersama, movementNo: await nomorMovementBerikutnya(tx, 'MOV'), toBoothId: boothBaruId, referenceType: 'shift_booth_move_in' },
+    });
+  }
 }

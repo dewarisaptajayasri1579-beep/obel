@@ -1,12 +1,8 @@
-import { IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsLatitude, IsLongitude, IsString, MinLength } from 'class-validator';
 
+/// Absen Berangkat di Gudang. Booth tidak dipilih di sini: shift dibuka di Booth roster staff,
+/// dan Barista memilih booth (boleh selain roster) saat Absen Tiba.
 export class CheckInDto {
-  /// Override manual — kosong berarti pakai Booth dari BoothShiftAssignment
-  /// milik staff yang login.
-  @IsOptional()
-  @IsUUID()
-  boothId?: string;
-
   /// GPS + foto selfie absen Berangkat — divalidasi radius terhadap Gudang
   /// (ShiftsService.periksaLokasi, BR-042).
   @IsLatitude()

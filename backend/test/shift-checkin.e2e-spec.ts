@@ -154,21 +154,22 @@ describe('Shift check-in (e2e)', () => {
     expect(second.body.shiftSessionId).toBe(first.body.shiftSessionId);
   });
 
-  it('rejects checking in to a different booth while already active elsewhere', async () => {
+  it('Berangkat no longer takes a booth: it always opens at the roster booth', async () => {
     const token = await createFreshBoothStaff();
     await assignBooth(token, boothId);
 
-    const first = await request(app.getHttpServer())
+    // The booth is chosen at Absen Tiba now; the field is rejected by validation.
+    await request(app.getHttpServer())
+      .post('/shifts/check-in')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...SAMPLE_CHECKIN_LOCATION, boothId: otherBoothId })
+      .expect(400);
+
+    const checkIn = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
       .send(SAMPLE_CHECKIN_LOCATION)
       .expect(201);
-
-    const second = await request(app.getHttpServer())
-      .post('/shifts/check-in')
-      .set('Authorization', `Bearer ${first.body.accessToken}`)
-      .send({ ...SAMPLE_CHECKIN_LOCATION, boothId: otherBoothId })
-      .expect(400);
-    expect(second.body.code).toBe('ALREADY_CHECKED_IN_ELSEWHERE');
+    expect(checkIn.body.booth.id).toBe(boothId);
   });
 });

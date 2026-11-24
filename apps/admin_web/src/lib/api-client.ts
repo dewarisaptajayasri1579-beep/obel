@@ -1903,11 +1903,12 @@ export const api = {
 
   getMyAssignment: () => request<MyBoothShiftAssignment | null>("/booth-shift-assignments/mine"),
   getActiveShift: () => request<ActiveShift>("/shifts/active"),
-  checkIn: (input: { boothId?: string; latitude: number; longitude: number; photoUrl: string }) =>
+  checkIn: (input: { latitude: number; longitude: number; photoUrl: string }) =>
     request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
   uploadAttendancePhoto: (file: File) => uploadPhoto("/shifts/attendance/photo", file),
   /// Absen Tiba di Booth & Kembali di Gudang (BR-042).
-  arriveAtBooth: (shiftSessionId: string, input: { latitude: number; longitude: number; photoUrl: string }) =>
+  /// `boothId` kosong = booth jadwal; booth lain → stok yang dibawa ikut pindah, token baru dikembalikan.
+  arriveAtBooth: (shiftSessionId: string, input: { latitude: number; longitude: number; photoUrl: string; boothId?: string }) =>
     request<ActiveShift>(`/shifts/${shiftSessionId}/arrive`, { method: "POST", body: input }),
   returnToWarehouse: (shiftSessionId: string, input: { latitude: number; longitude: number; photoUrl: string }) =>
     request<{ shiftSessionId: string; returnedAt: string }>(`/shifts/${shiftSessionId}/return`, { method: "POST", body: input }),

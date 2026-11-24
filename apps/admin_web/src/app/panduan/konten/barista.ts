@@ -44,13 +44,12 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     tanpaShift: true,
     gambar: [
       { file: "barista-berangkat-1.webp", keterangan: "Konfirmasi Lokasi Anda dan Ambil Foto Selfie." },
-      { file: "barista-berangkat-2.webp", keterangan: "Pilih Booth dan Konfirmasi Data Anda sebelum KONFIRMASI BERANGKAT." },
+      { file: "barista-berangkat-2.webp", keterangan: "Konfirmasi Data Anda sebelum KONFIRMASI BERANGKAT." },
     ],
     langkah: [
       { judul: "Ambil lokasi", isi: "Ketuk Ambil Lokasi Saya. Pastikan Anda berada di Gudang." },
       { judul: "Ambil foto selfie", isi: "Ketuk Ambil Foto, lalu potret wajah Anda dengan jelas." },
-      { judul: "Periksa Booth", isi: "Booth tugas Anda sudah terpilih. Ketuk pilihan Booth bila hari ini bekerja di Booth lain." },
-      { judul: "Konfirmasi", isi: "Periksa Nama, Booth, Shift, dan Uang jalan, lalu ketuk KONFIRMASI BERANGKAT." },
+      { judul: "Konfirmasi", isi: "Periksa Nama, Booth jadwal, Shift, dan Uang jalan, lalu ketuk KONFIRMASI BERANGKAT. Booth tempat bertugas dipilih saat Absen Tiba." },
     ],
     perhatian: [
       // BR-042: absen 4 titik, radius dari Gudang (ShiftsService.periksaLokasi).
@@ -63,15 +62,18 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     kode: "barista-tiba",
     peran: "barista",
     judul: "Absen Tiba di Booth",
-    ringkasan: "Absen begitu sampai di Booth. Absen ini membuka tombol CHECK OUT.",
-    gambar: [{ file: "barista-tiba-1.webp", keterangan: "Konfirmasi lokasi di Booth dan foto selfie." }],
+    ringkasan: "Absen begitu sampai di Booth. Absen ini membuka Kasir dan tombol CHECK OUT.",
+    gambar: [{ file: "barista-tiba-1.webp", keterangan: "Pilih Booth, konfirmasi lokasi di Booth, dan foto selfie." }],
     langkah: [
       { judul: "Buka absen tiba", isi: "Di Beranda, ketuk ABSEN TIBA DI BOOTH." },
+      { judul: "Pilih Booth", isi: "Booth jadwal sudah terpilih. Bila hari ini bertugas di Booth lain, ketuk pilihan Booth, pilih Booth-nya, lalu ketuk Ya, Pindah." },
       { judul: "Lokasi dan foto", isi: "Ketuk Ambil Lokasi Saya di area Booth, lalu Ambil Foto." },
       { judul: "Konfirmasi", isi: "Ketuk KONFIRMASI TIBA." },
     ],
     perhatian: [
-      { teks: "Absen hanya bisa dilakukan dalam radius Booth.", tingkat: "penting" },
+      { teks: "Absen hanya bisa dilakukan dalam radius Booth yang dipilih.", tingkat: "penting" },
+      // ShiftsService.arrive: pindah booth memindahkan stok yang dibawa; ditolak bila ada kiriman/restock menggantung.
+      { teks: "Bila memilih Booth lain, stok yang Anda bawa ikut pindah ke Booth itu. Terima dulu semua kiriman stok sebelum Absen Tiba.", tingkat: "info" },
       // ShiftsService.arrive + SalesService.pastikanSudahTiba: Kasir menunggu Absen Tiba.
       { teks: "Kasir dan Check-Out baru bisa dipakai setelah Absen Tiba.", tingkat: "info" },
     ],

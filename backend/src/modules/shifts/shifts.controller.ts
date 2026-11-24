@@ -9,6 +9,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { AttendanceDto } from './dto/attendance.dto';
+import { ArriveDto } from './dto/arrive.dto';
 import { CheckInDto } from './dto/check-in.dto';
 import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
@@ -77,7 +78,7 @@ export class ShiftsController {
 
   @Post(':id/arrive')
   @Roles(UserRole.BOOTH_STAFF)
-  arrive(@Param('id') id: string, @Body() dto: AttendanceDto, @CurrentUser() user: JwtPayload) {
+  arrive(@Param('id') id: string, @Body() dto: ArriveDto, @CurrentUser() user: JwtPayload) {
     return this.shiftsService.arrive(user, id, dto);
   }
 

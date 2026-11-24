@@ -153,6 +153,8 @@ const KETERANGAN: Record<string, string> = {
   stock_adjustment_in: 'Adjustment stok',
   stock_adjustment_out: 'Adjustment stok',
   stock_write_off_out: 'Pemusnahan reject',
+  shift_booth_move_out: 'Pindah booth saat Tiba',
+  shift_booth_move_in: 'Pindah booth saat Tiba',
   stock_adjustment_reversal: 'Pembatalan adjustment',
   stock_adjustment_reversal_in: 'Pembatalan adjustment',
   stock_adjustment_reversal_out: 'Pembatalan adjustment',

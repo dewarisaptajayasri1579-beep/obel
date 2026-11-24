@@ -31,7 +31,8 @@ import { LocationPingDto } from './dto/location-ping.dto';
 import { ConfirmClosingDto } from './dto/confirm-closing.dto';
 import { ConfirmCashDepositDto } from './dto/confirm-cash-deposit.dto';
 import { CorrectShiftDto } from './dto/correct-shift.dto';
-import { stokUntukCheckOut } from './shift-stock';
+import { pindahkanStokShift, stokUntukCheckOut } from './shift-stock';
+import { ArriveDto } from './dto/arrive.dto';
 
 const UNIQUE_VIOLATION = 'P2002';
 
@@ -109,11 +110,10 @@ export class ShiftsService {
   }
 
   /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
-  /// duluan, jadi langsung create berstatus OPEN). Booth default diambil dari
-  /// BoothShiftAssignment staff ybs (roster tetap Booth+Shift per staff),
-  /// `dto.boothId` boleh override manual. Idempotent terhadap double-tap:
-  /// kalau staff SUDAH aktif di Booth yang sama, kembalikan session yang
-  /// sudah ada apa adanya alih-alih membuat baris baru. Guard ini sudah
+  /// duluan, jadi langsung create berstatus OPEN) di Booth roster staff ybs
+  /// (BoothShiftAssignment). Booth tempat bertugas dipilih saat Absen Tiba (arrive).
+  /// Idempotent terhadap double-tap: kalau staff SUDAH aktif, kembalikan session
+  /// yang sudah ada apa adanya alih-alih membuat baris baru. Guard ini sudah
   /// dijamin race-safe di level DB juga lewat partial unique index
   /// (shift_sessions_one_active_per_staff, migration
   /// 20260922165212_shift_session_checkin) — kalau dua request check-in
@@ -125,12 +125,6 @@ export class ShiftsService {
       include: { booth: true, shiftTemplate: true },
     });
     if (existing) {
-      if (dto.boothId && dto.boothId !== existing.boothId) {
-        throw new DomainError(
-          'ALREADY_CHECKED_IN_ELSEWHERE',
-          `Anda masih aktif di Booth "${existing.booth.name}". Checkout dulu sebelum check-in ke Booth lain.`,
-        );
-      }
       return this.toActiveShiftResponse(existing, await this.reissueToken(user, existing.boothId));
     }
 
@@ -158,7 +152,7 @@ export class ShiftsService {
       );
     }
 
-    const boothId = dto.boothId ?? assignment.boothId;
+    const boothId = assignment.boothId;
     const booth = await this.prisma.booth.findUnique({ where: { id: boothId } });
     if (!booth || booth.status !== 'ACTIVE') {
       throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
@@ -203,10 +197,13 @@ export class ShiftsService {
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
   }
 
-  /// Absen Tiba di Booth (BR-042) — wajib sebelum Kasir dan Check-Out.
-  /// Idempotent: kalau sudah tiba, kembalikan shift apa adanya.
-  async arrive(user: JwtPayload, shiftSessionId: string, dto: AttendanceDto) {
-    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include: { booth: true, shiftTemplate: true } });
+  /// Absen Tiba di Booth (BR-042) — wajib sebelum Kasir dan Check-Out. Barista memilih booth
+  /// tempat bertugas (default booth roster); booth lain → lokasi dicek terhadap booth itu dan stok
+  /// yang dibawa dari Gudang ikut pindah (pindahkanStokShift). Idempotent: kalau sudah tiba,
+  /// kembalikan shift apa adanya.
+  async arrive(user: JwtPayload, shiftSessionId: string, dto: ArriveDto) {
+    const include = { booth: true, shiftTemplate: true } as const;
+    const shift = await this.prisma.shiftSession.findUnique({ where: { id: shiftSessionId }, include });
     if (!shift || shift.staffId !== user.sub) {
       throw new DomainError('NOT_FOUND', 'Shift tidak ditemukan.');
     }
@@ -215,17 +212,51 @@ export class ShiftsService {
     }
     if (shift.arrivedAt) return this.toActiveShiftResponse(shift);
 
-    const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.ARRIVE, dto, this.acuanBooth(shift.booth));
+    const pindah = dto.boothId && dto.boothId !== shift.boothId;
+    const tujuan = pindah ? await this.prisma.booth.findUnique({ where: { id: dto.boothId } }) : shift.booth;
+    if (!tujuan || tujuan.status !== 'ACTIVE') {
+      throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
+    }
+    const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.ARRIVE, dto, this.acuanBooth(tujuan));
+    if (pindah) await this.pastikanBolehPindahBooth(shift);
+
+    const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
-      const hasil = await tx.shiftSession.update({
-        where: { id: shiftSessionId },
-        data: { arrivedAt: new Date(), arrivalLatitude: dto.latitude, arrivalLongitude: dto.longitude, arrivalPhotoUrl: dto.photoUrl },
-        include: { booth: true, shiftTemplate: true },
+      // Klaim Absen Tiba lebih dulu: dua request bersamaan tidak boleh memindahkan stok dua kali.
+      const diklaim = await tx.shiftSession.updateMany({
+        where: { id: shiftSessionId, arrivedAt: null },
+        data: { arrivedAt: now, arrivalLatitude: dto.latitude, arrivalLongitude: dto.longitude, arrivalPhotoUrl: dto.photoUrl },
       });
+      if (diklaim.count !== 1) return null;
+      if (pindah) {
+        await pindahkanStokShift(tx, shift, tujuan.id, user.sub, now);
+        await tx.shiftSession.update({ where: { id: shiftSessionId }, data: { boothId: tujuan.id } });
+      }
       if (lokasi.permitId) await this.permits.pakai(tx, lokasi.permitId, shiftSessionId);
-      return hasil;
+      return tx.shiftSession.findUniqueOrThrow({ where: { id: shiftSessionId }, include });
     });
-    return this.toActiveShiftResponse(updated);
+    if (!updated) {
+      return this.toActiveShiftResponse(await this.prisma.shiftSession.findUniqueOrThrow({ where: { id: shiftSessionId }, include }));
+    }
+    // Token membawa boothId: setelah pindah booth, endpoint Barista (Kasir, Stok, Terima Stok) harus ikut booth baru.
+    return this.toActiveShiftResponse(updated, pindah ? await this.reissueToken(user, tujuan.id) : undefined);
+  }
+
+  /// Stok yang masih di jalan ke booth lama tidak bisa diterima setelah pindah (penerimaan dicek
+  /// terhadap booth di token), jadi harus diselesaikan dulu.
+  private async pastikanBolehPindahBooth(shift: { staffId: string; boothId: string }) {
+    const [kirimanMenunggu, restockMenunggu] = await Promise.all([
+      this.prisma.stockDistribution.count({
+        where: { boothId: shift.boothId, status: 'SENT', OR: [{ sentToId: shift.staffId }, { sentToId: null }] },
+      }),
+      this.prisma.restockRequest.count({ where: { boothId: shift.boothId, requestedById: shift.staffId, status: 'REQUESTED' } }),
+    ]);
+    if (kirimanMenunggu > 0) {
+      throw new DomainError('PENDING_STOCK_HANDOVER', 'Masih ada kiriman stok yang belum Anda terima. Terima dulu di menu Terima Stok.');
+    }
+    if (restockMenunggu > 0) {
+      throw new DomainError('PENDING_RESTOCK_REQUEST', 'Masih ada pengajuan restock yang belum diproses Admin untuk booth jadwal Anda.');
+    }
   }
 
   /// Absen Kembali di Gudang (BR-042) — setelah Check-Out; baru sesudahnya Admin
@@ -944,11 +975,12 @@ export class ShiftsService {
     // di stock-handovers.service.ts, dikenali dari referenceId (= distribution
     // id) movement WAREHOUSE_TO_BOOTH yang occurredAt-nya paling awal di
     // antara movement shift ini. Kiriman berikutnya (referenceId lain) baru
-    // dihitung Restock.
+    // dihitung Restock. Tidak dibatasi ke booth shift saat ini: Barista yang
+    // pindah booth saat Absen Tiba menerima Stok Awal-nya di booth roster.
     let referenceIdAwal: string | null = null;
     let waktuAwal: Date | null = null;
     for (const m of movements) {
-      if (m.movementType !== StockMovementType.WAREHOUSE_TO_BOOTH || m.toBoothId !== shift.boothId) continue;
+      if (m.movementType !== StockMovementType.WAREHOUSE_TO_BOOTH || !m.toBoothId) continue;
       if (!waktuAwal || m.occurredAt < waktuAwal) {
         waktuAwal = m.occurredAt;
         referenceIdAwal = m.referenceId;

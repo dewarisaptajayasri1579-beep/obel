@@ -21,6 +21,7 @@ export function AbsenScreen({
   tempat,
   submitLabel,
   onSubmit,
+  before,
   children,
 }: {
   title: string;
@@ -29,6 +30,8 @@ export function AbsenScreen({
   submitLabel: string;
   /// Dipanggil dengan lokasi + URL foto yang sudah diunggah; lempar ApiError kalau gagal.
   onSubmit: (input: { latitude: number; longitude: number; photoUrl: string }) => Promise<void>;
+  /// Isi di atas lokasi & foto, mis. pilihan booth di Absen Tiba (lokasi dicek terhadap booth itu).
+  before?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const toast = useToast();
@@ -70,6 +73,8 @@ export function AbsenScreen({
 
       <div className="px-4 -mt-2 flex flex-col gap-4">
         {ditolak && <PanelLokasiDitolak penolakan={ditolak} tempat={tempat} />}
+
+        {before}
 
         <AttendanceCapture
           tempat={tempat}
