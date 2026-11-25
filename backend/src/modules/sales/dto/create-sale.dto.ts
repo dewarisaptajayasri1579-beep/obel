@@ -24,6 +24,11 @@ export class SaleItemDto {
   @IsUUID()
   productId!: string;
 
+  /// Wajib bila produk punya varian aktif (SalesService.pastikanVarian).
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
   @IsInt()
   @Min(1)
   qty!: number;

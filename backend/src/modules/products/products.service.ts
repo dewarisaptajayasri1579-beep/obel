@@ -6,10 +6,31 @@ import { ActivityLogService } from '../../common/activity-log.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductVariantDto } from './dto/product-variant.dto';
 
 /// Awalan kode barang. Bukan angka ajaib yang tersebar: satu-satunya tempat
 /// pola kode produk didefinisikan.
 const SKU_PREFIX = 'OBL';
+
+const INCLUDE_PRODUK = {
+  category: true,
+  variants: { where: { deletedAt: null }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
+} satisfies Prisma.ProductInclude;
+
+function keResponsProduk(p: Prisma.ProductGetPayload<{ include: typeof INCLUDE_PRODUK }>) {
+  return {
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    category: p.category?.name ?? null,
+    sellPrice: Number(p.sellPrice),
+    imageUrl: p.imageUrl,
+    active: p.active,
+    minimumQty: p.minimumQty,
+    criticalQty: p.criticalQty,
+    variants: p.variants.map((v) => ({ id: v.id, name: v.name, active: v.active })),
+  };
+}
 
 @Injectable()
 export class ProductsService {
@@ -23,22 +44,12 @@ export class ProductsService {
       // Soft-deleted tidak pernah tampil di daftar biasa — lihat AGENTS.md
       // "Aturan Soft Delete". Nonaktif TETAP tampil, hanya digeser ke bawah.
       where: { deletedAt: null },
-      include: { category: true },
+      include: INCLUDE_PRODUK,
       // active DESC dulu: nonaktif otomatis ke bawah pada urutan bawaan,
       // tanpa pemakai perlu memilih sortir apa pun.
       orderBy: [{ active: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
-    return products.map((p) => ({
-      id: p.id,
-      sku: p.sku,
-      name: p.name,
-      category: p.category?.name ?? null,
-      sellPrice: Number(p.sellPrice),
-      imageUrl: p.imageUrl,
-      active: p.active,
-      minimumQty: p.minimumQty,
-      criticalQty: p.criticalQty,
-    }));
+    return products.map(keResponsProduk);
   }
 
   /// `productCount` counts only products that are not soft-deleted, the same
@@ -229,24 +240,14 @@ export class ProductsService {
       note: `Produk ${product.sku} "${product.name}" dibuat.`,
     });
 
-    return {
-      id: product.id,
-      sku: product.sku,
-      name: product.name,
-      category: product.category?.name ?? null,
-      sellPrice: Number(product.sellPrice),
-      imageUrl: product.imageUrl,
-      active: product.active,
-      minimumQty: product.minimumQty,
-      criticalQty: product.criticalQty,
-    };
+    return keResponsProduk(product);
   }
 
-  private async buatDenganKodeUnik(dto: CreateProductDto, percobaan = 0): Promise<Prisma.ProductGetPayload<{ include: { category: true } }>> {
+  private async buatDenganKodeUnik(dto: CreateProductDto, percobaan = 0): Promise<Prisma.ProductGetPayload<{ include: typeof INCLUDE_PRODUK }>> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const sku = dto.sku ?? (await this.kodeBerikutnya(tx));
-        return tx.product.create({
+        const product = await tx.product.create({
           data: {
             sku,
             name: dto.name,
@@ -254,8 +255,9 @@ export class ProductsService {
             sellPrice: BigInt(dto.sellPrice),
             imageUrl: dto.imageUrl,
           },
-          include: { category: true },
         });
+        if (dto.variants?.length) await this.sinkronkanVarian(tx, product.id, dto.variants);
+        return tx.product.findUniqueOrThrow({ where: { id: product.id }, include: INCLUDE_PRODUK });
       });
     } catch (err) {
       const bentrokKode =
@@ -280,18 +282,24 @@ export class ProductsService {
       await this.pastikanBisaDinonaktifkan(existing.id, existing.name);
     }
 
-    const product = await this.prisma.product.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        categoryId: dto.categoryId,
-        sellPrice: dto.sellPrice !== undefined ? BigInt(dto.sellPrice) : undefined,
-        active: dto.active,
-        imageUrl: dto.imageUrl,
-        minimumQty: dto.minimumQty,
-        criticalQty: dto.criticalQty,
-      },
-      include: { category: true },
+    const { product, perubahanVarian } = await this.prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          categoryId: dto.categoryId,
+          sellPrice: dto.sellPrice !== undefined ? BigInt(dto.sellPrice) : undefined,
+          active: dto.active,
+          imageUrl: dto.imageUrl,
+          minimumQty: dto.minimumQty,
+          criticalQty: dto.criticalQty,
+        },
+      });
+      const perubahanVarian = dto.variants ? await this.sinkronkanVarian(tx, id, dto.variants) : [];
+      return {
+        product: await tx.product.findUniqueOrThrow({ where: { id }, include: INCLUDE_PRODUK }),
+        perubahanVarian,
+      };
     });
 
     // Diaktifkan/dinonaktifkan dicatat sebagai aksi TERSENDIRI ("ngapain"
@@ -317,18 +325,77 @@ export class ProductsService {
         note: `Produk ${product.sku} diperbarui.`,
       });
     }
+    if (perubahanVarian.length > 0) {
+      await this.activityLog.record(this.prisma, {
+        entityType: 'product',
+        entityId: product.id,
+        action: 'UPDATE',
+        actorId,
+        actorName,
+        note: `Varian produk ${product.sku}: ${perubahanVarian.join('; ')}.`,
+      });
+    }
 
-    return {
-      id: product.id,
-      sku: product.sku,
-      name: product.name,
-      category: product.category?.name ?? null,
-      sellPrice: Number(product.sellPrice),
-      imageUrl: product.imageUrl,
-      active: product.active,
-      minimumQty: product.minimumQty,
-      criticalQty: product.criticalQty,
-    };
+    return keResponsProduk(product);
+  }
+
+  /// Menyamakan Varian Rasa produk dengan daftar dari form (urutan daftar = urutan tampil).
+  /// Varian lama yang tidak dikirim lagi dihapus (soft) bila belum pernah terjual, atau
+  /// dinonaktifkan bila sudah: nota dan laporan lama tetap merujuk ke barisnya (AGENTS.md,
+  /// Aturan Soft Delete). Mengembalikan ringkasan perubahan untuk log aktivitas.
+  private async sinkronkanVarian(tx: Prisma.TransactionClient, productId: string, input: ProductVariantDto[]) {
+    const daftar = input.map((v) => ({ ...v, name: v.name.trim() }));
+    if (daftar.some((v) => !v.name)) {
+      throw new DomainError('VARIANT_NAME_REQUIRED', 'Nama varian wajib diisi.');
+    }
+    const namaDipakai = new Set<string>();
+    for (const v of daftar) {
+      const kunci = v.name.toLowerCase();
+      if (namaDipakai.has(kunci)) {
+        throw new DomainError('VARIANT_NAME_TAKEN', `Varian "${v.name}" ditulis dua kali.`, undefined, HttpStatus.CONFLICT);
+      }
+      namaDipakai.add(kunci);
+    }
+
+    const lama = await tx.productVariant.findMany({
+      where: { productId, deletedAt: null },
+      include: { _count: { select: { saleItems: true } } },
+    });
+    const lamaById = new Map(lama.map((v) => [v.id, v]));
+    const idDikirim = new Set(daftar.filter((v) => v.id).map((v) => v.id!));
+    const perubahan: string[] = [];
+
+    const dilepas = lama.filter((v) => !idDikirim.has(v.id));
+    // Varian terjual yang dilepas tetap ada (nonaktif) dan namanya tetap memegang index unik.
+    const kembar = dilepas.find((v) => v._count.saleItems > 0 && namaDipakai.has(v.name.toLowerCase()));
+    if (kembar) {
+      throw new DomainError('VARIANT_NAME_TAKEN', `Varian "${kembar.name}" sudah pernah terjual. Aktifkan lagi varian lamanya.`, undefined, HttpStatus.CONFLICT);
+    }
+    // Yang dilepas dulu, supaya nama varian terhapus bisa langsung dipakai lagi.
+    for (const v of dilepas) {
+      if (v._count.saleItems > 0) {
+        await tx.productVariant.update({ where: { id: v.id }, data: { active: false } });
+        if (v.active) perubahan.push(`${v.name} dinonaktifkan`);
+      } else {
+        await tx.productVariant.update({ where: { id: v.id }, data: { deletedAt: new Date() } });
+        perubahan.push(`${v.name} dihapus`);
+      }
+    }
+
+    for (const [urutan, v] of daftar.entries()) {
+      if (v.id) {
+        const sebelum = lamaById.get(v.id);
+        if (!sebelum) throw new DomainError('NOT_FOUND', 'Varian tidak ditemukan pada produk ini.', { variantId: v.id });
+        const aktif = v.active ?? sebelum.active;
+        await tx.productVariant.update({ where: { id: v.id }, data: { name: v.name, active: aktif, sortOrder: urutan } });
+        if (sebelum.name !== v.name) perubahan.push(`${sebelum.name} diganti nama jadi ${v.name}`);
+        if (sebelum.active !== aktif) perubahan.push(`${v.name} ${aktif ? 'diaktifkan' : 'dinonaktifkan'}`);
+      } else {
+        await tx.productVariant.create({ data: { productId, name: v.name, active: v.active ?? true, sortOrder: urutan } });
+        perubahan.push(`${v.name} ditambahkan`);
+      }
+    }
+    return perubahan;
   }
 
   /// Produk hanya boleh dinonaktifkan kalau sudah tidak beredar sama sekali:

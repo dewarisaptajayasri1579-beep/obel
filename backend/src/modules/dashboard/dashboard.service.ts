@@ -294,7 +294,10 @@ export class DashboardService {
     // getAdminDashboard/getBoothAktif di atas).
     const sales = effectiveByGroup(salesRaw);
 
-    const byProductMap = new Map<string, { productId: string; productName: string; cupSold: number }>();
+    const byProductMap = new Map<
+      string,
+      { productId: string; productName: string; cupSold: number; variants: Map<string, { name: string; cupSold: number }> }
+    >();
     const byBoothMap = new Map<string, { boothId: string; boothName: string; cupSold: number; omzet: number }>();
     const byStaffShiftMap = new Map<
       string,
@@ -310,9 +313,15 @@ export class DashboardService {
           productId: item.productId,
           productName: item.productNameSnapshot,
           cupSold: 0,
+          variants: new Map(),
         };
         cur.cupSold += item.qty;
         byProductMap.set(item.productId, cur);
+        if (item.variantNameSnapshot) {
+          const v = cur.variants.get(item.variantNameSnapshot) ?? { name: item.variantNameSnapshot, cupSold: 0 };
+          v.cupSold += item.qty;
+          cur.variants.set(item.variantNameSnapshot, v);
+        }
       }
 
       const booth = byBoothMap.get(sale.boothId) ?? {
@@ -344,7 +353,10 @@ export class DashboardService {
     }
 
     return {
-      byProduct: [...byProductMap.values()].sort((a, b) => b.cupSold - a.cupSold),
+      // Rincian per rasa (C9); kosong untuk produk tanpa varian.
+      byProduct: [...byProductMap.values()]
+        .sort((a, b) => b.cupSold - a.cupSold)
+        .map(({ variants, ...p }) => ({ ...p, variants: [...variants.values()].sort((a, b) => b.cupSold - a.cupSold) })),
       byBooth: [...byBoothMap.values()].sort((a, b) => b.omzet - a.omzet),
       byStaffShift: [...byStaffShiftMap.values()].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.omzet - a.omzet),
     };

@@ -6,6 +6,11 @@ export class RefundItemDto {
   @IsUUID()
   productId!: string;
 
+  /// Baris sale yang di-refund = produk + varian (null untuk produk tanpa varian).
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
   @IsInt()
   @Min(1)
   qty!: number;

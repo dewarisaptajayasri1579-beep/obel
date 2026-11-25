@@ -1,4 +1,6 @@
-import { IsInt, IsOptional, IsString, IsUUID, Min, MinLength, IsUrl } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsInt, IsOptional, IsString, IsUUID, Min, MinLength, IsUrl, ValidateNested } from 'class-validator';
+import { ProductVariantDto } from './product-variant.dto';
 
 export class CreateProductDto {
   /// Kode barang dibuat otomatis oleh server (`OBL-0001`). Klien BOLEH tidak
@@ -24,4 +26,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsUrl({ require_tld: false })
   imageUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants?: ProductVariantDto[];
 }

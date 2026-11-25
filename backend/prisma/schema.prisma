@@ -338,11 +338,34 @@ model Product {
   saleRefundItems     SaleRefundItem[]
   stockReceiptItems   StockReceiptItem[]
   staffLiabilities    StaffLiability[]
+  variants            ProductVariant[]
 
   @@index([categoryId])
   @@index([active])
   @@index([deletedAt])
   @@map("products")
+}
+
+/// Varian rasa sebuah produk (mis. Kopsu Rasa: Butterscotch), dipilih Barista saat jual.
+/// Hanya label penjualan: harga dan stok tetap milik produknya. Nama unik per produk
+/// tanpa membedakan huruf besar/kecil di antara varian yang belum dihapus (index parsial
+/// di migration 20261125120000_product_variants). Soft delete seperti Product.
+model ProductVariant {
+  id        String    @id @default(uuid())
+  productId String    @map("product_id")
+  product   Product   @relation(fields: [productId], references: [id])
+  name      String
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0) @map("sort_order")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  saleItems       SaleItem[]
+  saleRefundItems SaleRefundItem[]
+
+  @@index([productId])
+  @@map("product_variants")
 }
 
 /// Beban Ganti Rugi ke Petugas — dicatat Admin dari layar Koreksi
@@ -679,6 +702,11 @@ model SaleItem {
   productId           String  @map("product_id")
   product             Product @relation(fields: [productId], references: [id])
   productNameSnapshot String  @map("product_name_snapshot")
+  /// Varian rasa yang dipilih (null untuk produk tanpa varian); namanya di-snapshot
+  /// seperti productNameSnapshot supaya nota lama tetap terbaca bila varian diganti nama.
+  variantId           String?         @map("variant_id")
+  variant             ProductVariant? @relation(fields: [variantId], references: [id])
+  variantNameSnapshot String?         @map("variant_name_snapshot")
   unitPrice           BigInt  @map("unit_price")
   qty                 Int
   lineTotal           BigInt  @map("line_total")
@@ -736,6 +764,8 @@ model SaleRefundItem {
   saleRefund    SaleRefund @relation(fields: [saleRefundId], references: [id])
   productId     String     @map("product_id")
   product       Product    @relation(fields: [productId], references: [id])
+  variantId     String?         @map("variant_id")
+  variant       ProductVariant? @relation(fields: [variantId], references: [id])
   qty           Int
   unitPrice     BigInt     @map("unit_price")
   lineTotal     BigInt     @map("line_total")

@@ -82,7 +82,7 @@ describe('Draft payment (e2e)', () => {
     const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
     const harga = catalog.body.find((p: { id: string }) => p.id === productId).sellPrice as number;
     const itemDiharapkan = (qty: number) => [
-      { productId, productName: expect.any(String), unitPrice: harga, qty, lineTotal: harga * qty },
+      { productId, productName: expect.any(String), variantId: null, variantName: null, unitPrice: harga, qty, lineTotal: harga * qty },
     ];
 
     const langsung = await request(server())
@@ -125,7 +125,7 @@ describe('Draft payment (e2e)', () => {
     expect(baris.total).toBe(harga * 2 - 1000);
     expect(baris.staffName).toEqual(expect.any(String));
     expect(baris.items).toEqual([
-      { productId, productName: expect.any(String), qty: 2, unitPrice: harga, lineTotal: harga * 2 },
+      { productId, productName: expect.any(String), variantId: null, variantName: null, qty: 2, unitPrice: harga, lineTotal: harga * 2 },
     ]);
   });
 

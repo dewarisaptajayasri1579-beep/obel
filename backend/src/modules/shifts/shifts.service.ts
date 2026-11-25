@@ -1249,7 +1249,8 @@ export class ShiftsService {
     let total = 0;
     let cup = 0;
     const metode = { CASH: { count: 0, amount: 0 }, QRIS: { count: 0, amount: 0 } };
-    type Baris = { name: string; qty: number; amount: number };
+    type Rincian = { name: string; qty: number; amount: number };
+    type Baris = Rincian & { varian: Map<string, Rincian> };
     const kategori = new Map<string, { name: string; sortOrder: number; qty: number; amount: number; produk: Map<string, Baris> }>();
 
     for (const s of lunas) {
@@ -1273,10 +1274,16 @@ export class ShiftsService {
         }
         k.qty += it.qty;
         k.amount += Number(it.lineTotal);
-        const p = k.produk.get(it.productId) ?? { name: it.product.name, qty: 0, amount: 0 };
+        const p = k.produk.get(it.productId) ?? { name: it.product.name, qty: 0, amount: 0, varian: new Map() };
         p.qty += it.qty;
         p.amount += Number(it.lineTotal);
         k.produk.set(it.productId, p);
+        if (it.variantNameSnapshot) {
+          const v = p.varian.get(it.variantNameSnapshot) ?? { name: it.variantNameSnapshot, qty: 0, amount: 0 };
+          v.qty += it.qty;
+          v.amount += Number(it.lineTotal);
+          p.varian.set(it.variantNameSnapshot, v);
+        }
       }
     }
 
@@ -1307,7 +1314,10 @@ export class ShiftsService {
           name: k.name,
           qty: k.qty,
           amount: k.amount,
-          produk: [...k.produk.values()].sort((a, b) => a.name.localeCompare(b.name)),
+          produk: [...k.produk.values()]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            // Rincian per rasa (C9); kosong untuk produk tanpa varian.
+            .map(({ varian, ...p }) => ({ ...p, varian: [...varian.values()].sort((a, b) => a.name.localeCompare(b.name)) })),
         })),
     };
   }

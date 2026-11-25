@@ -48,6 +48,11 @@ function formatRupiah(n: bigint | number): string {
   return `Rp${n.toLocaleString('id-ID')}`;
 }
 
+/// Identitas satu baris sale: produk + varian rasa (kosong untuk produk tanpa varian).
+function kunciBaris(productId: string, variantId?: string | null): string {
+  return `${productId}|${variantId ?? ''}`;
+}
+
 @Injectable()
 export class SalesService {
   constructor(
@@ -96,6 +101,33 @@ export class SalesService {
     }
   }
 
+  /// Varian rasa tiap baris, sejajar dengan `items` (null = tanpa varian). Produk yang punya
+  /// varian aktif wajib memilih satu; varian harus milik produknya dan aktif. `bolehLama` berisi
+  /// kunciBaris dari sale lama (revisi): baris itu tetap sah walau variannya kini nonaktif atau
+  /// produknya baru diberi varian setelah sale dibuat.
+  private async varianPerBaris(items: { productId: string; variantId?: string }[], bolehLama = new Set<string>()) {
+    const semua = await this.prisma.productVariant.findMany({
+      where: { productId: { in: [...new Set(items.map((i) => i.productId))] }, deletedAt: null },
+    });
+    return items.map((item) => {
+      const lama = bolehLama.has(kunciBaris(item.productId, item.variantId));
+      if (!item.variantId) {
+        if (!lama && semua.some((v) => v.productId === item.productId && v.active)) {
+          throw new DomainError('VARIANT_REQUIRED', 'Pilih rasa untuk produk ini.', { productId: item.productId });
+        }
+        return null;
+      }
+      const varian = semua.find((v) => v.id === item.variantId);
+      if (!varian || varian.productId !== item.productId || (!varian.active && !lama)) {
+        throw new DomainError('VARIANT_INVALID', 'Rasa yang dipilih tidak tersedia untuk produk ini.', {
+          productId: item.productId,
+          variantId: item.variantId,
+        });
+      }
+      return varian;
+    });
+  }
+
   async createPaidSale(user: JwtPayload, dto: CreateSaleDto) {
     const existing = await this.prisma.sale.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
@@ -136,6 +168,7 @@ export class SalesService {
         );
       }
     }
+    const varian = await this.varianPerBaris(dto.items);
 
     const saleId = randomUUID();
     const paidAt = new Date();
@@ -188,6 +221,8 @@ export class SalesService {
           saleId,
           productId: item.productId,
           productNameSnapshot: product.name,
+          variantId: varian[index]?.id ?? null,
+          variantNameSnapshot: varian[index]?.name ?? null,
           unitPrice: product.sellPrice,
           qty: item.qty,
           lineTotal,
@@ -353,11 +388,13 @@ export class SalesService {
       }
     }
 
+    const varian = await this.varianPerBaris(dto.items);
+
     const saleId = randomUUID();
 
     let subtotal = 0n;
     const saleItemsData: Prisma.SaleItemCreateManyInput[] = [];
-    for (const item of dto.items) {
+    for (const [index, item] of dto.items.entries()) {
       const product = productById.get(item.productId)!;
       const lineTotal = product.sellPrice * BigInt(item.qty);
       subtotal += lineTotal;
@@ -366,6 +403,8 @@ export class SalesService {
         saleId,
         productId: item.productId,
         productNameSnapshot: product.name,
+        variantId: varian[index]?.id ?? null,
+        variantNameSnapshot: varian[index]?.name ?? null,
         unitPrice: product.sellPrice,
         qty: item.qty,
         lineTotal,
@@ -669,6 +708,8 @@ export class SalesService {
         items: s.items.map((item) => ({
           productId: item.productId,
           productName: item.productNameSnapshot,
+          variantId: item.variantId,
+          variantName: item.variantNameSnapshot,
           qty: item.qty,
           unitPrice: Number(item.unitPrice),
           lineTotal: Number(item.lineTotal),
@@ -819,6 +860,8 @@ export class SalesService {
       items: sale.items.map((i) => ({
         productId: i.productId,
         productName: i.productNameSnapshot,
+        variantId: i.variantId,
+        variantName: i.variantNameSnapshot,
         unitPrice: Number(i.unitPrice),
         qty: i.qty,
         lineTotal: Number(i.lineTotal),
@@ -1222,11 +1265,13 @@ export class SalesService {
     }
     this.corrections.validateReason(dto.reasonCode, dto.reasonNote);
 
-    const itemBySale = new Map(sale.items.map((i) => [i.productId, i]));
-    const alreadyRefundedByProduct = new Map<string, number>();
+    // Per baris sale (produk + varian): refund satu rasa tidak boleh memakan jatah rasa lain.
+    const itemBySale = new Map(sale.items.map((i) => [kunciBaris(i.productId, i.variantId), i]));
+    const alreadyRefundedByLine = new Map<string, number>();
     for (const refund of sale.refunds) {
       for (const item of refund.items) {
-        alreadyRefundedByProduct.set(item.productId, (alreadyRefundedByProduct.get(item.productId) ?? 0) + item.qty);
+        const kunci = kunciBaris(item.productId, item.variantId);
+        alreadyRefundedByLine.set(kunci, (alreadyRefundedByLine.get(kunci) ?? 0) + item.qty);
       }
     }
 
@@ -1235,11 +1280,17 @@ export class SalesService {
     const stockDeltas: { productId: string; qty: number }[] = [];
 
     for (const item of dto.items) {
-      const saleItem = itemBySale.get(item.productId);
+      const kunci = kunciBaris(item.productId, item.variantId);
+      const saleItem = itemBySale.get(kunci);
       if (!saleItem) {
-        throw new DomainError('PRODUCT_NOT_IN_SALE', 'Produk ini tidak ada di sale asli.', { productId: item.productId });
+        throw new DomainError('PRODUCT_NOT_IN_SALE', 'Produk ini tidak ada di sale asli.', {
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+        });
       }
-      const alreadyRefunded = alreadyRefundedByProduct.get(item.productId) ?? 0;
+      const alreadyRefunded = alreadyRefundedByLine.get(kunci) ?? 0;
+      // Baris yang sama dua kali dalam satu refund ikut dihitung.
+      alreadyRefundedByLine.set(kunci, alreadyRefunded + item.qty);
       if (alreadyRefunded + item.qty > saleItem.qty) {
         throw new DomainError('REFUND_EXCEEDS_SALE_QTY', `Qty refund melebihi qty sale untuk produk ini.`, {
           productId: item.productId,
@@ -1253,6 +1304,7 @@ export class SalesService {
       amount += lineTotal;
       refundItemsData.push({
         productId: item.productId,
+        variantId: saleItem.variantId,
         qty: item.qty,
         unitPrice: saleItem.unitPrice,
         lineTotal,
@@ -1331,7 +1383,7 @@ export class SalesService {
   async listRefunds(saleId: string) {
     const refunds = await this.prisma.saleRefund.findMany({
       where: { saleId },
-      include: { items: { include: { product: true } }, createdBy: true },
+      include: { items: { include: { product: true, variant: true } }, createdBy: true },
       orderBy: { createdAt: 'desc' },
     });
     return refunds.map((r) => this.formatRefund(r));
@@ -1340,13 +1392,13 @@ export class SalesService {
   private async toRefundResponse(refundId: string) {
     const refund = await this.prisma.saleRefund.findUniqueOrThrow({
       where: { id: refundId },
-      include: { items: { include: { product: true } }, createdBy: true },
+      include: { items: { include: { product: true, variant: true } }, createdBy: true },
     });
     return this.formatRefund(refund);
   }
 
   private formatRefund(
-    refund: Prisma.SaleRefundGetPayload<{ include: { items: { include: { product: true } }; createdBy: true } }>,
+    refund: Prisma.SaleRefundGetPayload<{ include: { items: { include: { product: true, variant: true } }; createdBy: true } }>,
   ) {
     return {
       id: refund.id,
@@ -1361,6 +1413,8 @@ export class SalesService {
       items: refund.items.map((i) => ({
         productId: i.productId,
         productName: i.product.name,
+        variantId: i.variantId,
+        variantName: i.variant?.name ?? null,
         qty: i.qty,
         unitPrice: Number(i.unitPrice),
         lineTotal: Number(i.lineTotal),
@@ -1400,12 +1454,11 @@ export class SalesService {
 
   private async buildRevisionPlan(
     sale: Awaited<ReturnType<SalesService['loadVoidableSale']>>,
-    newItems: { productId: string; qty: number }[],
+    newItems: { productId: string; variantId?: string; qty: number }[],
   ) {
     const productIds = [...new Set(newItems.map((i) => i.productId))];
     const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
     const productById = new Map(products.map((p) => [p.id, p]));
-    const oldQtyByProduct = new Map(sale.items.map((i) => [i.productId, i.qty]));
 
     for (const item of newItems) {
       const product = productById.get(item.productId);
@@ -1416,11 +1469,13 @@ export class SalesService {
       }
     }
 
-    const oldItemBySnapshot = new Map(sale.items.map((i) => [i.productId, i]));
+    // Satu baris = produk + varian; dua rasa satu produk adalah dua baris.
+    const oldItemByLine = new Map(sale.items.map((i) => [kunciBaris(i.productId, i.variantId), i]));
+    const varian = await this.varianPerBaris(newItems, new Set(oldItemByLine.keys()));
     let newTotal = 0n;
     const newItemsData: Prisma.SaleItemCreateManyInput[] = [];
-    for (const item of newItems) {
-      const existingItem = oldItemBySnapshot.get(item.productId);
+    for (const [index, item] of newItems.entries()) {
+      const existingItem = oldItemByLine.get(kunciBaris(item.productId, item.variantId));
       const product = productById.get(item.productId)!;
       const unitPrice = existingItem?.unitPrice ?? product.sellPrice;
       const lineTotal = unitPrice * BigInt(item.qty);
@@ -1430,13 +1485,20 @@ export class SalesService {
         saleId: '',
         productId: item.productId,
         productNameSnapshot: existingItem?.productNameSnapshot ?? product.name,
+        variantId: varian[index]?.id ?? null,
+        variantNameSnapshot: existingItem?.variantNameSnapshot ?? varian[index]?.name ?? null,
         unitPrice,
         qty: item.qty,
         lineTotal,
       });
     }
 
-    const newQtyByProduct = new Map(newItems.map((i) => [i.productId, i.qty]));
+    // Stok per produk: jumlahkan semua baris (rasa) produk yang sama.
+    const jumlahPerProduk = (items: { productId: string; qty: number }[]) =>
+      items.reduce((m, i) => m.set(i.productId, (m.get(i.productId) ?? 0) + i.qty), new Map<string, number>());
+    const oldQtyByProduct = jumlahPerProduk(sale.items);
+    const newQtyByProduct = jumlahPerProduk(newItems);
+    const oldItemBySnapshot = new Map(sale.items.map((i) => [i.productId, i]));
     const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
     const stockDeltas: StockDelta[] = [];
     for (const productId of allProductIds) {
@@ -1477,6 +1539,8 @@ export class SalesService {
       items: sale.items.map((i) => ({
         productId: i.productId,
         productName: i.productNameSnapshot,
+        variantId: i.variantId,
+        variantName: i.variantNameSnapshot,
         unitPrice: Number(i.unitPrice),
         qty: i.qty,
       })),
@@ -1511,6 +1575,8 @@ export class SalesService {
       items: sale.items.map((i) => ({
         productId: i.productId,
         productName: i.productNameSnapshot,
+        variantId: i.variantId,
+        variantName: i.variantNameSnapshot,
         unitPrice: Number(i.unitPrice),
         qty: i.qty,
         lineTotal: Number(i.lineTotal),

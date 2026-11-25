@@ -1,4 +1,6 @@
-import { IsBoolean, IsInt, IsOptional, IsUUID, Min, MinLength, IsString, IsUrl } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsUUID, Min, MinLength, IsString, IsUrl, ValidateNested } from 'class-validator';
+import { ProductVariantDto } from './product-variant.dto';
 
 /// TX-15/TX-16 (24-data-consistency-correction-reversal.md): perubahan
 /// master price/nama hanya berlaku untuk transaksi BARU — sale lama tetap
@@ -41,4 +43,11 @@ export class UpdateProductDto {
   @IsInt()
   @Min(0)
   criticalQty?: number;
+
+  /// Daftar lengkap Varian Rasa. Tidak dikirim = varian tidak diubah.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants?: ProductVariantDto[];
 }
