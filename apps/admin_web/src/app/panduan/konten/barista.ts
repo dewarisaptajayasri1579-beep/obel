@@ -109,6 +109,8 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     ],
     langkah: [
       { judul: "Pilih produk", isi: "Ketuk tombol + pada produk yang dibeli. Gunakan Cari menu... atau kategori untuk mempercepat pencarian." },
+      // Kasir: produk bervarian membuka sheet Pilih Rasa (C9).
+      { judul: "Pilih rasa", isi: "Untuk produk yang punya rasa, misalnya Kopsu Rasa, pilih rasanya di Pilih Rasa. Setiap rasa menjadi baris tersendiri di keranjang." },
       { judul: "Periksa keranjang", isi: "Ketuk Lihat Keranjang untuk mengubah jumlah atau mengisi diskon, lalu ketuk Lanjut Pembayaran." },
       { judul: "Pilih metode pembayaran", isi: "Pilih Tunai, QRIS, atau Split. Untuk QRIS, tunjukkan Kode QRIS Booth kepada pelanggan." },
       { judul: "Bayar", isi: "Ketuk Bayar Sekarang. Layar Transaksi Berhasil akan tampil." },
@@ -118,7 +120,7 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
       // PembayaranInput: QRIS & Split wajib foto bukti bayar sebelum Bayar Sekarang aktif.
       { teks: "Pembayaran QRIS dan Split wajib disertai Foto Bukti Bayar QRIS.", tingkat: "penting" },
       // Stok dipotong di server dalam satu transaksi; produk tidak bisa melebihi sisa stok.
-      { teks: "Jumlah produk tidak dapat melebihi sisa stok Booth yang tertera.", tingkat: "info" },
+      { teks: "Jumlah produk tidak dapat melebihi sisa stok Booth yang tertera. Semua rasa satu produk memakai stok produk itu.", tingkat: "info" },
       { teks: "Transaksi yang belum dibayar dapat disimpan dengan Simpan Draft dan dibuka lagi dari Draft Tersimpan.", tingkat: "info" },
     ],
   },

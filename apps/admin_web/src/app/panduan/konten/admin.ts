@@ -223,6 +223,7 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
     ],
     langkah: [
       { judul: "Tambah produk", isi: "Klik Tambah Produk, isi Nama Barang, Kategori, Harga Jual, dan Foto Produk, lalu klik Simpan." },
+      { judul: "Atur varian rasa", isi: "Di form produk, klik Tambah Rasa untuk setiap rasa, misalnya Butterscotch dan Brown Sugar, lalu klik Simpan. Barista memilih rasanya saat menjual. Harga dan stok tetap milik produknya." },
       { judul: "Kelola kategori", isi: "Klik Kelola Kategori untuk menambah, mengubah nama, atau menghapus kategori. Kategori baru juga bisa ditambah langsung dari isian Kategori di form produk." },
       { judul: "Ubah produk", isi: "Klik kode atau nama produk, atau Edit Produk di menu titik tiga." },
       { judul: "Atur harga dan batas", isi: "Buka tab Pengaturan. Ubah Harga Jual, Stok Menipis, dan Stok Kritis. Perubahan tersimpan otomatis." },
@@ -233,6 +234,8 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
       { teks: "Produk yang sudah pernah dipakai transaksi tidak bisa dihapus. Gunakan Nonaktifkan.", tingkat: "penting" },
       { teks: "Produk yang stoknya masih beredar belum bisa dinonaktifkan.", tingkat: "info" },
       { teks: "Kategori yang masih dipakai produk tidak bisa dihapus. Pindahkan produknya ke kategori lain dulu.", tingkat: "info" },
+      // ProductsService.sinkronkanVarian: rasa terjual dinonaktifkan, bukan dihapus.
+      { teks: "Rasa yang sudah pernah terjual tidak terhapus saat dihapus dari form, melainkan dinonaktifkan supaya nota lama tetap terbaca.", tingkat: "info" },
     ],
   },
   {

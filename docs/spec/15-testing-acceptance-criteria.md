@@ -194,3 +194,6 @@ Shift 1 menerima 5 & jual 1, Shift 2 menerima 7 & jual 2 di booth yang sama → 
 
 ### AC-52 Memindahkan Barista di Setting Barista
 Barista di slot A dipilih untuk slot B tanpa konfirmasi → `STAFF_ALREADY_ASSIGNED` dengan nama Barista, booth, dan shift slot A; slot A tetap. Dengan `reassign` → slot A kosong, slot B terisi, `/booth-shift-assignments/mine` Barista menunjuk slot B. Test: `booth-shift-reassign.e2e-spec.ts` (BR-046).
+
+### AC-53 Varian rasa produk
+Produk dibuat dengan dua rasa. Jual tanpa rasa → `VARIANT_REQUIRED`; rasa acak atau rasa produk lain → `VARIANT_INVALID`. Jual Butterscotch 2 + Brown Sugar 1 → dua baris berharga produk, stok produk turun 3. Refund Brown Sugar 2 → `REFUND_EXCEEDS_SALE_QTY` (baris itu cuma 1); refund Butterscotch 2 lolos. Revisi Butterscotch 1 → 3 menurunkan stok 2 lagi. Draft menyimpan rasa. Ringkasan Shift & Dashboard merinci per rasa. Rasa belum terjual yang dihapus → terhapus, rasa terjual → nonaktif dan ditolak saat jual, nama rasa dobel → `VARIANT_NAME_TAKEN`. Test: `product-variants.e2e-spec.ts` (BR-047).
