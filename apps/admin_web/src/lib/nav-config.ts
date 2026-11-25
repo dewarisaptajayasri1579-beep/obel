@@ -351,7 +351,6 @@ const MENU_HALAMAN_LAIN: Record<string, MenuKey> = {
   "/master/threshold": "BOOTH",
   "/koreksi": "DASHBOARD",
   "/return": "SETOR_PENGEMBALIAN",
-  "/penjualan": "KASIR",
 };
 
 /** Syarat akses sebuah halaman admin: menu tertentu, khusus Owner, atau bebas. */
