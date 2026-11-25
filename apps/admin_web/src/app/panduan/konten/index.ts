@@ -12,8 +12,8 @@ export const SEMUA_LAYAR: LayarPanduan[] = [...LAYAR_BARISTA, ...LAYAR_ADMIN];
 export const ALUR_HARIAN: LangkahAlur[] = [
   { peran: "barista", judul: "Absen Berangkat", isi: "Barista absen di Gudang dan menerima uang jalan. Shift dimulai.", layar: "barista-berangkat" },
   { peran: "admin", judul: "Kirim stok", isi: "Admin mengirim stok ke Barista yang sedang aktif. Stok Gudang berkurang.", layar: "admin-serah-terima-stok" },
-  { peran: "barista", judul: "Absen Tiba di Booth", isi: "Barista absen begitu sampai di Booth.", layar: "barista-tiba" },
-  { peran: "barista", judul: "Terima Stok", isi: "Barista mencocokkan kiriman lalu mengonfirmasi penerimaan. Stok Booth bertambah.", layar: "barista-terima-stok" },
+  { peran: "barista", judul: "Terima Stok", isi: "Barista mencocokkan kiriman di Gudang lalu mengonfirmasi penerimaan. Stok Booth bertambah.", layar: "barista-terima-stok" },
+  { peran: "barista", judul: "Absen Tiba di Booth", isi: "Barista absen begitu sampai di Booth. Kasir terbuka.", layar: "barista-tiba" },
   { peran: "barista", judul: "Berjualan", isi: "Barista mencatat setiap penjualan di Kasir.", layar: "barista-kasir" },
   { peran: "barista", judul: "Ajukan restock", isi: "Bila stok menipis, Barista mengajukan restock. Admin memprosesnya di Serah Terima Stok.", layar: "barista-stok" },
   { peran: "admin", judul: "Pantau Booth", isi: "Admin memantau penjualan, stok, dan lokasi Booth secara real-time.", layar: "admin-booth-aktif" },

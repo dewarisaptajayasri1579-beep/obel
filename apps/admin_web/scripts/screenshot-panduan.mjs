@@ -35,7 +35,6 @@ const bukaKeranjang = async (page) => {
   await tambahKeKeranjang(page);
   await page.getByRole("button", { name: "Lihat Keranjang" }).click();
 };
-const gulirKeBawah = (page) => page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 /// Folder public/ bisa diunduh tanpa login: username (separuh kredensial) diburamkan.
 const samarkanUsername = (page) => page.addStyleTag({ content: "tbody td:first-child{filter:blur(5px)}" });
 
@@ -55,7 +54,6 @@ const RESEP = [
   { file: "barista-beranda-1.webp", peran: "barista", path: "/petugas" },
   { file: "barista-beranda-2.webp", peran: "barista", path: "/petugas", siapkan: (p) => p.getByRole("button", { name: "Riwayat", exact: true }).click() },
   { file: "barista-berangkat-1.webp", peran: "barista", path: "/petugas/check-in", mock: tanpaShift },
-  { file: "barista-berangkat-2.webp", peran: "barista", path: "/petugas/check-in", mock: tanpaShift, siapkan: gulirKeBawah },
   { file: "barista-tiba-1.webp", peran: "barista", path: "/petugas/tiba", mock: belumTiba },
   { file: "barista-terima-stok-1.webp", peran: "barista", path: "/petugas/terima-stok" },
   { file: "barista-terima-stok-2.webp", peran: "barista", path: "/petugas/terima-stok", siapkan: (p) => p.getByText("Dari Gudang Pusat").first().click() },

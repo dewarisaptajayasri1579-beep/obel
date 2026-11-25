@@ -42,10 +42,7 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     judul: "Absen Berangkat",
     ringkasan: "Absen di Gudang sebelum berangkat ke Booth. Absen ini membuka shift Anda.",
     tanpaShift: true,
-    gambar: [
-      { file: "barista-berangkat-1.webp", keterangan: "Konfirmasi Lokasi Anda dan Ambil Foto Selfie." },
-      { file: "barista-berangkat-2.webp", keterangan: "Konfirmasi Data Anda sebelum KONFIRMASI BERANGKAT." },
-    ],
+    gambar: [{ file: "barista-berangkat-1.webp", keterangan: "Konfirmasi lokasi, foto selfie, dan Konfirmasi Data Anda sebelum KONFIRMASI BERANGKAT." }],
     langkah: [
       { judul: "Ambil lokasi", isi: "Ketuk Ambil Lokasi Saya. Pastikan Anda berada di Gudang." },
       { judul: "Ambil foto selfie", isi: "Ketuk Ambil Foto, lalu potret wajah Anda dengan jelas." },
