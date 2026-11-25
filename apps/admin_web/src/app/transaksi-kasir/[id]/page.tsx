@@ -23,6 +23,7 @@ import {
   type SaleDetail,
   type SaleRefund,
 } from "@/lib/api-client";
+import { namaItem } from "@/lib/receipt";
 import { randomUUID } from "@/lib/uuid";
 import { SaleActivityLog } from "../SaleActivityLog";
 import { SaleNotaPreviewModal } from "../SaleNotaPreviewModal";
@@ -38,6 +39,9 @@ const REFUND_CONDITION_OPTIONS = [
   { value: "REFUND_NO_STOCK_RETURN", label: "Uang kembali saja (produk sudah dikonsumsi/rusak)" },
   { value: "REFUND_WITH_STOCK_RETURN", label: "Uang kembali + produk kembali ke stok" },
 ];
+
+/// Satu baris sale = produk + rasa; dua rasa satu produk adalah dua baris dengan revisi/refund sendiri.
+const kunciBaris = (i: { productId: string; variantId: string | null }) => `${i.productId}|${i.variantId ?? ""}`;
 
 function formatRupiah(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
@@ -99,8 +103,8 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
       const [d, r] = await Promise.all([api.getSaleDetail(id), api.getSaleRefunds(id)]);
       setDetail(d);
       setRefunds(r);
-      setReviseQty(Object.fromEntries(d.items.map((i) => [i.productId, i.qty])));
-      setRefundQty(Object.fromEntries(d.items.map((i) => [i.productId, 0])));
+      setReviseQty(Object.fromEntries(d.items.map((i) => [kunciBaris(i), i.qty])));
+      setRefundQty(Object.fromEntries(d.items.map((i) => [kunciBaris(i), 0])));
       setPaymentMethod(d.paymentMethod === "QRIS" ? "CASH" : "QRIS");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat detail transaksi.");
@@ -121,15 +125,17 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     setReasonNote("");
   }
 
-  function alreadyRefundedQty(productId: string): number {
-    return refunds.reduce((sum, r) => sum + r.items.filter((i) => i.productId === productId).reduce((s, i) => s + i.qty, 0), 0);
+  function alreadyRefundedQty(kunci: string): number {
+    return refunds.reduce((sum, r) => sum + r.items.filter((i) => kunciBaris(i) === kunci).reduce((s, i) => s + i.qty, 0), 0);
   }
+
+  /// Baris revisi/refund dari state per kunci baris, dengan productId & variantId aslinya.
+  const barisDari = (qtyPerBaris: Record<string, number>) =>
+    (detail?.items ?? []).map((i) => ({ productId: i.productId, variantId: i.variantId ?? undefined, qty: qtyPerBaris[kunciBaris(i)] ?? i.qty }));
 
   async function handleRefundConfirm() {
     if (!detail) return;
-    const items = Object.entries(refundQty)
-      .filter(([, qty]) => qty > 0)
-      .map(([productId, qty]) => ({ productId, qty }));
+    const items = barisDari(refundQty).filter((i) => i.qty > 0);
     if (items.length === 0) {
       toast.error("Pilih minimal 1 produk untuk di-refund.");
       return;
@@ -188,7 +194,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     try {
       setImpact(
         await api.previewReviseSale(detail.id, {
-          items: Object.entries(reviseQty).map(([productId, qty]) => ({ productId, qty })),
+          items: barisDari(reviseQty),
         }),
       );
     } catch (err) {
@@ -217,7 +223,7 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
     try {
       const result = await api.reviseSale(detail.id, {
         idempotencyKey: randomUUID(),
-        items: Object.entries(reviseQty).map(([productId, qty]) => ({ productId, qty })),
+        items: barisDari(reviseQty),
         reasonCode,
         reasonNote: reasonNote || undefined,
       });
@@ -343,19 +349,20 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
             {mode === "refund" ? (
               <div className="space-y-2">
                 {detail.items.map((item) => {
-                  const refunded = alreadyRefundedQty(item.productId);
+                  const kunci = kunciBaris(item);
+                  const refunded = alreadyRefundedQty(kunci);
                   const max = item.qty - refunded;
                   return (
-                    <div key={item.productId} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
+                    <div key={kunci} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
                       <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-fg">{item.productName}</p>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-fg">{namaItem(item)}</p>
                         <p className="text-xs text-slate-500 dark:text-fg-muted">
                           {formatRupiah(item.unitPrice)} · sudah di-refund {refunded}/{item.qty}
                         </p>
                       </div>
                       <QuantityStepperInline
-                        value={refundQty[item.productId] ?? 0}
-                        onChange={(v) => setRefundQty((prev) => ({ ...prev, [item.productId]: Math.min(Math.max(v, 0), max) }))}
+                        value={refundQty[kunci] ?? 0}
+                        onChange={(v) => setRefundQty((prev) => ({ ...prev, [kunci]: Math.min(Math.max(v, 0), max) }))}
                       />
                     </div>
                   );
@@ -385,14 +392,14 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
             ) : mode === "revise" ? (
               <div className="space-y-2">
                 {detail.items.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
+                  <div key={kunciBaris(item)} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-line px-3 py-2">
                     <div>
-                      <p className="text-sm font-semibold text-slate-800 dark:text-fg">{item.productName}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-fg">{namaItem(item)}</p>
                       <p className="text-xs text-slate-500 dark:text-fg-muted">{formatRupiah(item.unitPrice)}</p>
                     </div>
                     <QuantityStepperInline
-                      value={reviseQty[item.productId] ?? item.qty}
-                      onChange={(v) => setReviseQty((prev) => ({ ...prev, [item.productId]: v }))}
+                      value={reviseQty[kunciBaris(item)] ?? item.qty}
+                      onChange={(v) => setReviseQty((prev) => ({ ...prev, [kunciBaris(item)]: v }))}
                     />
                   </div>
                 ))}
@@ -405,8 +412,8 @@ function DetailTransaksiKasirContent({ id }: { id: string }) {
                 <p className="text-xs font-bold text-slate-700 dark:text-fg-secondary mb-2">Item Transaksi</p>
                 <div className="space-y-1">
                   {detail.items.map((item) => (
-                    <div key={item.productId} className="flex items-center justify-between text-sm">
-                      <span>{item.productName}</span>
+                    <div key={kunciBaris(item)} className="flex items-center justify-between text-sm">
+                      <span>{namaItem(item)}</span>
                       <span>
                         {item.qty} x {formatRupiah(item.unitPrice)} = {formatRupiah(item.lineTotal)}
                       </span>

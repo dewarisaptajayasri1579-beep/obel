@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Printer } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { SaleDetail } from "@/lib/api-client";
-import { LEBAR_STRUK, buatStrukPenjualan, labelMetodeBayar, type PrintLine } from "@/lib/receipt";
+import { LEBAR_STRUK, buatStrukPenjualan, labelMetodeBayar, type PrintLine, namaItem } from "@/lib/receipt";
 import { usePerusahaan } from "@/lib/use-perusahaan";
 
 /// Struk kertas 58mm: baris dari lib/receipt.ts (sama persis dengan yang dicetak Booth), font
@@ -53,7 +53,7 @@ export function SaleNotaPreviewModal({
         saleNo: sale.saleNo,
         waktuIso: sale.paidAt ?? sale.createdAt,
         barista: sale.staffName,
-        items: sale.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+        items: sale.items.map((i) => ({ name: namaItem(i), qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
         subtotal: sale.subtotal,
         discount: sale.discount,
         total: sale.total,

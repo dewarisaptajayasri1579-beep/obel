@@ -19,6 +19,7 @@ import {
   api,
   ApiError,
   type Product,
+  type ProductVariant,
   type BoothStockRow,
   type DraftSale,
   type SaleResult,
@@ -32,7 +33,7 @@ import { useHidePetugasNav } from "@/components/layout/PetugasShell";
 import { TopBar } from "../_components/TopBar";
 import { formatRupiah, formatJamJakarta } from "../_lib/format";
 import { printStruk, isNativeBridgeAvailable } from "../_lib/native-bridge";
-import { buatStrukPenjualan, labelMetodeBayar, teksStruk } from "@/lib/receipt";
+import { buatStrukPenjualan, labelMetodeBayar, teksStruk, namaItem } from "@/lib/receipt";
 import { usePerusahaan } from "@/lib/use-perusahaan";
 import { PhotoCapture } from "../_components/PhotoCapture";
 import {
@@ -51,8 +52,12 @@ const GREEN = OBBEL.primaryDark;
 
 interface CartLine {
   product: Product;
+  /// Rasa yang dipilih (produk bervarian); satu baris keranjang = produk + rasa.
+  variant: ProductVariant | null;
   qty: number;
 }
+
+const kunciBaris = (productId: string, variantId?: string | null) => `${productId}|${variantId ?? ""}`;
 
 type Sheet = null | "cart" | "payment" | "drafts";
 
@@ -79,6 +84,8 @@ function KasirContent() {
   const [stockByProduct, setStockByProduct] = useState<Map<string, number>>(new Map());
   const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
   const [sheet, setSheet] = useState<Sheet>(null);
+  // Produk bervarian yang sedang dipilihkan rasanya (sheet Pilih Rasa).
+  const [pilihRasa, setPilihRasa] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("Semua");
 
@@ -198,7 +205,7 @@ function KasirContent() {
 
   // Sheet keranjang/pembayaran/draft sama-sama nempel di bawah —
   // sembunyikan bottom nav supaya tidak numpuk, sama kayak Detail Penerimaan.
-  useHidePetugasNav(totalItems > 0 || sheet !== null);
+  useHidePetugasNav(totalItems > 0 || sheet !== null || pilihRasa !== null);
 
   useEffect(() => {
     if (sheet !== "payment") return;
@@ -206,37 +213,46 @@ function KasirContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet]);
 
-  function addToCart(product: Product) {
+  /// Stok dipegang produk, jadi semua rasa satu produk berbagi stok yang sama.
+  const qtyProdukDiKeranjang = (keranjang: Map<string, CartLine>, productId: string) =>
+    [...keranjang.values()].filter((l) => l.product.id === productId).reduce((n, l) => n + l.qty, 0);
+
+  /// Tombol + di kartu produk: produk bervarian minta rasa dulu.
+  function tambahProduk(product: Product) {
+    if (product.variants.some((v) => v.active)) setPilihRasa(product);
+    else addToCart(product, null);
+  }
+
+  function addToCart(product: Product, variant: ProductVariant | null) {
     if (draftAktif) return;
     setCart((prev) => {
       const next = new Map(prev);
-      const existing = next.get(product.id);
+      const kunci = kunciBaris(product.id, variant?.id);
       const stock = stockByProduct.get(product.id) ?? 0;
-      const nextQty = (existing?.qty ?? 0) + 1;
-      if (nextQty > stock) {
+      if (qtyProdukDiKeranjang(prev, product.id) + 1 > stock) {
         toast.warning(`Stok ${product.name} tinggal ${stock} cup.`);
         return prev;
       }
-      next.set(product.id, { product, qty: nextQty });
+      next.set(kunci, { product, variant, qty: (next.get(kunci)?.qty ?? 0) + 1 });
       return next;
     });
   }
 
-  function changeQty(productId: string, delta: number) {
+  function changeQty(kunci: string, delta: number) {
     if (draftAktif) return;
     setCart((prev) => {
       const next = new Map(prev);
-      const line = next.get(productId);
+      const line = next.get(kunci);
       if (!line) return prev;
-      const stock = stockByProduct.get(productId) ?? 0;
+      const stock = stockByProduct.get(line.product.id) ?? 0;
       const nextQty = line.qty + delta;
       if (nextQty <= 0) {
-        next.delete(productId);
-      } else if (nextQty > stock) {
+        next.delete(kunci);
+      } else if (delta > 0 && qtyProdukDiKeranjang(prev, line.product.id) + delta > stock) {
         toast.warning(`Stok ${line.product.name} tinggal ${stock} cup.`);
         return prev;
       } else {
-        next.set(productId, { ...line, qty: nextQty });
+        next.set(kunci, { ...line, qty: nextQty });
       }
       return next;
     });
@@ -271,7 +287,7 @@ function KasirContent() {
       await api.createDraftSale({
         idempotencyKey: draftKey,
         shiftSessionId: shift.shiftSessionId,
-        items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
+        items: lines.map((l) => ({ productId: l.product.id, variantId: l.variant?.id, qty: l.qty })),
         discount,
       });
       toast.success("Draft transaksi berhasil disimpan.");
@@ -316,7 +332,7 @@ function KasirContent() {
         : await api.createSale({
             idempotencyKey: saleKey,
             shiftSessionId: shift.shiftSessionId,
-            items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
+            items: lines.map((l) => ({ productId: l.product.id, variantId: l.variant?.id, qty: l.qty })),
             discount,
             ...payload,
           });
@@ -351,7 +367,7 @@ function KasirContent() {
       saleNo: sale.saleNo,
       waktuIso: sale.paidAt ?? new Date().toISOString(),
       barista: session?.profile.fullName,
-      items: sale.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+      items: sale.items.map((i) => ({ name: namaItem(i), qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
       subtotal: sale.subtotal,
       discount: sale.discount,
       total: sale.total,
@@ -380,7 +396,7 @@ function KasirContent() {
         boothName: shift.booth.name,
         saleNo: result.saleNo,
         time: result.paidAt ?? new Date().toISOString(),
-        items: result.items.map((i) => ({ name: i.productName, qty: i.qty, price: i.unitPrice })),
+        items: result.items.map((i) => ({ name: namaItem(i), qty: i.qty, price: i.unitPrice })),
         total: result.total,
         paymentMethod: labelMetodeBayar(result.paymentMethod),
         staffName: session?.profile.fullName,
@@ -590,7 +606,7 @@ function KasirContent() {
                   <button
                     type="button"
                     disabled={!bisaDitambah || !!draftAktif}
-                    onClick={() => addToCart(p)}
+                    onClick={() => tambahProduk(p)}
                     className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-30 shrink-0"
                     style={{ backgroundColor: GREEN }}
                   >
@@ -623,6 +639,39 @@ function KasirContent() {
             >
               Lihat Keranjang
             </button>
+          </div>
+        </div>
+      )}
+
+      {pilihRasa && (
+        <div className="fixed inset-0 bg-black/40 z-30 flex items-end" onClick={() => setPilihRasa(null)}>
+          <div className="w-full max-w-md mx-auto bg-white rounded-t-[28px] max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-extrabold text-slate-900">Pilih Rasa</p>
+                <p className="text-sm text-slate-500 wrap-break-word">{pilihRasa.name}</p>
+              </div>
+              <button type="button" onClick={() => setPilihRasa(null)} className="text-slate-400" aria-label="Tutup">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2.5">
+              {pilihRasa.variants
+                .filter((v) => v.active)
+                .map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      addToCart(pilihRasa, v);
+                      setPilihRasa(null);
+                    }}
+                    className="rounded-2xl border-2 border-slate-200 px-3 py-4 font-bold text-base text-slate-900 text-center wrap-break-word active:bg-slate-50"
+                  >
+                    {v.name}
+                  </button>
+                ))}
+            </div>
           </div>
         </div>
       )}
@@ -685,29 +734,40 @@ function KasirContent() {
                 </div>
               )}
               {draftAktif?.items.map((i) => (
-                <div key={i.productId} className="flex items-center justify-between gap-3">
+                <div key={kunciBaris(i.productId, i.variantId)} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-base text-slate-900 truncate">{i.productName}</p>
+                    {i.variantName && (
+                      <p className="text-sm font-semibold truncate" style={{ color: GREEN }}>
+                        {i.variantName}
+                      </p>
+                    )}
                     <p className="text-sm text-slate-500">{formatRupiah(i.unitPrice)}</p>
                   </div>
                   <span className="shrink-0 text-base font-semibold text-slate-700">x{i.qty}</span>
                 </div>
               ))}
               {lines.map((l) => (
-                <div key={l.product.id} className="flex items-center gap-3">
+                <div key={kunciBaris(l.product.id, l.variant?.id)} className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-base text-slate-900 truncate">{l.product.name}</p>
+                    {/* Rasa di baris kedua: nama produk panjang terpotong di layar 360 px, rasanya tidak boleh ikut hilang. */}
+                    {l.variant && (
+                      <p className="text-sm font-semibold truncate" style={{ color: GREEN }}>
+                        {l.variant.name}
+                      </p>
+                    )}
                     <p className="text-sm text-slate-500">{formatRupiah(l.product.sellPrice)}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button type="button" onClick={() => changeQty(l.product.id, -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                    <button type="button" onClick={() => changeQty(kunciBaris(l.product.id, l.variant?.id), -1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
                       <Minus size={18} />
                     </button>
                     <span className="w-6 text-center text-base font-semibold">{l.qty}</span>
-                    <button type="button" onClick={() => changeQty(l.product.id, 1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
+                    <button type="button" onClick={() => changeQty(kunciBaris(l.product.id, l.variant?.id), 1)} className="w-10 h-10 rounded-full border flex items-center justify-center active:bg-slate-100">
                       <Plus size={18} />
                     </button>
-                    <button type="button" onClick={() => changeQty(l.product.id, -l.qty)} className="w-10 h-10 flex items-center justify-center ml-1" style={{ color: OBBEL.accentRed }}>
+                    <button type="button" onClick={() => changeQty(kunciBaris(l.product.id, l.variant?.id), -l.qty)} className="w-10 h-10 flex items-center justify-center ml-1" style={{ color: OBBEL.accentRed }}>
                       <Trash2 size={18} />
                     </button>
                   </div>

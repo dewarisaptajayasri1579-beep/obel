@@ -16,6 +16,7 @@ import { api, ApiError } from "@/lib/api-client";
 import { useAccess } from "@/lib/auth-context";
 import { nilaiAwalProduk, type ProdukFormValues } from "./form-values";
 import { FotoProdukInput } from "./FotoProdukInput";
+import { VarianRasaInput } from "./VarianRasaInput";
 import { NonaktifDiblokirModal, rincianNonaktifDiblokir, type RincianNonaktifDiblokir } from "./NonaktifDiblokirModal";
 
 type Option = { value: string; label: string };
@@ -143,11 +144,16 @@ export const ProdukForm: React.FC<{
       setError("Harga jual wajib diisi");
       return false;
     }
+    if (form.variants.some((v) => !v.name.trim())) {
+      setError("Nama rasa wajib diisi");
+      return false;
+    }
     return true;
   };
 
   const simpan = async (lanjutIsiLagi = false) => {
     if (!bolehKelola || !validate()) return;
+    const variants = form.variants.map((v) => ({ id: v.id, name: v.name.trim(), active: v.active }));
 
     setSubmitting(true);
     try {
@@ -158,6 +164,7 @@ export const ProdukForm: React.FC<{
           categoryId: form.categoryId || undefined,
           sellPrice: form.sellPrice,
           imageUrl: form.imageUrl || undefined,
+          variants,
         });
         toast.success(`Produk ${dibuat.sku} ditambahkan`);
       } else {
@@ -169,6 +176,7 @@ export const ProdukForm: React.FC<{
           sellPrice: form.sellPrice,
           active: form.isActive,
           imageUrl: form.imageUrl || null,
+          variants,
         });
         toast.success(`Produk ${form.sku} diperbarui`);
       }
@@ -284,6 +292,14 @@ export const ProdukForm: React.FC<{
       <FotoProdukInput
         value={form.imageUrl}
         onChange={(url) => set("imageUrl", url)}
+        labelClassName={COMPACT_LABEL}
+      />
+
+      <VarianRasaInput
+        value={form.variants}
+        onChange={(v) => set("variants", v)}
+        disabled={!bolehKelola}
+        fieldClassName={COMPACT_FIELD}
         labelClassName={COMPACT_LABEL}
       />
 

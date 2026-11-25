@@ -25,6 +25,12 @@ export interface Perusahaan {
   telepon?: string | null;
 }
 
+/// Nama baris jual di struk dan layar: `Kopsu Rasa (Butterscotch)` untuk produk bervarian. Tanda
+/// kurung (ASCII) supaya aman untuk printer thermal.
+export function namaItem(item: { productName: string; variantName?: string | null }): string {
+  return item.variantName ? `${item.productName} (${item.variantName})` : item.productName;
+}
+
 /// Label cara bayar di struk (`Payment`) dan di layar Barista.
 export function labelMetodeBayar(m: "CASH" | "QRIS" | "SPLIT" | null | undefined): string {
   return m === "CASH" ? "Tunai" : m === "QRIS" ? "QRIS" : m === "SPLIT" ? "Split" : "-";
@@ -174,7 +180,12 @@ export interface RingkasanShiftInput {
   pembatalan: { count: number; cup: number; amount: number };
   tunai: { amount: number };
   qris: { amount: number };
-  kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number }[] }[];
+  kategori: {
+    name: string;
+    qty: number;
+    amount: number;
+    produk: { name: string; qty: number; amount: number; varian?: { name: string; qty: number; amount: number }[] }[];
+  }[];
 }
 
 /// Struk ringkasan penjualan satu shift (dicetak Barista saat Check-Out), bentuknya mengikuti struk
@@ -216,7 +227,10 @@ export function buatStrukRingkasanShift(input: RingkasanShiftInput): PrintLine[]
   if (input.kategori.length === 0) baris.push(tengah("Belum ada penjualan"));
   for (const k of input.kategori) {
     baris.push(kiri(k.name.toUpperCase(), true));
-    for (const p of k.produk) baris.push(...kiriKanan(`x${p.qty} ${p.name}`, angka(p.amount), false, 1));
+    for (const p of k.produk) {
+      baris.push(...kiriKanan(`x${p.qty} ${p.name}`, angka(p.amount), false, 1));
+      for (const v of p.varian ?? []) baris.push(...kiriKanan(`x${v.qty} ${v.name}`, angka(v.amount), false, 4));
+    }
     baris.push(...kiriKanan("TOTAL", `(${k.qty}) ${angka(k.amount)}`, true));
   }
 

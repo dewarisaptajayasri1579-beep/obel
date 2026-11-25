@@ -27,6 +27,7 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { api, ApiError, type Booth, type SaleDetail, type SaleListItem, type UserAccount } from "@/lib/api-client";
+import { namaItem } from "@/lib/receipt";
 import { TRANSAKSI_BOOTH_FILTER_KEYS, usePersistedFilter } from "@/lib/use-persisted-filter";
 import { KasirReportPreviewModal } from "./KasirReportPreviewModal";
 import { TabSebaranPenjualan } from "./TabSebaranPenjualan";
@@ -582,8 +583,8 @@ function TransaksiKasirContent() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-line">
                                       {detail.items.map((item) => (
-                                        <tr key={item.productId}>
-                                          <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{item.productName}</td>
+                                        <tr key={`${item.productId}|${item.variantId ?? ""}`}>
+                                          <td className="py-2 px-3 text-slate-800 dark:text-fg font-medium">{namaItem(item)}</td>
                                           <td className="py-2 px-3 text-right tabular-nums">{item.qty}</td>
                                           <td className="py-2 px-3 text-right tabular-nums">{formatRupiah(item.unitPrice)}</td>
                                           <td className="py-2 px-3 text-right tabular-nums font-semibold">{formatRupiah(item.lineTotal)}</td>

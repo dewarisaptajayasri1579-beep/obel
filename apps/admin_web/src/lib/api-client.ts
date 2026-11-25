@@ -261,6 +261,29 @@ export interface Product {
   /// (lihat BoothStockThreshold & BR-007).
   minimumQty: number
   criticalQty: number
+  /// Varian rasa (C9), termasuk yang nonaktif; Kasir hanya menawarkan yang aktif.
+  variants: ProductVariant[]
+}
+
+/// Varian rasa sebuah produk: hanya label penjualan, harga & stok milik produknya.
+export interface ProductVariant {
+  id: string
+  name: string
+  active: boolean
+}
+
+/// Baris Varian Rasa di form Produk (tanpa `id` = varian baru).
+export interface ProductVariantInput {
+  id?: string
+  name: string
+  active?: boolean
+}
+
+/// Satu baris jual: produk + rasa (`variantId` hanya untuk produk bervarian).
+export interface SaleLineInput {
+  productId: string
+  variantId?: string
+  qty: number
 }
 
 /// Rekap & riwayat mutasi stok (GET /stock-movements/*). Dihitung backend dari
@@ -784,6 +807,8 @@ export interface SalesReportByProduct {
   productId: string
   productName: string
   cupSold: number
+  /// Rincian per rasa; kosong untuk produk tanpa varian.
+  variants: { name: string; cupSold: number }[]
 }
 
 export interface SalesReportByBooth {
@@ -894,7 +919,7 @@ export interface SaleListItem {
   /// Baris Payment aktif (Split = dua baris).
   payments: { method: "CASH" | "QRIS"; amount: number }[]
   /// Harga & total per baris ikut dikirim supaya struk bisa dicetak ulang dari daftar.
-  items: { productName: string; qty: number; unitPrice: number; lineTotal: number }[]
+  items: { productName: string; variantName: string | null; qty: number; unitPrice: number; lineTotal: number }[]
   paidAt: string | null
   createdAt: string
   versionNo?: number
@@ -904,6 +929,8 @@ export interface SaleListItem {
 export interface SaleDetailItem {
   productId: string
   productName: string
+  variantId: string | null
+  variantName: string | null
   unitPrice: number
   qty: number
   lineTotal: number
@@ -953,7 +980,16 @@ export interface SaleRefund {
   reasonNote: string | null
   createdByName: string
   createdAt: string
-  items: { productId: string; productName: string; qty: number; unitPrice: number; lineTotal: number; stockReturned: boolean }[]
+  items: {
+    productId: string
+    productName: string
+    variantId: string | null
+    variantName: string | null
+    qty: number
+    unitPrice: number
+    lineTotal: number
+    stockReturned: boolean
+  }[]
 }
 
 export interface SaleCorrectionImpact {
@@ -1318,7 +1354,7 @@ export interface ShiftSalesSummary {
   qris: { count: number; amount: number }
   uangJalan: number
   setoranDiharapkan: number
-  kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number }[] }[]
+  kategori: { name: string; qty: number; amount: number; produk: { name: string; qty: number; amount: number; varian: { name: string; qty: number; amount: number }[] }[] }[]
 }
 
 export interface ShiftReport {
@@ -1384,7 +1420,15 @@ export interface SaleResult {
   payments: PaymentSplitInput[]
   paidAt: string | null
   /// Item seperti tercatat di server (nama & harga snapshot) — sumber isi struk.
-  items: { productId: string; productName: string; unitPrice: number; qty: number; lineTotal: number }[]
+  items: {
+    productId: string
+    productName: string
+    variantId: string | null
+    variantName: string | null
+    unitPrice: number
+    qty: number
+    lineTotal: number
+  }[]
   /// Sisa stok Booth untuk produk di sale ini, setelah dipotong.
   remainingStock: { productId: string; qtyOnHand: number }[]
 }
@@ -1392,6 +1436,8 @@ export interface SaleResult {
 export interface DraftSaleItem {
   productId: string
   productName: string
+  variantId: string | null
+  variantName: string | null
   unitPrice: number
   qty: number
 }
@@ -1518,7 +1564,14 @@ export const api = {
   },
   /// `sku` opsional — backend membuatkannya otomatis (`OBL-0001`). Dikirim
   /// hanya oleh jalur seed/impor data lama, tidak oleh form.
-  createProduct: (input: { sku?: string; name: string; categoryId?: string; sellPrice: number; imageUrl?: string }) =>
+  createProduct: (input: {
+    sku?: string
+    name: string
+    categoryId?: string
+    sellPrice: number
+    imageUrl?: string
+    variants?: ProductVariantInput[]
+  }) =>
     request<Product>("/products", { method: "POST", body: input }),
   updateProduct: (
     id: string,
@@ -1530,6 +1583,7 @@ export const api = {
       imageUrl?: string | null
       minimumQty?: number
       criticalQty?: number
+      variants?: ProductVariantInput[]
     },
   ) => request<Product>(`/products/${id}`, { method: "PATCH", body: input }),
   /// Ditolak (ApiError code PRODUCT_HAS_HISTORY / PRODUCT_HAS_STOCK) kalau
@@ -1716,13 +1770,13 @@ export const api = {
   previewVoidSale: (id: string) => request<SaleCorrectionImpact>(`/sales/${id}/preview-void`, { method: "POST" }),
   voidSale: (id: string, input: { idempotencyKey: string; reasonCode: ReasonCode; reasonNote?: string }) =>
     request(`/sales/${id}/void`, { method: "POST", body: input }),
-  previewReviseSale: (id: string, input: { items: { productId: string; qty: number }[]; paymentMethod?: "CASH" | "QRIS" }) =>
+  previewReviseSale: (id: string, input: { items: SaleLineInput[]; paymentMethod?: "CASH" | "QRIS" }) =>
     request<SaleCorrectionImpact>(`/sales/${id}/preview-revise`, { method: "POST", body: input }),
   reviseSale: (
     id: string,
     input: {
       idempotencyKey: string
-      items: { productId: string; qty: number }[]
+      items: SaleLineInput[]
       paymentMethod?: "CASH" | "QRIS"
       reasonCode: ReasonCode
       reasonNote?: string
@@ -1747,7 +1801,7 @@ export const api = {
     id: string,
     input: {
       idempotencyKey: string
-      items: { productId: string; qty: number; stockReturned?: boolean }[]
+      items: { productId: string; variantId?: string; qty: number; stockReturned?: boolean }[]
       condition: "REFUND_NO_STOCK_RETURN" | "REFUND_WITH_STOCK_RETURN" | "PARTIAL_REFUND"
       reasonCode: ReasonCode
       reasonNote?: string
@@ -1972,7 +2026,7 @@ export const api = {
     paymentMethod?: "CASH" | "QRIS"
     payments?: PaymentSplitInput[]
     discount?: number
-    items: { productId: string; qty: number }[]
+    items: SaleLineInput[]
     qrisProofPhotoUrl?: string
   }) => request<SaleResult>("/sales", { method: "POST", body: input }),
 
@@ -1980,7 +2034,7 @@ export const api = {
   createDraftSale: (input: {
     idempotencyKey: string
     shiftSessionId: string
-    items: { productId: string; qty: number }[]
+    items: SaleLineInput[]
     discount?: number
   }) => request<DraftSale>("/sales/draft", { method: "POST", body: input }),
   getMyDrafts: () => request<DraftSale[]>("/sales/drafts"),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Store, Coffee, Users2, AlertTriangle, ChevronDown } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
@@ -101,11 +101,21 @@ export function SalesReportPanel({ start, end }: { start: string; end: string })
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-line bg-white dark:bg-surface">
                   {data.byProduct.map((p, i) => (
-                    <tr key={p.productId}>
-                      <td className="py-2.5 px-3 text-slate-400 dark:text-fg-muted">{i + 1}</td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-fg">{p.productName}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-fg">{p.cupSold} cup</td>
-                    </tr>
+                    <Fragment key={p.productId}>
+                      <tr>
+                        <td className="py-2.5 px-3 text-slate-400 dark:text-fg-muted">{i + 1}</td>
+                        <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-fg">{p.productName}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-fg">{p.cupSold} cup</td>
+                      </tr>
+                      {/* Rincian per rasa (produk bervarian), di bawah produknya. */}
+                      {p.variants.map((v) => (
+                        <tr key={v.name} className="border-t-0!">
+                          <td />
+                          <td className="py-1.5 px-3 pl-6 text-slate-500 dark:text-fg-muted">{v.name}</td>
+                          <td className="py-1.5 px-3 text-right text-slate-600 dark:text-fg-secondary">{v.cupSold} cup</td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                   {data.byProduct.length === 0 && (
                     <tr>

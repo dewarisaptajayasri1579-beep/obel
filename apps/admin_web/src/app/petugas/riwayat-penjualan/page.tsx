@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatRupiah, formatJamJakarta, formatTanggalJakarta } from "../_lib/format";
 import { isNativeBridgeAvailable, printBaris } from "../_lib/native-bridge";
-import { buatStrukPenjualan, labelMetodeBayar } from "@/lib/receipt";
+import { buatStrukPenjualan, labelMetodeBayar, namaItem } from "@/lib/receipt";
 import { usePerusahaan } from "@/lib/use-perusahaan";
 import { GantiMetodeSheet } from "./GantiMetodeSheet";
 
@@ -52,7 +52,7 @@ function RiwayatPenjualanContent() {
           saleNo: s.saleNo,
           waktuIso: s.paidAt ?? s.createdAt,
           barista: s.staffName,
-          items: s.items.map((i) => ({ name: i.productName, qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
+          items: s.items.map((i) => ({ name: namaItem(i), qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal })),
           subtotal: s.subtotal,
           discount: s.discount,
           total: s.total,
