@@ -37,4 +37,25 @@ flutter pub get
 flutter run --dart-define=PWA_URL=http://10.0.2.2:3000/petugas
 ```
 
-`10.0.2.2` adalah alias `localhost` mesin host dari emulator Android. Ganti ke URL staging/produksi PWA saat build rilis.
+`10.0.2.2` adalah alias `localhost` mesin host dari emulator Android. Tanpa `--dart-define`, `PWA_URL` default ke production.
+
+## Build rilis
+
+Application ID `com.obbelcoffee.booth` dan kunci rilis bersifat permanen: APK dengan ID atau tanda tangan lain tidak bisa meng-update app yang sudah terpasang, jadi setiap HP harus uninstall dulu.
+
+- **Kunci:** satu keystore `obbel-booth.jks`, disimpan di luar repo dan di-backup bersama password-nya. Kalau hilang, update berikutnya memaksa semua HP uninstall.
+- **Konfigurasi:** salin `android/key.properties.example` ke `android/key.properties` (gitignored) lalu isi. Tanpa file itu build rilis sengaja gagal (`validateSigningRelease`), tidak jatuh ke debug key.
+- **Versi:** naikkan angka setelah `+` di `version:` pada `pubspec.yaml` (`versionCode`) setiap rilis. Android menolak APK dengan `versionCode` lebih kecil dari yang terpasang.
+
+Membuat keystore (sekali saja; `keytool` dari JDK 17):
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\keystores"
+keytool -genkeypair -v -keystore "$env:USERPROFILE\keystores\obbel-booth.jks" -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias obbel-booth
+```
+
+Build APK (tanpa `--dart-define`, `PWA_URL` default ke production):
+
+```powershell
+flutter build apk --release
+```

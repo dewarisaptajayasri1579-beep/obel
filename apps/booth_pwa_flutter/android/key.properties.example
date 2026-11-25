@@ -1,0 +1,6 @@
+# Copy to android/key.properties (gitignored) and fill in. See the README, "Build rilis".
+# storeFile: absolute path with forward slashes, outside the repo.
+storeFile=C:/Users/<user>/keystores/obbel-booth.jks
+storePassword=
+keyAlias=obbel-booth
+keyPassword=

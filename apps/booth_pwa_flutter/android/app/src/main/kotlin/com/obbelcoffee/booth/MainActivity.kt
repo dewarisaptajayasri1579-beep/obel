@@ -1,4 +1,4 @@
-package com.obelcoffee.booth_pwa_flutter
+package com.obbelcoffee.booth
 
 import io.flutter.embedding.android.FlutterActivity
 
