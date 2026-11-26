@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
+import { useAccess } from "@/lib/auth-context";
 import { QuantityStepperInline } from "@/components/warehouse/QuantityStepperInline";
 import { api, ApiError, REASON_CODE_OPTIONS, type ReasonCode, type StockReturn } from "@/lib/api-client";
 import { randomUUID } from "@/lib/uuid";
@@ -32,6 +33,8 @@ const STATUS_CONFIG: Record<StockReturn["status"], { type: StatusBadgeType; labe
 
 function ReturnContent() {
   const toast = useToast();
+  // Aksi Terima/Batalkan/Revisi/Koreksi butuh Kelola; yang hanya Lihat cukup membaca detail.
+  const canManage = useAccess().canManage("SETOR_PENGEMBALIAN");
   const [returns, setReturns] = useState<StockReturn[] | null>(null);
 
   const [detail, setDetail] = useState<StockReturn | null>(null);
@@ -60,7 +63,7 @@ function ReturnContent() {
       const target = data?.find((r) => r.id === params.get("id"));
       if (!target) return;
       openDetail(target);
-      if (params.get("aksi") === "koreksi" && (target.status === "RECEIVED" || target.status === "DISCREPANCY")) {
+      if (canManage && params.get("aksi") === "koreksi" && (target.status === "RECEIVED" || target.status === "DISCREPANCY")) {
         setMode("correct");
       }
     });
@@ -219,7 +222,7 @@ function ReturnContent() {
               </div>
             )}
 
-            {!mode && detail.status === "SUBMITTED" && (
+            {canManage && !mode && detail.status === "SUBMITTED" && (
               <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
                 <Button leftIcon={<PackageCheck className="w-4 h-4" />} onClick={() => setMode("receive")}>
                   Terima Return
@@ -233,7 +236,7 @@ function ReturnContent() {
               </div>
             )}
 
-            {!mode && (detail.status === "RECEIVED" || detail.status === "DISCREPANCY") && (
+            {canManage && !mode && (detail.status === "RECEIVED" || detail.status === "DISCREPANCY") && (
               <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-200 dark:border-line">
                 <Button variant="secondary" leftIcon={<Wrench className="w-4 h-4" />} onClick={() => setMode("correct")}>
                   Koreksi Penerimaan

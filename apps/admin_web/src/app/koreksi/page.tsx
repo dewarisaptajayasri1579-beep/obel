@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
+import { useAccess } from "@/lib/auth-context";
 import {
   api,
   ApiError,
@@ -93,6 +94,8 @@ function ImpactSnapshotView({ snapshot }: { snapshot: Record<string, unknown> })
 
 function KoreksiContent() {
   const toast = useToast();
+  // Tandai Selesai / Abaikan butuh Kelola Dashboard; yang hanya Lihat cukup membaca kasusnya.
+  const canManage = useAccess().canManage("DASHBOARD");
   const [records, setRecords] = useState<TransactionCorrectionRecord[] | null>(null);
   const [cases, setCases] = useState<ReconciliationCaseRecord[] | null>(null);
   const [entityFilter, setEntityFilter] = useState<string>("");
@@ -182,12 +185,16 @@ function KoreksiContent() {
                   </TableCell>
                   <TableCell>{reasonLabel(c.reasonCode)}</TableCell>
                   <TableCell className="flex gap-2">
-                    <Button size="sm" onClick={() => handleResolve(c.id, "RESOLVED")}>
-                      Tandai Selesai
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => handleResolve(c.id, "IGNORED")}>
-                      Abaikan
-                    </Button>
+                    {canManage && (
+                      <>
+                        <Button size="sm" onClick={() => handleResolve(c.id, "RESOLVED")}>
+                          Tandai Selesai
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleResolve(c.id, "IGNORED")}>
+                          Abaikan
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

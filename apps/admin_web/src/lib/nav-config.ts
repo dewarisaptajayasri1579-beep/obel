@@ -342,13 +342,8 @@ export function filterNav(groups: NavGroup[], boleh: (item: NavItem) => boolean)
   return groups.map((g) => ({ ...g, items: saring(g.items) })).filter((g) => g.items.length > 0);
 }
 
-/** Halaman yang tidak ada di menu (yatim / deep link) ikut menu terdekatnya. */
+/** Halaman yang tidak ada di menu (deep link) ikut menu terdekatnya. */
 const MENU_HALAMAN_LAIN: Record<string, MenuKey> = {
-  "/stok/adjustment": "TAMBAH_STOK_GUDANG",
-  "/stok/gudang": "TAMBAH_STOK_GUDANG",
-  "/stok/opname": "TAMBAH_STOK_GUDANG",
-  "/stok/booth": "BOOTH",
-  "/master/threshold": "BOOTH",
   "/koreksi": "DASHBOARD",
   "/return": "SETOR_PENGEMBALIAN",
 };

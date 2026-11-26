@@ -1050,14 +1050,6 @@ export interface BoothShiftAssignment {
   updatedAt: string
 }
 
-export interface BoothStockThreshold {
-  productId: string
-  productName: string
-  minimumQty: number
-  criticalQty: number
-  isCustomized: boolean
-}
-
 export type ReasonCode =
   | "WRONG_PRODUCT"
   | "WRONG_QTY"
@@ -1095,30 +1087,6 @@ export const REASON_CODE_OPTIONS: { value: ReasonCode; label: string }[] = [
   { value: "OTHER", label: "Lainnya" },
   { value: "EXPIRED", label: "Expired / Tidak Layak Jual" },
 ]
-
-export interface StockOpnameItem {
-  id: string
-  productId: string
-  productName: string
-  expectedQty: number
-  actualQty: number
-  discrepancyQty: number
-}
-
-export interface StockOpname {
-  id: string
-  opnameNo: string
-  locationType: "WAREHOUSE" | "BOOTH"
-  boothId: string | null
-  booth: { id: string; name: string } | null
-  status: "DRAFT" | "CONFIRMED" | "SUPERSEDED"
-  versionNo: number
-  snapshotAt: string
-  confirmedAt: string | null
-  countedBy: { id: string; fullName: string }
-  note: string | null
-  items: StockOpnameItem[]
-}
 
 export interface ReconciliationCaseRecord {
   id: string
@@ -1607,11 +1575,6 @@ export const api = {
     request<UserAccount>(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
 
   getWarehouseStock: () => request<WarehouseStockItem[]>("/warehouse-stock"),
-  adjustWarehouseStock: (input: { productId: string; targetQty: number; reason?: string }) =>
-    request<{ productId: string; qtyOnHand: number; delta: number }>("/warehouse-stock/adjust", {
-      method: "POST",
-      body: input,
-    }),
 
   getDistributions: () => request<Distribution[]>("/distributions"),
   getStockHandovers: (params?: {
@@ -1823,34 +1786,7 @@ export const api = {
   upsertBoothShiftAssignment: (input: { boothId: string; shiftTemplateId: string; staffId: string | null; force?: boolean; reassign?: boolean }) =>
     request<BoothShiftAssignment>("/booth-shift-assignments", { method: "PUT", body: input }),
 
-  getBoothStockThresholds: (boothId: string) =>
-    request<BoothStockThreshold[]>(`/booth-stock-thresholds?boothId=${boothId}`),
-  bulkUpsertBoothStockThresholds: (
-    boothId: string,
-    items: { productId: string; minimumQty: number; criticalQty: number }[],
-  ) =>
-    request<BoothStockThreshold[]>("/booth-stock-thresholds/bulk", {
-      method: "POST",
-      body: { boothId, items },
-    }),
-
-  getStockOpnames: () => request<StockOpname[]>("/stock-opname"),
-  startStockOpname: (input: { locationType: "WAREHOUSE" | "BOOTH"; boothId?: string }) =>
-    request<StockOpname>("/stock-opname", { method: "POST", body: input }),
-  confirmStockOpname: (
-    id: string,
-    input: { idempotencyKey: string; items: { productId: string; actualQty: number }[]; reasonCode: ReasonCode; reasonNote?: string },
-  ) => request<StockOpname>(`/stock-opname/${id}/confirm`, { method: "POST", body: input }),
   getStockAdjustments: () => request<StockAdjustmentRecord[]>("/stock-adjustments"),
-  createStockAdjustment: (input: {
-    idempotencyKey: string
-    locationType: "WAREHOUSE" | "BOOTH"
-    boothId?: string
-    productId: string
-    targetQty: number
-    reasonCode: ReasonCode
-    reasonNote?: string
-  }) => request<StockAdjustmentRecord>("/stock-adjustments", { method: "POST", body: input }),
   /// Pemusnahan Stok Gudang (produk expired / tidak layak jual): qty yang dibuang + foto wajib.
   uploadWriteOffPhoto: (file: File) => uploadPhoto("/stock-adjustments/write-off/photo", file),
   writeOffStock: (input: { idempotencyKey: string; productId: string; qty: number; photoUrl: string; reasonNote?: string }) =>
