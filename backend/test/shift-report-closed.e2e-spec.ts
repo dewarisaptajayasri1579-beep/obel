@@ -80,9 +80,8 @@ describe('Shift report after closing (e2e)', () => {
   async function shiftBaru(): Promise<string> {
     staffToken = await bereskanShiftLama(app, adminToken, staffLoginToken);
     await terimaReturnTertunda();
-    // Void / refund oleh Admin setelah shift CLOSED mengembalikan stok ke Booth tanpa
-    // shift pemilik (sisa itu terbawa ke shift berikutnya) — kosongkan dulu supaya
-    // tiap skenario mulai dari 0.
+    // Sisa stok booth dari run lama (sebelum koreksi shift CLOSED berhenti menggeser stok)
+    // bisa masih ada di DB test — kosongkan dulu supaya tiap skenario mulai dari 0.
     for (let i = 0; i < 2; i++) {
       const checkIn = await request(server()).post('/shifts/check-in').set({ Authorization: `Bearer ${staffLoginToken}` }).send(CHECKIN).expect(201);
       staffToken = checkIn.body.accessToken ?? staffLoginToken;
@@ -139,29 +138,48 @@ describe('Shift report after closing (e2e)', () => {
     expect(await rekap(sid)).toMatchObject({ stokAwal: 10, restock: 3, terjual: 2, sisaSistem: 11 });
   });
 
-  it('admin voiding a sale of the closed shift does not move Awal / Restock / Sisa', async () => {
+  /// Stok booth & ledger shift itu sebelum/sesudah koreksi: hitung fisik Check-Out sudah final,
+  /// jadi koreksi sale tidak boleh menambah stok booth (dulu jadi stok tanpa barang di shift berikutnya).
+  const stokBoothDanMutasi = async (sid: string) => ({
+    booth: (await prisma.boothStock.aggregate({ where: { boothId }, _sum: { qtyOnHand: true } }))._sum.qtyOnHand ?? 0,
+    mutasi: await prisma.stockMovement.count({ where: { shiftSessionId: sid } }),
+  });
+
+  it('admin voiding a sale of the closed shift changes money only, not stock', async () => {
     const { sid, sale } = await shiftTertutup();
+    const sebelum = await stokBoothDanMutasi(sid);
+    const preview = await request(server()).post(`/sales/${sale.id}/preview-void`).set(admin()).expect(201);
+    expect(preview.body.stockDeltas).toEqual([]);
     await request(server()).post(`/sales/${sale.id}/void`).set(admin()).send({ idempotencyKey: randomUUID(), reasonCode: 'WRONG_QTY' }).expect(201);
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status).toBe('VOIDED');
+    expect(await stokBoothDanMutasi(sid)).toEqual(sebelum);
     expect(await rekap(sid)).toMatchObject({ stokAwal: 10, restock: 3, sisaSistem: 11 });
   });
 
-  it('admin refunding (with stock return) a sale of the closed shift does not move Awal / Restock / Sisa', async () => {
+  it('refuses a stock-return refund on a closed shift; a refund without stock return still works', async () => {
     const { sid, sale } = await shiftTertutup();
-    await request(server())
-      .post(`/sales/${sale.id}/refund`)
-      .set(admin())
-      .send({ idempotencyKey: randomUUID(), condition: 'REFUND_WITH_STOCK_RETURN', reasonCode: 'WRONG_QTY', items: [{ productId, qty: 1 }] })
-      .expect(201);
+    const sebelum = await stokBoothDanMutasi(sid);
+    const refund = (condition: string) =>
+      request(server())
+        .post(`/sales/${sale.id}/refund`)
+        .set(admin())
+        .send({ idempotencyKey: randomUUID(), condition, reasonCode: 'WRONG_QTY', items: [{ productId, qty: 1 }] });
+    expect((await refund('REFUND_WITH_STOCK_RETURN').expect(400)).body.code).toBe('SHIFT_STOCK_ALREADY_COUNTED');
+    await refund('REFUND_NO_STOCK_RETURN').expect(201);
+    expect(await stokBoothDanMutasi(sid)).toEqual(sebelum);
     expect(await rekap(sid)).toMatchObject({ stokAwal: 10, restock: 3, sisaSistem: 11 });
   });
 
-  it('admin revising a sale of the closed shift does not move Awal / Restock / Sisa', async () => {
+  it('admin revising a sale of the closed shift changes money only, not stock', async () => {
     const { sid, sale } = await shiftTertutup();
-    await request(server())
+    const sebelum = await stokBoothDanMutasi(sid);
+    const revised = await request(server())
       .post(`/sales/${sale.id}/revise`)
       .set(admin())
       .send({ idempotencyKey: randomUUID(), reasonCode: 'WRONG_QTY', items: [{ productId, qty: 1 }] })
       .expect(201);
+    expect(revised.body.total).toBeLessThan((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).total);
+    expect(await stokBoothDanMutasi(sid)).toEqual(sebelum);
     expect(await rekap(sid)).toMatchObject({ stokAwal: 10, restock: 3, sisaSistem: 11 });
   });
 });

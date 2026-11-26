@@ -450,6 +450,14 @@ Admin boleh correction, tetapi:
 - return reconciliation dapat berubah;
 - correction tercatat sebagai post-close correction.
 
+Implementasi (keputusan 2026-11-26): void dan revisi sale yang shift-nya sudah `CLOSED` **tidak menggeser stok**
+(booth maupun Gudang) dan tidak menulis stock movement; hanya uang, omzet, dan cup terjual yang berubah. Sisa
+stok shift itu sudah dihitung fisik saat Check-Out dan diterima Gudang dengan qty fisik saat Kembali, jadi
+stoknya sudah benar; dulu efek koreksi masuk ke booth sebagai stok tanpa barang dan muncul di Awal shift
+berikutnya. Refund "produk kembali ke stok" untuk shift `CLOSED` ditolak `SHIFT_STOCK_ALREADY_COUNTED`;
+barang yang benar-benar kembali dicatat lewat Tambah Stok Gudang. Rekap ulang selisih/expected closing di
+atas belum diimplementasikan.
+
 ---
 
 ## TX-04 — Payment

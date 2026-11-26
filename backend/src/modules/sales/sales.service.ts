@@ -1253,7 +1253,7 @@ export class SalesService {
 
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
-      include: { items: true, refunds: { include: { items: true } } },
+      include: { items: true, refunds: { include: { items: true } }, shiftSession: { select: { status: true } } },
     });
     if (!sale) {
       throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
@@ -1314,6 +1314,13 @@ export class SalesService {
       if (dto.condition === 'REFUND_WITH_STOCK_RETURN' || item.stockReturned === true) {
         stockDeltas.push({ productId: item.productId, qty: item.qty });
       }
+    }
+    // Barang yang kembali setelah shift Check-Out tidak lagi berada di booth itu (lihat stokSudahDihitung).
+    if (stockDeltas.length > 0 && this.stokSudahDihitung(sale)) {
+      throw new DomainError(
+        'SHIFT_STOCK_ALREADY_COUNTED',
+        'Shift transaksi ini sudah Check-Out, jadi barang kembali tidak bisa dicatat di sini. Catat barangnya lewat Tambah Stok Gudang.',
+      );
     }
 
     const now = new Date();
@@ -1426,7 +1433,7 @@ export class SalesService {
   private async loadVoidableSale(saleId: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
-      include: { items: true, payments: true },
+      include: { items: true, payments: true, shiftSession: { select: { status: true } } },
     });
     if (!sale) {
       throw new DomainError('NOT_FOUND', 'Sale tidak ditemukan.');
@@ -1439,12 +1446,21 @@ export class SalesService {
     return sale;
   }
 
+  /// Shift sudah Check-Out (CLOSED): sisa stoknya sudah dihitung fisik dan diterima Gudang apa
+  /// adanya, jadi koreksi sale tidak boleh menggeser stok lagi (dulu masuk ke booth sebagai stok
+  /// tanpa barang dan muncul di Awal shift berikutnya). Koreksi hanya mengubah uang dan omzet.
+  private stokSudahDihitung(sale: { shiftSession: { status: ShiftStatus } }) {
+    return sale.shiftSession.status === ShiftStatus.CLOSED;
+  }
+
   private buildVoidImpact(sale: Awaited<ReturnType<SalesService['loadVoidableSale']>>) {
-    const stockDeltas: StockDelta[] = sale.items.map((item) => ({
-      productId: item.productId,
-      productName: item.productNameSnapshot,
-      qtyDelta: item.qty,
-    }));
+    const stockDeltas: StockDelta[] = this.stokSudahDihitung(sale)
+      ? []
+      : sale.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productNameSnapshot,
+          qtyDelta: item.qty,
+        }));
     return {
       omzetDelta: -Number(sale.total),
       cupSoldDelta: -sale.items.reduce((sum, i) => sum + i.qty, 0),
@@ -1501,7 +1517,7 @@ export class SalesService {
     const oldItemBySnapshot = new Map(sale.items.map((i) => [i.productId, i]));
     const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
     const stockDeltas: StockDelta[] = [];
-    for (const productId of allProductIds) {
+    for (const productId of this.stokSudahDihitung(sale) ? [] : allProductIds) {
       const oldQty = oldQtyByProduct.get(productId) ?? 0;
       const newQty = newQtyByProduct.get(productId) ?? 0;
       const qtyDelta = newQty - oldQty;
