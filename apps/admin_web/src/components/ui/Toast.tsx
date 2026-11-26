@@ -71,7 +71,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border backdrop-blur-md shadow-xl ${config.bg}`}
                   role="status"
                 >
-                  <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${ICON_COLOR[t.variant]}`} />
+                  <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${ICON_COLOR[t.variant]}`} />
                   <p className="flex-1 text-xs sm:text-sm font-semibold leading-relaxed">{t.message}</p>
                   <button
                     onClick={() => dismiss(t.id)}
