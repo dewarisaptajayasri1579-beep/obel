@@ -181,6 +181,53 @@ describe('RBAC per menu (e2e)', () => {
     );
   });
 
+  it('stops an Admin from resetting or deactivating an Admin with wider access', async () => {
+    const buatPeran = async (nama: string, permissions: { menu: string; level: 'VIEW' | 'MANAGE' }[]) =>
+      (await request(server()).post('/access-roles').set(bearer(ownerToken)).send(peranBody(`${PREFIX} ${nama}`, permissions)).expect(201)).body.id as string;
+    const buatAdmin = async (accessRoleId?: string) =>
+      (
+        await request(server())
+          .post('/users')
+          .set(bearer(ownerToken))
+          .send({ username: `e2e_rbac_${randomUUID().slice(0, 8)}`, password: 'obbel123', fullName: 'E2E Target', role: 'ADMIN', accessRoleId })
+          .expect(201)
+      ).body.id as string;
+    const reset = (id: string, token = ujiToken) => request(server()).post(`/users/${id}/reset-password`).set(bearer(token)).send({ newPassword: 'obbel123' });
+    const dibuat: string[] = [];
+    try {
+      await request(server())
+        .patch(`/users/${ujiId}/access-role`)
+        .set(bearer(ownerToken))
+        .send({ accessRoleId: await buatPeran('Kelola User', [{ menu: 'USER', level: 'MANAGE' }, { menu: 'KASIR', level: 'VIEW' }]) })
+        .expect(200);
+
+      // Admin Akses Penuh: tidak bisa diambil alih atau dikunci, dan datanya tidak berubah.
+      const penuh = await prisma.profile.findUniqueOrThrow({ where: { username: 'admin' } });
+      expect((await reset(penuh.id).expect(403)).body.code).toBe('TARGET_HAS_WIDER_ACCESS');
+      expect((await request(server()).patch(`/users/${penuh.id}`).set(bearer(ujiToken)).send({ active: false }).expect(403)).body.code).toBe('TARGET_HAS_WIDER_ACCESS');
+      const sesudah = await prisma.profile.findUniqueOrThrow({ where: { id: penuh.id } });
+      expect([sesudah.passwordHash, sesudah.active]).toEqual([penuh.passwordHash, true]);
+
+      // Admin terbatas dengan level lebih tinggi di satu menu (Kasir Kelola vs Lihat): ditolak.
+      const lebihTinggi = await buatAdmin(await buatPeran('Kasir Kelola', [{ menu: 'KASIR', level: 'MANAGE' }]));
+      dibuat.push(lebihTinggi);
+      expect((await reset(lebihTinggi).expect(403)).body.code).toBe('TARGET_HAS_WIDER_ACCESS');
+
+      // Akses setara atau lebih sempit, tanpa peran, dan akun sendiri: boleh.
+      const setara = await buatAdmin(await buatPeran('Kasir Lihat', [{ menu: 'KASIR', level: 'VIEW' }]));
+      const tanpaPeran = await buatAdmin();
+      dibuat.push(setara, tanpaPeran);
+      for (const id of [setara, tanpaPeran, ujiId]) await reset(id).expect(201);
+      await request(server()).patch(`/users/${tanpaPeran}`).set(bearer(ujiToken)).send({ active: false }).expect(200);
+
+      // Admin Akses Penuh tetap boleh mengelola Admin terbatas.
+      await reset(lebihTinggi, adminToken).expect(201);
+    } finally {
+      await prisma.profile.deleteMany({ where: { id: { in: dibuat } } });
+      await bersihkanPeran();
+    }
+  });
+
   it('lets only Owner attach an access role while creating an Admin account', async () => {
     const username = `e2e_rbac_${randomUUID().slice(0, 8)}`;
     const akun = (extra: object, role = 'ADMIN') => ({ username, password: 'obbel123', fullName: 'E2E Dibuat Owner', role, ...extra });

@@ -1,9 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { AccessLevel, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { aksesDitolak, pastikanAkses } from '../../common/access/access-denied';
+import { hitungAkses, punyaAkses } from '../../common/access/access-rules';
+import { ACCESS_ROLE_SELECT } from '../../common/access/access.service';
+import type { MenuKey } from '../../common/access/menus';
 import { DomainError } from '../../common/domain-error';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import type { AuthUser } from '../auth/jwt-payload.interface';
@@ -19,15 +22,32 @@ const SELECT_SAFE_FIELDS = {
   accessRole: { select: { id: true, name: true } },
 } as const;
 
+type PeranTarget = Parameters<typeof hitungAkses>[1];
+
 /// Siapa boleh mengelola akun ber-role tertentu (BR-044): akun Barista lewat menu Barista,
 /// akun Admin lewat menu User (atau Owner), akun Owner hanya oleh Owner.
-function pastikanBolehKelolaAkun(actor: AuthUser, targetRole: UserRole) {
-  if (targetRole === UserRole.OWNER) {
+/// Admin hanya boleh mengelola Admin yang aksesnya tidak lebih luas dari aksesnya sendiri:
+/// tanpa itu Admin terbatas bisa reset password Admin Akses Penuh lalu masuk sebagai dia.
+function pastikanBolehKelolaAkun(actor: AuthUser, target: { role: UserRole; accessRole?: PeranTarget }) {
+  if (target.role === UserRole.OWNER) {
     if (actor.role !== UserRole.OWNER) throw aksesDitolak();
     return;
   }
-  if (targetRole === UserRole.ADMIN) {
-    if (actor.role !== UserRole.OWNER) pastikanAkses(actor, ['USER'], AccessLevel.MANAGE);
+  if (target.role === UserRole.ADMIN) {
+    if (actor.role === UserRole.OWNER) return;
+    pastikanAkses(actor, ['USER'], AccessLevel.MANAGE);
+    const aksesTarget = hitungAkses(UserRole.ADMIN, target.accessRole ?? null).levels;
+    const lebihLuas = (Object.entries(aksesTarget) as [MenuKey, AccessLevel][]).some(
+      ([menu, level]) => !punyaAkses(actor.access, [menu], level),
+    );
+    if (lebihLuas) {
+      throw new DomainError(
+        'TARGET_HAS_WIDER_ACCESS',
+        'Akun ini punya akses yang tidak Anda miliki. Hanya Owner atau Admin dengan akses setara yang bisa mengubahnya.',
+        undefined,
+        HttpStatus.FORBIDDEN,
+      );
+    }
     return;
   }
   pastikanAkses(actor, ['BARISTA'], AccessLevel.MANAGE);
@@ -61,7 +81,7 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, actor: AuthUser) {
-    pastikanBolehKelolaAkun(actor, dto.role);
+    pastikanBolehKelolaAkun(actor, { role: dto.role });
     const existing = await this.prisma.profile.findUnique({ where: { username: dto.username } });
     if (existing) {
       throw new ConflictException(`Username "${dto.username}" sudah dipakai.`);
@@ -126,11 +146,11 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto, actor: AuthUser) {
-    const existing = await this.prisma.profile.findUnique({ where: { id } });
+    const existing = await this.prisma.profile.findUnique({ where: { id }, include: { accessRole: ACCESS_ROLE_SELECT } });
     if (!existing) {
       throw new NotFoundException('User tidak ditemukan.');
     }
-    pastikanBolehKelolaAkun(actor, existing.role);
+    pastikanBolehKelolaAkun(actor, existing);
     // Menonaktifkan akun sendiri bisa mengunci satu-satunya Owner/Admin di luar sistem.
     if (dto.active === false && id === actor.sub) {
       throw new DomainError('CANNOT_DEACTIVATE_SELF', 'Anda tidak bisa menonaktifkan akun Anda sendiri.');
@@ -151,11 +171,11 @@ export class UsersService {
   /// belum ada infra email di project ini). Admin Pusat mereset password
   /// user manapun dari halaman Master User.
   async resetPassword(id: string, dto: ResetPasswordDto, actor: AuthUser) {
-    const existing = await this.prisma.profile.findUnique({ where: { id } });
+    const existing = await this.prisma.profile.findUnique({ where: { id }, include: { accessRole: ACCESS_ROLE_SELECT } });
     if (!existing) {
       throw new NotFoundException('User tidak ditemukan.');
     }
-    pastikanBolehKelolaAkun(actor, existing.role);
+    pastikanBolehKelolaAkun(actor, existing);
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     return this.prisma.profile.update({

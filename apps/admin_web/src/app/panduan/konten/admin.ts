@@ -350,6 +350,7 @@ export const LAYAR_ADMIN: LayarPanduan[] = [
     perhatian: [
       { teks: "Akun yang dinonaktifkan langsung keluar dari aplikasi. Datanya tetap tersimpan.", tingkat: "info" },
       { teks: "Anda tidak bisa menonaktifkan akun sendiri.", tingkat: "info" },
+      { teks: "Akun Admin dengan akses lebih luas dari akses Anda hanya bisa dikelola Owner atau Admin dengan akses setara.", tingkat: "info" },
     ],
   },
   {
