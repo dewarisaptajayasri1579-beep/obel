@@ -6,6 +6,7 @@ import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from '../src/app.module';
 import { absenTiba } from './support/shift';
+import { ensureBoothStock } from './support/warehouse';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// AC-41 / BR-038 — foto bukti bayar QRIS wajib untuk petugas booth, disimpan
@@ -45,9 +46,8 @@ describe('QRIS payment proof (e2e)', () => {
     await absenTiba(app, boothToken, shiftSessionId);
 
     const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
-    const target = catalog.body.find((p: { qtyOnHand: number }) => p.qtyOnHand >= 12);
-    if (!target) throw new Error('Tidak ada produk dengan stok >= 12 di booth01 (obbel_test) — test tidak bisa jalan.');
-    productId = target.id;
+    productId = catalog.body[0].id;
+    await ensureBoothStock(app, adminToken, boothToken, [productId]);
     const products = await request(server()).get('/products').set('Authorization', `Bearer ${adminToken}`).expect(200);
     price = products.body.find((p: { id: string }) => p.id === productId).sellPrice;
     expect(price).toBeGreaterThan(1);

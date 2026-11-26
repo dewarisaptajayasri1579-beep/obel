@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { absenTiba } from './support/shift';
+import { ensureBoothStock } from './support/warehouse';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// Melunasi draft (POST /sales/:id/pay) harus aman terhadap request dobel
@@ -34,9 +35,8 @@ describe('Draft payment (e2e)', () => {
       .body.shiftSessionId;
     await absenTiba(app, boothToken, shiftSessionId);
     const catalog = await request(server()).get('/catalog').set('Authorization', `Bearer ${boothToken}`).expect(200);
-    const target = catalog.body.find((p: { qtyOnHand: number }) => p.qtyOnHand >= 6);
-    if (!target) throw new Error('Tidak ada produk dengan stok >= 6 di booth01 (obbel_test) — test tidak bisa jalan.');
-    productId = target.id;
+    productId = catalog.body[0].id;
+    await ensureBoothStock(app, adminToken, boothToken, [productId]);
   });
 
   afterAll(async () => {

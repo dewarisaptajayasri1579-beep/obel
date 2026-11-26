@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { absenTiba } from './support/shift';
+import { ensureBoothStock } from './support/warehouse';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 /// Menjalankan acceptance case COR-01/02/03/12 dari
@@ -51,6 +52,7 @@ describe('Sale correction flows (e2e)', () => {
       .set('Authorization', `Bearer ${boothToken}`)
       .expect(200);
     productId = catalog.body[0].id;
+    await ensureBoothStock(app, adminToken, boothToken, [productId]);
   });
 
   afterAll(async () => {
