@@ -40,28 +40,55 @@ function callBridge(action: string, payload: Record<string, unknown>): Promise<u
   });
 }
 
+/// `startGpsTracking` yang sedang berjalan (dialog izin Android bisa masih terbuka) — ditunggu
+/// `isGpsTracking` supaya Beranda tidak menilai "GPS mati" sebelum Barista selesai menjawab izin.
+let gpsStarting: Promise<boolean> | null = null;
+
 /// Mulai kirim lokasi GPS latar belakang (foreground service Android, jalan
-/// walau layar terkunci) — dipanggil SEKALI setelah Check-In berhasil.
-export async function startGpsTracking(shiftId: string): Promise<void> {
-  const token = getToken();
-  if (!token) return;
+/// walau layar terkunci) — dipanggil setelah Check-In berhasil dan dari banner
+/// GPS di Beranda. `false` = gagal (mis. izin lokasi ditolak); tidak pernah
+/// melempar, karena GPS tidak boleh menghalangi Petugas lanjut kerja.
+export function startGpsTracking(shiftId: string): Promise<boolean> {
+  gpsStarting = (async () => {
+    const token = getToken();
+    if (!token) return false;
+    try {
+      // Interval diatur Admin dari peta Booth Aktif > Realtime (AppSettings) —
+      // fallback 60 detik kalau endpoint gagal diakses, supaya GPS tetap jalan
+      // walau settingnya sendiri gagal diambil.
+      const intervalSeconds = await api.getAppSettings().then((s) => s.gpsPingIntervalSeconds).catch(() => 60);
+      await callBridge("gps.start", {
+        apiBaseUrl: BASE_URL,
+        authToken: token,
+        shiftId,
+        locationPath: "shifts/{shiftId}/location-ping",
+        intervalSeconds,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return gpsStarting;
+}
+
+/// Apakah service lokasi Android sedang jalan. `null` di luar APK (browser tidak punya
+/// service itu) atau kalau status tidak bisa dibaca — pemanggil tidak menampilkan apa-apa.
+export async function isGpsTracking(): Promise<boolean | null> {
+  if (!isNativeBridgeAvailable()) return null;
+  await gpsStarting;
   try {
-    // Interval diatur Admin dari peta Booth Aktif > Realtime (AppSettings) —
-    // fallback 60 detik kalau endpoint gagal diakses, supaya GPS tetap jalan
-    // walau settingnya sendiri gagal diambil.
-    const intervalSeconds = await api.getAppSettings().then((s) => s.gpsPingIntervalSeconds).catch(() => 60);
-    await callBridge("gps.start", {
-      apiBaseUrl: BASE_URL,
-      authToken: token,
-      shiftId,
-      locationPath: "shifts/{shiftId}/location-ping",
-      intervalSeconds,
-    });
+    const data = (await callBridge("gps.status", {})) as { tracking?: boolean } | null;
+    return data?.tracking ?? null;
   } catch {
-    // Izin lokasi ditolak dsb — diam-diam gagal, TIDAK boleh menghalangi
-    // Petugas lanjut kerja. Cuma peta Booth Aktif Admin yang tidak dapat
-    // update lokasi real-time, bukan hal yang mem-block Check-In.
+    return null;
   }
+}
+
+/// Buka Pengaturan app Android — jalan pulih kalau izin lokasi sudah ditolak permanen.
+export async function openGpsSettings(): Promise<void> {
+  if (!isNativeBridgeAvailable()) return;
+  await callBridge("gps.openSettings", {}).catch(() => undefined);
 }
 
 /// Hentikan kirim lokasi — dipanggil setelah Check-Out berhasil, supaya

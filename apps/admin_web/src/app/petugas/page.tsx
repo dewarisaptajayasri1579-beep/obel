@@ -27,6 +27,7 @@ import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { formatJamJakarta, formatRupiah, startOfTodayJakarta } from "./_lib/format";
 import { OBBEL, OBBEL_SCALE } from "./_lib/theme";
 import { gabungNotifikasiStok, useDibacaBarista, useNotifikasiBooth } from "./_lib/notifikasi";
+import { GpsWarning } from "./_components/GpsWarning";
 
 const GREEN = OBBEL.primaryDark;
 
@@ -288,6 +289,8 @@ function HomeContent() {
           )}
           <p className="relative text-white/70 text-sm mt-3 font-medium">— Kerja hebat hari ini 💚</p>
         </div>
+
+        <GpsWarning shiftId={shift.shiftSessionId} />
 
         <div className="grid grid-cols-2 gap-3 mt-4">
           {MENU.map((item) => {
