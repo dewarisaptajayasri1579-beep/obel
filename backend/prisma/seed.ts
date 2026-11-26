@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { businessDateOf } from '../src/common/jakarta-date';
 
 const prisma = new PrismaClient();
 
@@ -142,16 +143,31 @@ async function main() {
     },
   });
 
-  // Stok Gudang Pusat — sesuai 16-seed-dummy-data.md §7 ("100–300 cup/product").
-  await Promise.all(
-    createdProducts.map((product) =>
-      prisma.warehouseStock.upsert({
-        where: { productId: product.id },
-        update: {},
-        create: { productId: product.id, qtyOnHand: 300 },
+  // Stok Gudang Pusat — sesuai 16-seed-dummy-data.md §7 ("100–300 cup/product"). Saldo proyeksi
+  // wajib bisa dijelaskan buku besar (stock:reconcile), jadi saldo awal ditulis bersama movement
+  // OPENING-nya; produk yang sudah punya saldo tidak disentuh.
+  const adminId = (await prisma.profile.findUniqueOrThrow({ where: { username: 'admin' } })).id;
+  const now = new Date();
+  for (const product of createdProducts) {
+    if (await prisma.warehouseStock.findUnique({ where: { productId: product.id } })) continue;
+    await prisma.$transaction([
+      prisma.warehouseStock.create({ data: { productId: product.id, qtyOnHand: 300 } }),
+      prisma.stockMovement.create({
+        data: {
+          movementNo: docNo('OPN'),
+          movementType: 'OPENING',
+          productId: product.id,
+          qty: 300,
+          referenceType: 'opening_balance_seed_in',
+          referenceId: product.id,
+          businessDate: businessDateOf(now),
+          occurredAt: now,
+          createdBy: adminId,
+          note: 'Saldo awal Gudang (seed)',
+        },
       }),
-    ),
-  );
+    ]);
+  }
 
   // Distribusi demo berstatus SENT ke Booth 1, supaya alur "Terima Stok" di
   // app Petugas Booth ada datanya begitu backend dites end-to-end.
@@ -166,12 +182,26 @@ async function main() {
     }));
 
     await prisma.$transaction([
-      ...demoItems.map((item) =>
+      ...demoItems.flatMap((item) => [
         prisma.warehouseStock.update({
           where: { productId: item.productId },
           data: { qtyOnHand: { decrement: item.qty } },
         }),
-      ),
+        // Sama seperti DistributionsService: Gudang berkurang saat kiriman dibuat.
+        prisma.stockMovement.create({
+          data: {
+            movementNo: docNo('MOV'),
+            movementType: 'WAREHOUSE_TO_BOOTH',
+            productId: item.productId,
+            qty: item.qty,
+            referenceType: 'stock_distribution',
+            referenceId: demoDistributionId,
+            businessDate: businessDateOf(now),
+            occurredAt: now,
+            createdBy: adminId,
+          },
+        }),
+      ]),
       prisma.stockDistribution.create({
         data: {
           id: demoDistributionId,
@@ -179,8 +209,8 @@ async function main() {
           boothId: mainBooth.id,
           status: 'SENT',
           idempotencyKey: randomUUID(),
-          sentAt: new Date(),
-          createdById: (await prisma.profile.findUniqueOrThrow({ where: { username: 'admin' } })).id,
+          sentAt: now,
+          createdById: adminId,
           note: 'Distribusi awal (seed)',
           items: { createMany: { data: demoItems.map((i) => ({ productId: i.productId, qtySent: i.qty })) } },
         },
