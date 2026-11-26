@@ -70,12 +70,14 @@ export function NotificationBell({ iconButtonClass }: { iconButtonClass: string 
 
   useEffect(() => {
     if (!open) return
+    // Dibuka = ingin melihat yang terbaru, jangan tunggu interval 30 detik.
+    load()
     const tutup = (e: MouseEvent) => {
       if (wadah.current && !wadah.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener("mousedown", tutup)
     return () => document.removeEventListener("mousedown", tutup)
-  }, [open])
+  }, [open, load])
 
   const belumDibaca = items.filter((n) => !sudahDibaca(n)).length
 
