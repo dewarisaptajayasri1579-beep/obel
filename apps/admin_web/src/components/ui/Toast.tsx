@@ -58,8 +58,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ show }}>
       {children}
       {mounted &&
+        // Lapisan paling atas: di atas Modal (z-100), Select (z-110) & kamera Barista (z-100). Dengan
+        // z-index sama, portal yang dipasang belakangan (modal) menutupi toast beserta pesan errornya.
         createPortal(
-          <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2.5 w-full max-w-sm pointer-events-none">
+          <div className="fixed bottom-4 right-4 z-200 flex flex-col gap-2.5 w-full max-w-sm pointer-events-none">
             {toasts.map((t) => {
               const config = VARIANT_CONFIG[t.variant];
               const Icon = config.icon;
