@@ -4,6 +4,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { businessDateKeyJakarta } from '../src/common/jakarta-date';
 
 /// Verifikasi POST /shifts/check-in (Absen Berangkat — self-service open
 /// shift, lihat docs/stock-v2/09-checkin-checkout-petugas.md). Sengaja TIDAK
@@ -133,6 +134,14 @@ describe('Shift check-in (e2e)', () => {
       .set('Authorization', `Bearer ${checkIn.body.accessToken}`)
       .expect(200);
     expect(active.body.shiftSessionId).toBe(checkIn.body.shiftSessionId);
+
+    // businessDate = tanggal Jakarta hari ini (dulu tersimpan mundur sehari), dan muncul di Riwayat Absen bulan ini.
+    const riwayat = await request(app.getHttpServer())
+      .get('/shifts/history')
+      .set('Authorization', `Bearer ${checkIn.body.accessToken}`)
+      .expect(200);
+    const baris = riwayat.body.items.find((i: { id: string }) => i.id === checkIn.body.shiftSessionId);
+    expect(baris?.businessDate.slice(0, 10)).toBe(businessDateKeyJakarta(new Date()));
   });
 
   it('is idempotent when checking in again while already active at the same booth', async () => {

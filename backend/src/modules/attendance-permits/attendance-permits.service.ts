@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../../common/activity-log.service';
 import { DomainError } from '../../common/domain-error';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
-import { startOfDayJakarta, startOfTodayJakarta } from '../../common/jakarta-date';
+import { businessDateOf } from '../../common/jakarta-date';
 import { JwtPayload } from '../auth/jwt-payload.interface';
 import { GrantAttendancePermitDto } from './dto/grant-attendance-permit.dto';
 
@@ -39,7 +39,7 @@ export class AttendancePermitsService {
           point,
           reason: dto.reason.trim(),
           grantedById: user.sub,
-          businessDate: startOfTodayJakarta(),
+          businessDate: businessDateOf(new Date()),
         },
       });
       await this.activityLog.record(tx, {
@@ -57,7 +57,7 @@ export class AttendancePermitsService {
   /// Riwayat izin satu hari (default hari ini, Asia/Jakarta).
   list(date?: Date) {
     return this.prisma.attendancePermit.findMany({
-      where: { businessDate: startOfDayJakarta(date ?? new Date()) },
+      where: { businessDate: businessDateOf(date ?? new Date()) },
       include: { staff: { select: SAFE_PROFILE_SELECT }, grantedBy: { select: SAFE_PROFILE_SELECT } },
       orderBy: { grantedAt: 'desc' },
     });
@@ -66,7 +66,7 @@ export class AttendancePermitsService {
   /// Izin hari ini yang berlaku (GRANTED) dan belum terpakai untuk absen ini (paling lama dulu).
   cariIzin(staffId: string, type: AttendancePermitType, point: AttendancePoint | null) {
     return this.prisma.attendancePermit.findFirst({
-      where: { staffId, type, point, businessDate: startOfTodayJakarta(), usedAt: null, status: AttendancePermitStatus.GRANTED },
+      where: { staffId, type, point, businessDate: businessDateOf(new Date()), usedAt: null, status: AttendancePermitStatus.GRANTED },
       orderBy: { grantedAt: 'asc' },
     });
   }
@@ -78,7 +78,7 @@ export class AttendancePermitsService {
     if (!shift) {
       throw new DomainError('SHIFT_NOT_OPEN', 'Pengajuan pulang cepat hanya untuk shift yang sedang berjalan.');
     }
-    const businessDate = startOfTodayJakarta();
+    const businessDate = businessDateOf(new Date());
     const ada = await this.prisma.attendancePermit.findFirst({
       where: {
         staffId: user.sub,
@@ -123,7 +123,7 @@ export class AttendancePermitsService {
   /// Pengajuan pulang cepat Barista hari ini yang terakhir (null kalau belum pernah mengajukan).
   findMyEarlyCheckout(user: JwtPayload) {
     return this.prisma.attendancePermit.findFirst({
-      where: { staffId: user.sub, type: AttendancePermitType.EARLY_CHECKOUT, businessDate: startOfTodayJakarta(), usedAt: null },
+      where: { staffId: user.sub, type: AttendancePermitType.EARLY_CHECKOUT, businessDate: businessDateOf(new Date()), usedAt: null },
       orderBy: { grantedAt: 'desc' },
     });
   }

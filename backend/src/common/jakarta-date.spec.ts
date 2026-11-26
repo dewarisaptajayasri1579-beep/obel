@@ -1,5 +1,6 @@
 import {
   businessDateKeyJakarta,
+  businessDateOf,
   combineJakartaDateAndTime,
   startOfDayJakarta,
 } from './jakarta-date';
@@ -41,5 +42,13 @@ describe('jakarta-date', () => {
     expect(combineJakartaDateAndTime(businessDate, '16:30').toISOString()).toBe(
       '2026-03-05T09:30:00.000Z',
     );
+  });
+
+  it('businessDateOf gives the Jakarta calendar date at UTC midnight, which combineJakartaDateAndTime also accepts', () => {
+    const pagiJakarta = new Date('2026-03-05T01:00:00.000Z'); // 08:00 Jakarta
+    const dinihariJakarta = new Date('2026-03-04T17:30:00.000Z'); // 00:30 Jakarta, still 03-04 in UTC
+    expect(businessDateOf(pagiJakarta).toISOString()).toBe('2026-03-05T00:00:00.000Z');
+    expect(businessDateOf(dinihariJakarta).toISOString()).toBe('2026-03-05T00:00:00.000Z');
+    expect(combineJakartaDateAndTime(businessDateOf(pagiJakarta), '08:00').toISOString()).toBe('2026-03-05T01:00:00.000Z');
   });
 });

@@ -15,10 +15,9 @@ import { DomainError } from '../../common/domain-error';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { pastikanBaristaSudahKembali } from '../../common/shift-return-guard';
 import {
-  batasBulanJakarta,
+  businessDateOf,
   combineJakartaDateAndTime,
   formatJamJakarta,
-  startOfTodayJakarta,
 } from '../../common/jakarta-date';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReturnsService } from '../returns/returns.service';
@@ -159,7 +158,7 @@ export class ShiftsService {
     }
     const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.DEPART, dto, await this.acuanGudang());
 
-    const businessDate = startOfTodayJakarta();
+    const businessDate = businessDateOf(new Date());
     const openedAt = new Date();
     const template = await this.templateUntukBerangkat(user.sub, businessDate, assignment.shiftTemplate);
     const scheduledStartAt = combineJakartaDateAndTime(businessDate, template.startTime);
@@ -205,7 +204,7 @@ export class ShiftsService {
       include: { shiftTemplate: true },
     });
     if (!assignment) return null;
-    const t = await this.templateUntukBerangkat(user.sub, startOfTodayJakarta(), assignment.shiftTemplate);
+    const t = await this.templateUntukBerangkat(user.sub, businessDateOf(new Date()), assignment.shiftTemplate);
     return { id: t.id, name: t.name, startTime: t.startTime, endTime: t.endTime };
   }
 
@@ -843,7 +842,9 @@ export class ShiftsService {
     const [tahun, bulan] = month
       ? month.split('-').map(Number)
       : [jakartaNow.getUTCFullYear(), jakartaNow.getUTCMonth() + 1];
-    const { awal, akhir } = batasBulanJakarta(bulan, tahun);
+    // businessDate kolom DATE polos (businessDateOf): batas bulannya tanggal UTC murni, bukan instant Jakarta.
+    const awal = new Date(Date.UTC(tahun, bulan - 1, 1));
+    const akhir = new Date(Date.UTC(tahun, bulan, 1));
 
     const shifts = await this.prisma.shiftSession.findMany({
       where: { staffId: user.sub, businessDate: { gte: awal, lt: akhir } },

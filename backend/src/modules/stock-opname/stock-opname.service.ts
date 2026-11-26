@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainError } from '../../common/domain-error';
 import { nomorSekuensialBerikutnya, nomorMovementBerikutnya } from '../../common/doc-no';
-import { startOfTodayJakarta, businessDateOf } from '../../common/jakarta-date';
+import { businessDateOf } from '../../common/jakarta-date';
 import { SAFE_PROFILE_SELECT } from '../../common/safe-profile';
 import { CorrectionsService } from '../corrections/corrections.service';
 import { ReconciliationCasesService } from '../reconciliation-cases/reconciliation-cases.service';
@@ -58,7 +58,7 @@ export class StockOpnameService {
           opnameNo: await this.nomorOpnameBerikutnya(tx),
           locationType: dto.locationType,
           boothId: dto.locationType === OpnameLocationType.BOOTH ? dto.boothId : null,
-          businessDate: startOfTodayJakarta(),
+          businessDate: businessDateOf(new Date()),
           status: OpnameStatus.DRAFT,
           countedById: user.sub,
           items: {

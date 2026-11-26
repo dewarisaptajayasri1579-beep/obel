@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AttendancePermitStatus, CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
-import { startOfTodayJakarta } from '../../common/jakarta-date';
+import { businessDateOf, startOfTodayJakarta } from '../../common/jakarta-date';
 import { BOOTH_STOCK_TERLIHAT } from '../booth-stock/booth-stock.service';
 
 export interface NotificationItem {
@@ -57,7 +57,7 @@ export class NotificationsService {
         }),
         // Pengajuan pulang cepat Barista hari ini yang menunggu keputusan Admin (B4).
         this.prisma.attendancePermit.findMany({
-          where: { status: AttendancePermitStatus.REQUESTED, businessDate: startOfTodayJakarta() },
+          where: { status: AttendancePermitStatus.REQUESTED, businessDate: businessDateOf(new Date()) },
           include: { staff: { select: { fullName: true } } },
           orderBy: { grantedAt: 'desc' },
         }),

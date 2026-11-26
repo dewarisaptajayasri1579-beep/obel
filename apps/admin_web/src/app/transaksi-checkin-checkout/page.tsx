@@ -59,9 +59,9 @@ const PERIODE_OPTIONS: { value: Periode; label: string }[] = [
 ];
 
 /// Batas [awal, akhir) periode di zona Asia/Jakarta (offset tetap +7, tidak
-/// ada DST), dibandingkan langsung terhadap `businessDate` yang juga
-/// disimpan sebagai tengah malam Jakarta (lihat startOfTodayJakarta di
-/// backend) — sama pola dgn Periode di Transaksi Kasir, ditambah CUSTOM.
+/// ada DST), dibandingkan langsung terhadap `businessDate` (tanggal Jakarta
+/// pukul 00.00 UTC, lihat businessDateOf di backend; jatuh di dalam hari
+/// Jakarta yang sama) — sama pola dgn Periode di Transaksi Kasir, ditambah CUSTOM.
 function rentangPeriode(
   periode: Periode,
   customDari: string,

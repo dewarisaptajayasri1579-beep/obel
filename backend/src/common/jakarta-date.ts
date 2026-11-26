@@ -3,6 +3,8 @@ const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 /// Awal hari ini menurut Asia/Jakarta, dinyatakan sebagai instant UTC —
 /// dipakai karena laporan harian dikelompokkan per tanggal lokal
 /// (02-system-architecture.md §7), sementara timestamp di DB tetap UTC.
+/// Hanya untuk membandingkan kolom TIMESTAMP. Jangan ditulis ke kolom `@db.Date`
+/// (tersimpan mundur sehari); untuk itu pakai `businessDateOf`.
 export function startOfTodayJakarta(): Date {
   return startOfDayJakarta(new Date());
 }
@@ -17,7 +19,7 @@ export function startOfDayJakarta(date: Date): Date {
   return new Date(startOfDayWallClock - JAKARTA_OFFSET_MS);
 }
 
-/// Gabungkan tanggal bisnis Asia/Jakarta (dari startOfDayJakarta) dengan jam
+/// Gabungkan tanggal bisnis Asia/Jakarta (dari businessDateOf atau startOfDayJakarta, hasilnya sama) dengan jam
 /// "HH:mm" jadi satu instant UTC, mis. untuk ShiftSession.scheduledStartAt.
 export function combineJakartaDateAndTime(businessDate: Date, hhmm: string): Date {
   const [hours, minutes] = hhmm.split(':').map(Number);
