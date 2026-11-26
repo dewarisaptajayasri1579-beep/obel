@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -26,6 +26,7 @@ export const Modal: React.FC<ModalProps> = ({
   closeOnBackdropClick = true,
 }) => {
   const [mounted, setMounted] = useState(false);
+  const titleId = useId();
 
   useEffect(() => {
     setMounted(true);
@@ -69,6 +70,9 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Card */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={`relative w-full ${sizeClasses[size]} glass-modal p-6 sm:p-8 rounded-4xl shadow-2xl z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] my-auto`}
       >
         {/* Header */}
@@ -76,11 +80,11 @@ export const Modal: React.FC<ModalProps> = ({
           <div className="flex items-start justify-between pb-4 border-b border-slate-200/60 dark:border-line mb-5 gap-4">
             <div>
               {title && typeof title === "string" ? (
-                <h3 className="text-xl font-bold text-slate-800 dark:text-fg tracking-tight">
+                <h3 id={titleId} className="text-xl font-bold text-slate-800 dark:text-fg tracking-tight">
                   {title}
                 </h3>
               ) : (
-                title
+                title && <div id={titleId}>{title}</div>
               )}
               {subtitle && typeof subtitle === "string" ? (
                 <p className="text-sm text-slate-600 dark:text-fg-muted font-medium mt-1">
