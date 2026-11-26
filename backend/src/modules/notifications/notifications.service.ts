@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { AttendancePermitStatus, CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
+import { AccessLevel, AttendancePermitStatus, CashDepositStatus, DistributionStatus, ReturnStatus, ShiftStatus } from '@prisma/client';
+import { punyaAkses, type UserAccess } from '../../common/access/access-rules';
+import type { MenuKey } from '../../common/access/menus';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveStockStatus } from '../../common/stock-status';
 import { businessDateOf, startOfTodayJakarta } from '../../common/jakarta-date';
@@ -12,6 +14,23 @@ export interface NotificationItem {
   type: 'info' | 'success' | 'warning' | 'error';
   readAt: null;
   createdAt: string;
+}
+
+/// Menu tujuan tiap jenis notifikasi Admin (sama dengan halaman yang dibuka bel di admin web,
+/// NotificationBell). Bel hanya menampilkan item yang menunya boleh dilihat user (BR-044).
+const NOTIFICATION_MENUS: [prefix: string, menu: MenuKey][] = [
+  ['lowstock:', 'BOOTH_AKTIF'],
+  ['pending:distributions', 'SERAH_TERIMA_STOK'],
+  ['pending:restock', 'SERAH_TERIMA_STOK'],
+  ['pending:approve', 'SETOR_PENGEMBALIAN'],
+  ['pending:early-checkout', 'CHECKIN_CHECKOUT'],
+  ['reconciliation:', 'DASHBOARD'],
+];
+
+/// Jenis yang tidak terpetakan disembunyikan (fail-closed).
+export function canSeeNotification(access: UserAccess, id: string): boolean {
+  const menu = NOTIFICATION_MENUS.find(([prefix]) => id.startsWith(prefix))?.[1];
+  return !!menu && punyaAkses(access, [menu], AccessLevel.VIEW);
 }
 
 /// Notifikasi diturunkan langsung dari kondisi real-time (stok kritis,

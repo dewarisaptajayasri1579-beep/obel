@@ -12,6 +12,7 @@ import { ROLES_KEY } from '../src/modules/auth/decorators/roles.decorator';
 import { RolesGuard } from '../src/modules/auth/guards/roles.guard';
 import { BoothAktifGateway } from '../src/modules/dashboard/booth-aktif.gateway';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { isiUlangGudang } from './support/warehouse';
 
 /// BR-044 — RBAC per menu: Owner membuat peran & memasangnya ke Admin; hak akses dibaca dari DB
 /// tiap request (berlaku langsung); endpoint Admin/Owner tanpa aturan akses ditolak (fail-closed).
@@ -286,6 +287,39 @@ describe('RBAC per menu (e2e)', () => {
     await request(server()).get('/users/me').set(bearer(ujiToken)).expect(401);
     await request(server()).patch(`/users/${ujiId}`).set(bearer(ownerToken)).send({ active: true }).expect(200);
     await request(server()).get('/users/me').set(bearer(ujiToken)).expect(200);
+  });
+
+  it('filters the Admin bell by menu access', async () => {
+    // Satu distribusi SENT supaya bel pasti berisi item Serah Terima (dibatalkan lagi di akhir).
+    const [booth] = (await request(server()).get('/booths').set(bearer(adminToken)).expect(200)).body;
+    const [product] = (await request(server()).get('/products').set(bearer(adminToken)).expect(200)).body;
+    await isiUlangGudang(app, adminToken, [product.id]);
+    const dist = (
+      await request(server())
+        .post('/distributions')
+        .set(bearer(adminToken))
+        .send({ idempotencyKey: randomUUID(), boothId: booth.id, items: [{ productId: product.id, qty: 1 }] })
+        .expect(201)
+    ).body;
+    const bel = async (token: string) => ((await request(server()).get('/notifications').set(bearer(token)).expect(200)).body as { id: string }[]).map((n) => n.id);
+    try {
+      expect(await bel(adminToken)).toContain('pending:distributions');
+      expect(await bel(ownerToken)).toContain('pending:distributions');
+      expect(await bel(ujiToken)).toEqual([]);
+
+      const peran = (await request(server()).post('/access-roles').set(bearer(ownerToken)).send(peranBody(`${PREFIX} Serah Terima`, [{ menu: 'SERAH_TERIMA_STOK', level: 'VIEW' }])).expect(201)).body;
+      await request(server()).patch(`/users/${ujiId}/access-role`).set(bearer(ownerToken)).send({ accessRoleId: peran.id }).expect(200);
+      const terlihat = await bel(ujiToken);
+      expect(terlihat).toContain('pending:distributions');
+      expect(terlihat.every((id) => id.startsWith('pending:distributions') || id.startsWith('pending:restock'))).toBe(true);
+    } finally {
+      await bersihkanPeran();
+      await request(server())
+        .post(`/distributions/${dist.id}/cancel`)
+        .set(bearer(adminToken))
+        .send({ idempotencyKey: randomUUID(), reasonCode: 'TRANSACTION_NEVER_HAPPENED' })
+        .expect(201);
+    }
   });
 
   it('closes the Booth Aktif socket for an Admin without View on that menu', async () => {
