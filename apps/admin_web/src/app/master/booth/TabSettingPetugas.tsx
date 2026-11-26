@@ -197,7 +197,8 @@ export function TabSettingPetugas({ booths }: { booths: Booth[] }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500 dark:text-fg-muted">
-        Barista default per Booth &amp; shift. Pilihan langsung tersimpan, tanpa tombol Simpan. Satu barista hanya
+        Jadwal bawaan Barista per Booth &amp; shift; Barista bisa memilih booth dan shift lain saat Absen Berangkat. Pilihan
+        langsung tersimpan, tanpa tombol Simpan. Satu barista hanya
         satu Booth dan satu Shift; memilih barista dari slot lain akan memindahkannya.
       </p>
 

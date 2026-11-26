@@ -109,8 +109,8 @@ export class ShiftsService {
   }
 
   /// Absen Berangkat — membuka ShiftSession (SCHEDULED tidak pernah dibuat
-  /// duluan, jadi langsung create berstatus OPEN) di Booth roster staff ybs
-  /// (BoothShiftAssignment). Booth tempat bertugas dipilih saat Absen Tiba (arrive).
+  /// duluan, jadi langsung create berstatus OPEN) di booth & shift pilihan Barista, bawaannya
+  /// roster (BoothShiftAssignment). Booth masih bisa diganti saat Absen Tiba (arrive).
   /// Idempotent terhadap double-tap: kalau staff SUDAH aktif, kembalikan session
   /// yang sudah ada apa adanya alih-alih membuat baris baru. Guard ini sudah
   /// dijamin race-safe di level DB juga lewat partial unique index
@@ -140,27 +140,34 @@ export class ShiftsService {
       );
     }
 
+    // Roster (Setting Barista) hanya nilai bawaan: Barista boleh memilih booth & shift lain.
     const assignment = await this.prisma.boothShiftAssignment.findUnique({
       where: { staffId: user.sub },
       include: { shiftTemplate: true },
     });
-    if (!assignment) {
-      throw new DomainError(
-        'NO_BOOTH_ASSIGNMENT',
-        'Anda belum ditugaskan ke Booth manapun. Hubungi Admin untuk mengatur penugasan Booth/Shift.',
-      );
+    const businessDate = businessDateOf(new Date());
+    const boothId = dto.boothId ?? assignment?.boothId;
+    let template;
+    if (dto.shiftTemplateId) {
+      const chosen = await this.prisma.shiftTemplate.findUnique({ where: { id: dto.shiftTemplateId } });
+      if (!chosen?.active) {
+        throw new DomainError('SHIFT_TEMPLATE_INACTIVE', 'Shift tidak ditemukan atau sudah nonaktif.');
+      }
+      template = chosen;
+    } else {
+      template = await this.templateUntukBerangkat(user.sub, businessDate, assignment?.shiftTemplate ?? null);
+    }
+    if (!boothId || !template) {
+      throw new DomainError('DEPART_CHOICE_REQUIRED', 'Pilih booth dan shift untuk Absen Berangkat.');
     }
 
-    const boothId = assignment.boothId;
     const booth = await this.prisma.booth.findUnique({ where: { id: boothId } });
     if (!booth || booth.status !== 'ACTIVE') {
       throw new DomainError('BOOTH_INACTIVE', 'Booth tidak ditemukan atau sudah nonaktif.');
     }
     const lokasi = await this.periksaLokasi(user.sub, AttendancePoint.DEPART, dto, await this.acuanGudang());
 
-    const businessDate = businessDateOf(new Date());
     const openedAt = new Date();
-    const template = await this.templateUntukBerangkat(user.sub, businessDate, assignment.shiftTemplate);
     const scheduledStartAt = combineJakartaDateAndTime(businessDate, template.startTime);
     const scheduledEndAt = combineJakartaDateAndTime(businessDate, template.endTime);
 
@@ -197,25 +204,25 @@ export class ShiftsService {
     return this.toActiveShiftResponse(created, await this.reissueToken(user, boothId));
   }
 
-  /// Pratinjau shift untuk layar Absen Berangkat (null kalau belum punya roster).
+  /// Shift bawaan layar Absen Berangkat (null kalau tidak ada: Barista tanpa roster yang belum
+  /// menyelesaikan shift hari ini memilih sendiri).
   async getMyNextTemplate(user: JwtPayload) {
     const assignment = await this.prisma.boothShiftAssignment.findUnique({
       where: { staffId: user.sub },
       include: { shiftTemplate: true },
     });
-    if (!assignment) return null;
-    const t = await this.templateUntukBerangkat(user.sub, businessDateOf(new Date()), assignment.shiftTemplate);
-    return { id: t.id, name: t.name, startTime: t.startTime, endTime: t.endTime };
+    const t = await this.templateUntukBerangkat(user.sub, businessDateOf(new Date()), assignment?.shiftTemplate ?? null);
+    return t && { id: t.id, name: t.name, startTime: t.startTime, endTime: t.endTime };
   }
 
-  /// Shift yang dibuka Berangkat: shift roster, KECUALI Barista sudah menyelesaikan shift hari ini
+  /// Shift bawaan saat Berangkat: shift roster, KECUALI Barista sudah menyelesaikan shift hari ini
   /// (Check-Out + Kembali) — lanjut shift berarti shift aktif berikutnya menurut jam mulai, supaya
   /// jam selesai & aturan pulang cepat ikut shift yang benar-benar dijalani. Tidak ada shift
-  /// berikutnya → shift roster. `businessDate` dihitung dengan fungsi yang sama saat disimpan.
+  /// berikutnya → shift roster (null tanpa roster). `businessDate` dihitung dengan fungsi yang sama saat disimpan.
   private async templateUntukBerangkat(
     staffId: string,
     businessDate: Date,
-    roster: { id: string; name: string; startTime: string; endTime: string },
+    roster: { id: string; name: string; startTime: string; endTime: string } | null,
   ) {
     const terakhir = await this.prisma.shiftSession.findFirst({
       where: { staffId, businessDate, status: ShiftStatus.CLOSED, returnedAt: { not: null } },

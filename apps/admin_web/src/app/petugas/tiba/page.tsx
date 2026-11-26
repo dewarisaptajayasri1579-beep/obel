@@ -14,7 +14,7 @@ import { OBBEL } from "../_lib/theme";
 const GREEN = OBBEL.primaryDark;
 
 /// Absen Tiba di Booth (titik 2 dari 4, BR-042) — wajib sebelum Kasir dan Check-Out. Barista
-/// memilih booth tempat bertugas; booth jadwal terpilih otomatis. Memilih booth lain minta
+/// memilih booth tempat bertugas; booth pilihan saat Berangkat terpilih otomatis. Memilih booth lain minta
 /// konfirmasi, karena stok yang dibawa ikut dipindahkan ke booth itu.
 function TibaContent() {
   const shift = useActiveShift();
@@ -60,7 +60,7 @@ function TibaContent() {
               <Store size={16} style={{ color: GREEN }} />
               <span className="text-base font-bold text-slate-800">Booth</span>
             </div>
-            <p className="text-sm text-slate-500 mb-3">Jadwal Anda: {jadwal.name}.</p>
+            <p className="text-sm text-slate-500 mb-3">Booth saat Berangkat: {jadwal.name}.</p>
 
             <button
               type="button"
@@ -82,7 +82,7 @@ function TibaContent() {
                     style={b.id === boothId ? { color: GREEN, fontWeight: 700 } : undefined}
                   >
                     {b.name}
-                    {b.id === jadwal.id && <span className="text-sm font-medium text-slate-400">Jadwal</span>}
+                    {b.id === jadwal.id && <span className="text-sm font-medium text-slate-400">Berangkat</span>}
                   </button>
                 ))}
               </div>
@@ -102,7 +102,7 @@ function TibaContent() {
           <div className="w-full max-w-md mx-auto bg-white rounded-t-[28px] p-5 flex flex-col gap-4">
             <p className="font-extrabold text-lg text-slate-900">Absen di booth lain?</p>
             <p className="text-base text-slate-600">
-              Anda dijadwalkan di {jadwal.name}. Yakin absen di {calon.name}? Stok yang Anda bawa ikut dipindahkan ke {calon.name}.
+              Anda berangkat untuk {jadwal.name}. Yakin absen di {calon.name}? Stok yang Anda bawa ikut dipindahkan ke {calon.name}.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <button type="button" onClick={() => setCalon(null)} className="rounded-xl border border-slate-200 py-3.5 font-bold text-slate-700">

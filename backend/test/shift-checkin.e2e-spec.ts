@@ -16,7 +16,9 @@ describe('Shift check-in (e2e)', () => {
   let adminToken: string;
   let boothId: string;
   let otherBoothId: string;
+  let otherBoothCashFloat: number;
   let shiftTemplateId: string;
+  let otherShiftTemplateId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -40,12 +42,14 @@ describe('Shift check-in (e2e)', () => {
       .expect(200);
     boothId = booths.body[0].id;
     otherBoothId = booths.body[1].id;
+    otherBoothCashFloat = Number(booths.body[1].cashFloat);
 
     const templates = await request(app.getHttpServer())
       .get('/shift-templates')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     shiftTemplateId = templates.body[0].id;
+    otherShiftTemplateId = templates.body.find((t: { id: string; active: boolean }) => t.active && t.id !== shiftTemplateId).id;
   });
 
   afterAll(async () => {
@@ -103,14 +107,22 @@ describe('Shift check-in (e2e)', () => {
     expect(res.body.code).toBe('NOT_FOUND');
   });
 
-  it('rejects check-in for a staff with no BoothShiftAssignment', async () => {
+  it('lets a staff without a roster depart only after picking a booth and a shift', async () => {
     const token = await createFreshBoothStaff();
-    const res = await request(app.getHttpServer())
-      .post('/shifts/check-in')
-      .set('Authorization', `Bearer ${token}`)
-      .send(SAMPLE_CHECKIN_LOCATION)
-      .expect(400);
-    expect(res.body.code).toBe('NO_BOOTH_ASSIGNMENT');
+    const checkIn = (extra: object) =>
+      request(app.getHttpServer()).post('/shifts/check-in').set('Authorization', `Bearer ${token}`).send({ ...SAMPLE_CHECKIN_LOCATION, ...extra });
+
+    expect((await checkIn({}).expect(400)).body.code).toBe('DEPART_CHOICE_REQUIRED');
+    expect((await checkIn({ boothId: otherBoothId }).expect(400)).body.code).toBe('DEPART_CHOICE_REQUIRED');
+    expect((await checkIn({ boothId: otherBoothId, shiftTemplateId: randomUUID() }).expect(400)).body.code).toBe('SHIFT_TEMPLATE_INACTIVE');
+    expect((await checkIn({ boothId: randomUUID(), shiftTemplateId: otherShiftTemplateId }).expect(400)).body.code).toBe('BOOTH_INACTIVE');
+
+    const res = await checkIn({ boothId: otherBoothId, shiftTemplateId: otherShiftTemplateId }).expect(201);
+    expect(res.body.booth.id).toBe(otherBoothId);
+    expect(res.body.cashFloat).toBe(otherBoothCashFloat);
+    // Terima Stok di Gudang membaca boothId dari token baru: harus booth pilihan.
+    const payload = JSON.parse(Buffer.from(res.body.accessToken.split('.')[1], 'base64url').toString('utf8'));
+    expect(payload.boothId).toBe(otherBoothId);
   });
 
   it('creates a new OPEN ShiftSession from the staff BoothShiftAssignment and is readable afterwards', async () => {
@@ -163,22 +175,17 @@ describe('Shift check-in (e2e)', () => {
     expect(second.body.shiftSessionId).toBe(first.body.shiftSessionId);
   });
 
-  it('Berangkat no longer takes a booth: it always opens at the roster booth', async () => {
+  it('treats the roster as a default: Berangkat can pick another booth and shift', async () => {
     const token = await createFreshBoothStaff();
     await assignBooth(token, boothId);
-
-    // The booth is chosen at Absen Tiba now; the field is rejected by validation.
-    await request(app.getHttpServer())
-      .post('/shifts/check-in')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...SAMPLE_CHECKIN_LOCATION, boothId: otherBoothId })
-      .expect(400);
 
     const checkIn = await request(app.getHttpServer())
       .post('/shifts/check-in')
       .set('Authorization', `Bearer ${token}`)
-      .send(SAMPLE_CHECKIN_LOCATION)
+      .send({ ...SAMPLE_CHECKIN_LOCATION, boothId: otherBoothId, shiftTemplateId: otherShiftTemplateId })
       .expect(201);
-    expect(checkIn.body.booth.id).toBe(boothId);
+    expect(checkIn.body.booth.id).toBe(otherBoothId);
+    const templates = await request(app.getHttpServer()).get('/shift-templates').set('Authorization', `Bearer ${token}`).expect(200);
+    expect(checkIn.body.shiftName).toBe(templates.body.find((t: { id: string }) => t.id === otherShiftTemplateId).name);
   });
 });

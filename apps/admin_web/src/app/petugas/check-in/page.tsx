@@ -2,27 +2,88 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, type MyBoothShiftAssignment } from "@/lib/api-client";
+import { api, ApiError, type Booth, type ShiftTemplate } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { RequirePetugasAuth } from "@/components/layout/RequirePetugasAuth";
 import { AbsenScreen } from "../_components/AbsenScreen";
 import { formatRupiah } from "../_lib/format";
 import { startGpsTracking } from "../_lib/native-bridge";
+import { OBBEL } from "../_lib/theme";
 
-/// Absen Berangkat di Gudang (titik 1 dari 4, BR-042) — membuka shift di booth jadwal (roster):
-/// Terima Stok langsung bisa dipakai, uang jalan booth dicatat di shift (BR-043). Booth tempat
-/// bertugas dipilih saat Absen Tiba; Kasir baru bisa dipakai setelah itu.
+const GREEN = OBBEL.primaryDark;
+
+type Option = { id: string; label: string };
+
+/// Dropdown inline seperti pemilih booth di Absen Tiba. `defaultId` = pilihan dari jadwal (roster).
+function ChoicePicker({
+  options,
+  value,
+  defaultId,
+  placeholder,
+  onChange,
+}: {
+  options: Option[];
+  value: string;
+  defaultId?: string;
+  placeholder: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.id === value);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base font-semibold text-slate-800"
+      >
+        <span className={selected ? undefined : "text-slate-400 font-medium"}>{selected?.label ?? placeholder}</span>
+        <ChevronDown size={16} className="text-slate-400" />
+      </button>
+      {open && (
+        <div className="mt-2 rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => {
+                onChange(o.id);
+                setOpen(false);
+              }}
+              className="w-full flex items-center justify-between text-left px-4 py-3 text-base hover:bg-slate-50"
+              style={o.id === value ? { color: GREEN, fontWeight: 700 } : undefined}
+            >
+              {o.label}
+              {o.id === defaultId && <span className="text-sm font-medium text-slate-400">Jadwal</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const formatTime = (hhmm: string) => hhmm.replace(":", ".");
+
+/// Absen Berangkat di Gudang (titik 1 dari 4, BR-042) — membuka shift di booth & shift pilihan Barista,
+/// bawaannya jadwal (roster); Barista tanpa jadwal memilih sendiri. Terima Stok langsung bisa dipakai
+/// untuk booth itu, uang jalan booth dicatat di shift (BR-043). Booth masih bisa diganti saat Absen Tiba;
+/// Kasir baru bisa dipakai setelah itu.
 function CheckInContent() {
   const { session, loading: authLoading, updateToken } = useAuth();
   const router = useRouter();
   const toast = useToast();
 
   const [loadingInit, setLoadingInit] = useState(true);
-  const [assignment, setAssignment] = useState<MyBoothShiftAssignment | null>(null);
-  // Shift yang benar-benar akan dibuka: shift berikutnya kalau hari ini sudah selesai satu shift.
-  const [namaShift, setNamaShift] = useState<string | null>(null);
+  const [booths, setBooths] = useState<Booth[]>([]);
+  const [shifts, setShifts] = useState<ShiftTemplate[]>([]);
+  const [defaultBoothId, setDefaultBoothId] = useState<string>();
+  const [defaultShiftId, setDefaultShiftId] = useState<string>();
+  const [boothId, setBoothId] = useState("");
+  const [shiftTemplateId, setShiftTemplateId] = useState("");
 
   useEffect(() => {
     if (authLoading || !session) return;
@@ -46,9 +107,19 @@ function CheckInContent() {
           router.replace("/petugas/kembali");
           return;
         }
-        const [myAssignment, berikutnya] = await Promise.all([api.getMyAssignment(), api.getNextShiftTemplate()]);
-        setAssignment(myAssignment);
-        setNamaShift(berikutnya?.name ?? null);
+        // Shift bawaan = shift berikutnya kalau hari ini sudah selesai satu shift, selain itu jadwal.
+        const [roster, nextShift, allBooths, allShifts] = await Promise.all([
+          api.getMyAssignment(),
+          api.getNextShiftTemplate(),
+          api.getBooths(),
+          api.getShiftTemplates(),
+        ]);
+        setBooths(allBooths.filter((b) => b.status === "ACTIVE"));
+        setShifts(allShifts.filter((t) => t.active).sort((a, b) => a.startTime.localeCompare(b.startTime)));
+        setDefaultBoothId(roster?.boothId);
+        setDefaultShiftId(nextShift?.id);
+        setBoothId(roster?.boothId ?? "");
+        setShiftTemplateId(nextShift?.id ?? "");
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Gagal memuat data Absen Berangkat.");
       } finally {
@@ -66,16 +137,7 @@ function CheckInContent() {
     );
   }
 
-  if (!assignment) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9F6] max-w-md mx-auto px-6 text-center gap-3">
-        <p className="font-bold text-slate-800">Anda belum ditugaskan ke Booth manapun.</p>
-        <p className="text-base text-slate-500">Hubungi Admin untuk mengatur penugasan Booth/Shift Anda.</p>
-      </div>
-    );
-  }
-
-  const uangJalan = assignment.booth.cashFloat ?? 0;
+  const uangJalan = booths.find((b) => b.id === boothId)?.cashFloat ?? 0;
 
   return (
     <AbsenScreen
@@ -83,8 +145,9 @@ function CheckInContent() {
       subtitle="Absen di Gudang sebelum berangkat ke booth."
       tempat="gudang"
       submitLabel="KONFIRMASI BERANGKAT"
+      canSubmit={!!boothId && !!shiftTemplateId}
       onSubmit={async (absen) => {
-        const result = await api.checkIn(absen);
+        const result = await api.checkIn({ ...absen, boothId, shiftTemplateId });
         if (result.accessToken) updateToken(result.accessToken);
         startGpsTracking(result.shiftSessionId);
         toast.success("Absen Berangkat berhasil. Selamat bekerja!");
@@ -93,18 +156,30 @@ function CheckInContent() {
     >
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-base font-bold text-slate-800 mb-2">Konfirmasi Data Anda</p>
-        <div className="text-base text-slate-600 flex flex-col gap-1.5">
+        <div className="text-base text-slate-600 flex flex-col gap-3">
           <div className="flex justify-between">
             <span className="text-slate-400">Nama</span>
             <span className="font-semibold text-slate-800">{session?.profile.fullName}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-400">Booth jadwal</span>
-            <span className="font-semibold text-slate-800">{assignment.booth.name}</span>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-slate-400">Booth</span>
+            <ChoicePicker
+              options={booths.map((b) => ({ id: b.id, label: b.name }))}
+              value={boothId}
+              defaultId={defaultBoothId}
+              placeholder="Pilih booth"
+              onChange={setBoothId}
+            />
           </div>
-          <div className="flex justify-between">
+          <div className="flex flex-col gap-1.5">
             <span className="text-slate-400">Shift</span>
-            <span className="font-semibold text-slate-800">{namaShift ?? assignment.shiftTemplate.name}</span>
+            <ChoicePicker
+              options={shifts.map((t) => ({ id: t.id, label: `${t.name} ${formatTime(t.startTime)}-${formatTime(t.endTime)}` }))}
+              value={shiftTemplateId}
+              defaultId={defaultShiftId}
+              placeholder="Pilih shift"
+              onChange={setShiftTemplateId}
+            />
           </div>
           {uangJalan > 0 && (
             <div className="flex justify-between">
@@ -113,10 +188,9 @@ function CheckInContent() {
             </div>
           )}
         </div>
-        <p className="text-sm text-slate-500 mt-2">
-          Booth tempat bertugas dipilih saat Absen Tiba.
-          {uangJalan > 0 && " Terima uang jalan dari Admin; dikembalikan utuh saat absen Kembali."}
-        </p>
+        {uangJalan > 0 && (
+          <p className="text-sm text-slate-500 mt-2">Terima uang jalan dari Admin; dikembalikan utuh saat absen Kembali.</p>
+        )}
       </div>
     </AbsenScreen>
   );

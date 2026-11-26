@@ -1966,7 +1966,7 @@ export const api = {
   /// Shift yang akan dibuka Absen Berangkat (shift berikutnya bila hari ini sudah selesai satu shift).
   getNextShiftTemplate: () => request<Pick<ShiftTemplate, "id" | "name" | "startTime" | "endTime"> | null>("/shifts/next-template"),
   getActiveShift: () => request<ActiveShift>("/shifts/active"),
-  checkIn: (input: { latitude: number; longitude: number; photoUrl: string }) =>
+  checkIn: (input: { latitude: number; longitude: number; photoUrl: string; boothId?: string; shiftTemplateId?: string }) =>
     request<ActiveShift>("/shifts/check-in", { method: "POST", body: input }),
   uploadAttendancePhoto: (file: File) => uploadPhoto("/shifts/attendance/photo", file),
   /// Absen Tiba di Booth & Kembali di Gudang (BR-042).

@@ -23,6 +23,7 @@ export function AbsenScreen({
   onSubmit,
   before,
   children,
+  canSubmit = true,
 }: {
   title: string;
   subtitle: string;
@@ -33,6 +34,8 @@ export function AbsenScreen({
   /// Isi di atas lokasi & foto, mis. pilihan booth di Absen Tiba (lokasi dicek terhadap booth itu).
   before?: React.ReactNode;
   children?: React.ReactNode;
+  /// false = tombol konfirmasi nonaktif, mis. booth/shift Berangkat belum dipilih.
+  canSubmit?: boolean;
 }) {
   const toast = useToast();
   // Tombol konfirmasi menempel di bawah layar; tanpa ini bottom nav mengambang menutupinya.
@@ -44,7 +47,7 @@ export function AbsenScreen({
   const [ditolak, setDitolak] = useState<PenolakanLokasi | null>(null);
 
   async function kirim() {
-    if (!location || !photoFile) return;
+    if (!canSubmit || !location || !photoFile) return;
     setSubmitting(true);
     setDitolak(null);
     try {
@@ -97,7 +100,7 @@ export function AbsenScreen({
         <button
           type="button"
           onClick={kirim}
-          disabled={!location || !photoFile || submitting}
+          disabled={!canSubmit || !location || !photoFile || submitting}
           className="w-full flex items-center justify-center rounded-xl py-3.5 font-extrabold text-white disabled:opacity-50"
           style={{ backgroundColor: GREEN }}
         >

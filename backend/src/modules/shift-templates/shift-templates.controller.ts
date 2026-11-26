@@ -15,7 +15,8 @@ export class ShiftTemplatesController {
 
   @Get()
   @Lookup()
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  // Barista: pilihan shift di Absen Berangkat.
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.BOOTH_STAFF)
   findAll() {
     return this.shiftTemplatesService.findAll();
   }

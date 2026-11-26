@@ -46,13 +46,13 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     langkah: [
       { judul: "Ambil lokasi", isi: "Ketuk Ambil Lokasi Saya. Pastikan Anda berada di Gudang." },
       { judul: "Ambil foto selfie", isi: "Ketuk Ambil Foto, lalu potret wajah Anda dengan jelas." },
-      { judul: "Konfirmasi", isi: "Periksa Nama, Booth jadwal, Shift, dan Uang jalan, lalu ketuk KONFIRMASI BERANGKAT. Booth tempat bertugas dipilih saat Absen Tiba." },
+      { judul: "Pilih Booth dan Shift", isi: "Booth dan Shift jadwal Anda sudah terpilih. Bila hari ini bertugas di Booth atau Shift lain, ketuk pilihannya lalu ganti." },
+      { judul: "Konfirmasi", isi: "Periksa Nama, Booth, Shift, dan Uang jalan, lalu ketuk KONFIRMASI BERANGKAT." },
     ],
     perhatian: [
       // BR-042: absen 4 titik, radius dari Gudang (ShiftsService.periksaLokasi).
       { teks: "Absen hanya bisa dilakukan dalam radius Gudang. Bila GPS meleset padahal Anda sudah di lokasi, minta Admin memberi izin absen.", tingkat: "penting" },
       { teks: "Terima uang jalan dari Admin. Uang jalan dikembalikan utuh saat Absen Kembali.", tingkat: "info" },
-      { teks: "Akun yang belum ditugaskan ke Booth tidak bisa absen. Hubungi Admin untuk mengatur penugasan.", tingkat: "info" },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const LAYAR_BARISTA: LayarPanduan[] = [
     gambar: [{ file: "barista-tiba-1.webp", keterangan: "Pilih Booth, konfirmasi lokasi di Booth, dan foto selfie." }],
     langkah: [
       { judul: "Buka absen tiba", isi: "Di Beranda, ketuk ABSEN TIBA DI BOOTH." },
-      { judul: "Pilih Booth", isi: "Booth jadwal sudah terpilih. Bila hari ini bertugas di Booth lain, ketuk pilihan Booth, pilih Booth-nya, lalu ketuk Ya, Pindah." },
+      { judul: "Pilih Booth", isi: "Booth pilihan saat Berangkat sudah terpilih. Bila ternyata bertugas di Booth lain, ketuk pilihan Booth, pilih Booth-nya, lalu ketuk Ya, Pindah." },
       { judul: "Lokasi dan foto", isi: "Ketuk Ambil Lokasi Saya di area Booth, lalu Ambil Foto." },
       { judul: "Konfirmasi", isi: "Ketuk KONFIRMASI TIBA." },
     ],
